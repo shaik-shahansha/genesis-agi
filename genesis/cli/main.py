@@ -1058,7 +1058,7 @@ def daemon_logs(
         import time
         
         try:
-            with open(log_file, 'r') as f:
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
                 # Go to end of file
                 f.seek(0, 2)
                 while True:
@@ -1072,7 +1072,7 @@ def daemon_logs(
     else:
         # Show last N lines
         console.print(f"[cyan]Last {lines} lines of logs for {name}:[/cyan]\n")
-        with open(log_file, 'r') as f:
+        with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
             all_lines = f.readlines()
             for line in all_lines[-lines:]:
                 console.print(line.rstrip())
