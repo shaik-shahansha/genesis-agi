@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # Redis for LLM response caching
+  redis:
+    image: redis:7-alpine
+    container_name: genesis-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - genesis-net
+    command: redis-server --appendonly yes
+
+  # Genesis API Server
+  genesis-api:
+    build: .
+    container_name: genesis-api
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEFAULT_REASONING_MODEL=groq/openai/gpt-oss-120b
+      - DEFAULT_FAST_MODEL=groq/llama-3.1-8b-instant
+      - REDIS_URL=redis://redis:6379
+      - ENABLE_LLM_CACHE=true
+    volumes:
+      - genesis-data:/data
+      - ./genesis:/app/genesis
+    restart: unless-stopped
+    depends_on:
+      - redis
+    networks:
+      - genesis-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Web Playground
+  web-playground:
+    build: ./web-playground
+    container_name: genesis-playground
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - genesis-api
+    restart: unless-stopped
+    networks:
+      - genesis-net
+
+  # Mind Daemon (optional - uncomment to run a Mind 24/7)
+  # genesis-mind:
+  #   build: .
+  #   container_name: genesis-mind-${MIND_ID}
+  #   environment:
+  #     - MIND_ID=${MIND_ID}
+  #     - GROQ_API_KEY=${GROQ_API_KEY:-}
+  #     - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+  #     - REDIS_URL=redis://redis:6379
+  #   volumes:
+  #     - genesis-data:/data
+  #   depends_on:
+  #     - redis
+  #   restart: unless-stopped
+  #   networks:
+  #     - genesis-net
+  #   command: python -m genesis.daemon --mind-id ${MIND_ID}
+
+volumes:
+  redis-data:
+    driver: local
+  genesis-data:
+    driver: local
+
+networks:
+  genesis-net:
+    driver: bridge

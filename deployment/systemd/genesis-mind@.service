@@ -1,0 +1,46 @@
+[Unit]
+Description=Genesis Mind: %i
+After=network.target
+Wants=redis.service
+
+[Service]
+Type=simple
+User=genesis
+Group=genesis
+WorkingDirectory=/opt/genesis
+
+# Environment
+Environment="GENESIS_HOME=/opt/genesis"
+Environment="GENESIS_DATA=/var/lib/genesis"
+Environment="PYTHONUNBUFFERED=1"
+EnvironmentFile=-/etc/genesis/env
+
+# Run daemon
+ExecStart=/usr/bin/python3 -m genesis.daemon --mind-id %i --log-level INFO
+ExecStop=/bin/kill -SIGTERM $MAINPID
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitInterval=120
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/genesis /var/log/genesis
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=2G
+CPUQuota=200%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=genesis-mind-%i
+
+[Install]
+WantedBy=multi-user.target
