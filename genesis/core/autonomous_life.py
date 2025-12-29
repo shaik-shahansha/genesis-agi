@@ -198,7 +198,7 @@ class AutonomousLifeEngine:
     async def start(self):
         """Start the autonomous life system."""
         self.is_running = True
-        logger.info(f"🌟 {self.mind.identity.name} is coming alive...")
+        logger.info(f"[AWAKE] {self.mind.identity.name} is coming alive...")
 
         # Start main life loop
         asyncio.create_task(self._life_loop())
@@ -212,7 +212,7 @@ class AutonomousLifeEngine:
     async def stop(self):
         """Stop the autonomous life system."""
         self.is_running = False
-        logger.info(f"💤 {self.mind.identity.name} is going to sleep...")
+        logger.info(f"[SLEEP] {self.mind.identity.name} is going to sleep...")
 
     # ========================================================================
     # MAIN LOOPS
@@ -357,14 +357,14 @@ class AutonomousLifeEngine:
         activity = event.data.get("activity")
 
         # Execute the activity
-        logger.info(f"⏰ Time-based activity: {activity}")
+        logger.info(f"[TIME] Time-based activity: {activity}")
 
     async def _handle_emotional_shift(self, event: Event):
         """Handle emotional state changes."""
         emotion = event.data.get("emotion")
         intensity = event.data.get("intensity", 0.5)
 
-        logger.info(f"💭 Emotional shift: {emotion} (intensity: {intensity})")
+        logger.info(f"[EMOTION] Emotional shift: {emotion} (intensity: {intensity})")
 
         # Strong emotions might trigger contemplation
         if intensity > 0.8 and self.current_state == LifeState.IDLE:
@@ -376,7 +376,7 @@ class AutonomousLifeEngine:
 
     async def _switch_routine(self, routine: Routine):
         """Switch to a new routine."""
-        logger.info(f"🔄 Switching to routine: {routine.name} ({routine.state})")
+        logger.info(f"[ROUTINE] Switching to routine: {routine.name} ({routine.state})")
 
         self.active_routine = routine
         await self._transition_state(routine.state)
@@ -589,7 +589,7 @@ class AutonomousLifeEngine:
 
     async def _dream_processing(self, use_llm: bool):
         """Process dreams during sleep."""
-        logger.info("💭 Dream processing...")
+        logger.info("[DREAM] Dream processing...")
         if use_llm and hasattr(self.mind, 'consciousness'):
             await self.mind.consciousness.dream(
                 self.mind.orchestrator,

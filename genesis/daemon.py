@@ -228,7 +228,7 @@ class MindDaemon:
                 if self.mind and self.is_running:
                     logger.debug("Saving Mind state...")
                     self.mind.save()
-                    logger.debug("✅ State saved")
+                    logger.debug("[SAVED] State saved")
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -267,7 +267,7 @@ class MindDaemon:
                     # Log detailed health stats every 5 minutes
                     if health_check_count % 5 == 0:
                         logger.info("\n" + "="*60)
-                        logger.info("📊 DETAILED HEALTH REPORT")
+                        logger.info("[HEALTH] DETAILED HEALTH REPORT")
                         logger.info("="*60)
                         
                         # Memory stats
@@ -275,7 +275,7 @@ class MindDaemon:
                             try:
                                 stats = self.mind.memory.get_memory_stats()
                                 recent_memories = self.mind.memory.get_recent_memories(limit=3)
-                                logger.info(f"💾 Memory: {stats.get('total_memories', 0)} total memories")
+                                logger.info(f"[MEMORY] Memory: {stats.get('total_memories', 0)} total memories")
                                 logger.info(f"   Status: {self.mind.state.status}")
                                 if recent_memories:
                                     logger.info(f"   Recent memories:")
@@ -289,7 +289,7 @@ class MindDaemon:
                         if hasattr(self.mind, 'consciousness') and hasattr(self.mind.consciousness, 'get_state'):
                             try:
                                 state = self.mind.consciousness.get_state()
-                                logger.info(f"🧠 Consciousness V2:")
+                                logger.info(f"[CONSCIOUSNESS] Consciousness V2:")
                                 logger.info(f"   Awareness: {state.get('awareness_level', 'unknown')}")
                                 logger.info(f"   Domain: {state.get('current_domain', 'unknown')}")
                                 logger.info(f"   Energy: {state.get('biological', {}).get('energy', 'N/A')}")
@@ -301,7 +301,7 @@ class MindDaemon:
                         if hasattr(self.mind, 'proactive_consciousness'):
                             try:
                                 proactive_stats = self.mind.proactive_consciousness.get_stats()
-                                logger.info(f"💚 Proactive Consciousness:")
+                                logger.info(f"[PROACTIVE] Proactive Consciousness:")
                                 logger.info(f"   Active concerns: {proactive_stats.get('active_concerns', 0)}")
                                 logger.info(f"   Resolved concerns: {proactive_stats.get('resolved_concerns', 0)}")
                                 concerns_by_type = proactive_stats.get('concerns_by_type', {})

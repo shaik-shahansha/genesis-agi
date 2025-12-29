@@ -2,10 +2,10 @@
 Action Executor - The Intelligence Bridge Between Consciousness and Execution
 
 This is the BRAIN of autonomous action - it bridges:
-- LLM decision-making → Actual execution
-- Consciousness thoughts → Real-world actions
-- User requests → Tool/plugin calls
-- Scheduled actions → Timed execution
+- LLM decision-making -> Actual execution
+- Consciousness thoughts -> Real-world actions
+- User requests -> Tool/plugin calls
+- Scheduled actions -> Timed execution
 
 The executor provides:
 1. Function calling for LLMs (like OpenAI's function calling)

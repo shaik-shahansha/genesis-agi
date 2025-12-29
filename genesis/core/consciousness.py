@@ -134,7 +134,7 @@ class ConsciousnessEngine:
                     if self.notification_manager:
                         await self.notification_manager.send_notification(
                             recipient="web_user@genesis.local",  # Default web playground user
-                            title=f"🧠 {self.mind_name} is thinking...",
+                            title=f"[THINKING] {self.mind_name} is thinking...",
                             message=f"Generating autonomous thought #{self.thought_count + 1}",
                             priority="low",
                             metadata={"type": "consciousness_activity", "activity": "thought_generation"}
@@ -149,7 +149,7 @@ class ConsciousnessEngine:
                         if self.notification_manager:
                             await self.notification_manager.send_notification(
                                 recipient="web_user@genesis.local",
-                                title=f"💭 {self.mind_name}'s thought",
+                                title=f"[THOUGHT] {self.mind_name}'s thought",
                                 message=thought[:200] + ("..." if len(thought) > 200 else ""),
                                 priority="low",
                                 metadata={"type": "consciousness_thought", "thought_content": thought}
@@ -161,7 +161,7 @@ class ConsciousnessEngine:
                         if self.notification_manager:
                             await self.notification_manager.send_notification(
                                 recipient="web_user@genesis.local",
-                                title=f"⚠️ {self.mind_name} thought generation issue",
+                                title=f"[WARNING] {self.mind_name} thought generation issue",
                                 message="Failed to generate autonomous thought",
                                 priority="low",
                                 metadata={"type": "consciousness_warning", "issue": "thought_generation_failed"}
@@ -181,13 +181,13 @@ class ConsciousnessEngine:
                     
                     # Occasionally revise/consolidate memories
                     if self.thought_count % 5 == 0 and self.logger:  # More frequent - every 5 thoughts
-                        print(f"\n[{self.mind_name}] 🔄 MEMORY CONSOLIDATION STARTING...")
+                        print(f"\n[{self.mind_name}] [CONSOLIDATING] MEMORY CONSOLIDATION STARTING...")
                         
                         # Send notification to web playground
                         if self.notification_manager:
                             await self.notification_manager.send_notification(
                                 recipient="web_user@genesis.local",
-                                title=f"🧠 {self.mind_name} consolidating memories",
+                                title=f"[MEMORY] {self.mind_name} consolidating memories",
                                 message="Processing and organizing stored memories for better recall",
                                 priority="low",
                                 metadata={"type": "consciousness_activity", "activity": "memory_consolidation"}
@@ -418,7 +418,7 @@ Respond with just the thought itself, no preamble."""
 
         try:
             # Get memories to process
-            print(f"[{self.mind_name}] 🧠 Gathering memories for dream processing...")
+            print(f"[{self.mind_name}] [DREAM] Gathering memories for dream processing...")
             important_memories = memory_manager.get_important_memories(limit=10)
             recent_memories = memory_manager.get_recent_memories(limit=20)
             print(f"[{self.mind_name}]   {len(important_memories)} important memories")

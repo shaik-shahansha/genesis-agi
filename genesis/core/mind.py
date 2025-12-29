@@ -309,7 +309,7 @@ class Mind:
         )
 
         # Test provider connection
-        print(f"🔌 Testing connection to {intelligence.reasoning_model}...")
+        print(f"[TESTING] Testing connection to {intelligence.reasoning_model}...")
         import asyncio
         try:
             # Try to get the running event loop
@@ -330,7 +330,7 @@ class Mind:
             print(f"   {message}")
 
         # Log birth
-        print(f"✨ Mind '{name}' has been born!")
+        print(f"[CREATED] Mind '{name}' has been born!")
         print(f"   GMID: {mind.identity.gmid}")
         print(f"   Fingerprint: {mind.identity.digital_fingerprint}")
         print(f"   Template: {template}")
@@ -591,7 +591,7 @@ class Mind:
             
             self.logger.log(
                 level=LogLevel.INFO,
-                message=f"🎯 LLM requesting action: {function_name}",
+                message=f"[ACTION] LLM requesting action: {function_name}",
                 metadata={"arguments": function_args}
             )
             
@@ -760,10 +760,10 @@ class Mind:
             Dict with results and artifacts
             
         Examples:
-            - "Find cheapest smart watch" → Web scraping
-            - "Analyze this CSV" → pandas code
-            - "Generate presentation on AI" → python-pptx
-            - "Fill form with Excel data" → browser + file processing
+            - "Find cheapest smart watch" -> Web scraping
+            - "Analyze this CSV" -> pandas code
+            - "Generate presentation on AI" -> python-pptx
+            - "Fill form with Excel data" -> browser + file processing
         """
         from genesis.core.autonomous_orchestrator import UploadedFile
         

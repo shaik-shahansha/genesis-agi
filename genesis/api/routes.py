@@ -317,7 +317,7 @@ async def create_mind(
         if request.reasoning_model:
             success, message = await mind.orchestrator.test_provider_connection(request.reasoning_model)
             if not success:
-                print(f"⚠️  Warning: {message}")
+                print(f"[WARNING] Warning: {message}")
                 print(f"   Mind created but may not be able to think until provider is configured.")
 
         # Save
@@ -1399,7 +1399,7 @@ async def websocket_chat(websocket: WebSocket, mind_id: str):
         # Register websocket with notification manager for proactive messages
         if hasattr(mind, 'notification_manager') and mind.notification_manager:
             mind.notification_manager.register_websocket(user_email, websocket)
-            logger.info(f"🔌 WebSocket registered for proactive notifications: {user_email}")
+            logger.info(f"[WEBSOCKET] WebSocket registered for proactive notifications: {user_email}")
             
             # Send any pending notifications that were stored while user was offline
             await send_pending_notifications(mind, user_email, websocket)
