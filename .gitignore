@@ -49,6 +49,11 @@ chroma_db/
 *.log
 logs/
 
+# Node modules
+node_modules/
+web-playground/node_modules/
+mobile-app/node_modules/
+
 # OS
 .DS_Store
 Thumbs.db
