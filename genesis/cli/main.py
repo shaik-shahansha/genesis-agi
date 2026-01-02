@@ -98,10 +98,8 @@ def _interactive_model_selection() -> Intelligence:
         console.print("\n[bold]API Providers:[/bold]\n")
         console.print("  [cyan]🌟 1.[/cyan] OpenRouter (FREE, RECOMMENDED - many free models: DeepSeek, Llama, Qwen)")
         console.print("  [cyan]2.[/cyan] Groq (FREE, ultra-fast)")
-        console.print("  [cyan]3.[/cyan] Google Gemini (FREE)")
-        console.print("  [cyan]4.[/cyan] 🌸 Pollinations AI (FREE forever, no API key, multi-model)")
-        console.print("  [cyan]5.[/cyan] OpenAI (GPT-4, paid - API key required)")
-        console.print("  [cyan]6.[/cyan] Anthropic (Claude, paid - API key required)\n")
+        console.print("  [cyan]3.[/cyan] OpenAI (GPT-4, paid - API key required)")
+        console.print("  [cyan]4.[/cyan] Anthropic (Claude, paid - API key required)\n")
 
         provider_choice = typer.prompt("Select provider", type=int, default=1)
 
@@ -167,32 +165,6 @@ def _interactive_model_selection() -> Intelligence:
             console.print("\n[green][SUCCESS] Using Groq openai/gpt-oss-120b (FREE, ultra-fast)[/green]\n")
 
         elif provider_choice == 3:
-            # Gemini
-            api_key = typer.prompt("Enter Gemini API key (or press Enter to skip)", default="", show_default=False)
-            if api_key:
-                import os
-                os.environ["GEMINI_API_KEY"] = api_key
-                # Store in Intelligence config
-                if not intelligence.api_keys:
-                    intelligence.api_keys = {}
-                intelligence.api_keys['gemini'] = api_key
-
-            intelligence.reasoning_model = "google/gemini-2.5-pro"
-            intelligence.fast_model = "google/gemini-2.5-flash"
-            console.print("\n[green][SUCCESS] Using Google Gemini 2.5 (FREE)[/green]\n")
-
-        elif provider_choice == 4:
-            # Pollinations AI - FREE, no API key required!
-            console.print("\n[bold cyan]🌸 Pollinations AI - 100% FREE![/bold cyan]")
-            console.print("[dim]No API key required - uses free URL-based API[/dim]")
-            console.print("[dim]Using default model (OpenAI GPT-5 Nano)[/dim]\n")
-            
-            # Use default model (no model parameter = uses Pollinations default)
-            intelligence.reasoning_model = "pollinations/default"
-            intelligence.fast_model = "pollinations/default"
-            console.print("[green][SUCCESS] Using Pollinations AI - FREE forever![/green]\n")
-
-        elif provider_choice == 5:
             # OpenAI
             api_key = typer.prompt("Enter OpenAI API key")
             import os
@@ -206,7 +178,7 @@ def _interactive_model_selection() -> Intelligence:
             intelligence.fast_model = "openai/gpt-5-mini"
             console.print("\n[green][SUCCESS] Using OpenAI (GPT-5.2 / GPT-5 mini)[/green]\n")
 
-        elif provider_choice == 6:
+        elif provider_choice == 4:
             # Anthropic
             api_key = typer.prompt("Enter Anthropic API key")
             import os
@@ -233,13 +205,12 @@ def init():
     if not env_path.exists():
         env_template = """# Genesis AGI Framework Configuration
 
-# Model Provider API Keys (Get keys from respective websites)
+# Model Provider API Keys (choose one or more)
 # OpenRouter (RECOMMENDED): https://openrouter.ai/ - Many FREE models!
 OPENROUTER_API_KEY=your-key-here
 
 # Other Providers
 GROQ_API_KEY=your-key-here
-GEMINI_API_KEY=your-key-here
 OPENAI_API_KEY=your-key-here
 ANTHROPIC_API_KEY=your-key-here
 
@@ -248,7 +219,7 @@ DEFAULT_REASONING_MODEL=openrouter/deepseek/deepseek-r1-0528:free
 DEFAULT_FAST_MODEL=openrouter/deepseek/deepseek-r1-0528:free
 DEFAULT_LOCAL_MODEL=ollama/llama3.1
 
-# Ollama Configuration
+# Ollama Configuration (for local models)
 OLLAMA_BASE_URL=http://localhost:11434
 
 # Consciousness Settings

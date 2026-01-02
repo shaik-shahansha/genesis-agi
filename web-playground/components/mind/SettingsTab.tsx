@@ -100,16 +100,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
       'claude-sonnet-4',
       'claude-haiku-4',
     ],
-    gemini: [
-      'gemini-3-pro',
-      'gemini-3-flash',
-      'gemini-2.5-pro',
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-    ],
-    pollinations: [
-      'default',         // Default model (OpenAI GPT-5 Nano - no signup needed)
-    ],
     ollama: [
       'llama2',
       'mistral',
@@ -274,8 +264,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
               >
                 <option value="openrouter">🌟 OpenRouter (Many Free Models - RECOMMENDED)</option>
                 <option value="groq">Groq (Fast & Free)</option>
-                <option value="pollinations">Pollinations AI (Free Multi-Model)</option>
-                <option value="gemini">Google Gemini (Free)</option>
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic (Claude)</option>
               </select>
@@ -299,7 +287,7 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 API Key {['openai', 'anthropic'].includes(provider) && <span className="text-red-500">*</span>}
-                {['groq', 'pollinations'].includes(provider) && <span className="text-green-600 text-xs ml-1">(Optional - Free API)</span>}
+                {['groq', 'openrouter'].includes(provider) && <span className="text-green-600 text-xs ml-1">(Optional - Free tier available)</span>}
               </label>
               <input
                 type="password"
@@ -307,17 +295,14 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
                 onChange={(e) => setApiKey(e.target.value)}
                 className="input w-full"
                 placeholder={
-                  ['groq', 'pollinations'].includes(provider) 
+                  ['groq', 'openrouter'].includes(provider) 
                     ? "Optional - Leave blank for free usage" 
-                    : provider === 'gemini'
-                    ? "Leave blank to use .env or free tier"
                     : "Required - Enter your API key"
                 }
               />
               <p className="text-xs text-gray-500 mt-1">
-                {provider === 'pollinations' && '🌸 Pollinations AI is 100% FREE - No API key required!'}
+                {provider === 'openrouter' && '🌟 OpenRouter has many FREE models available!'}
                 {provider === 'groq' && '⚡ Groq is FREE - API key optional for higher limits'}
-                {provider === 'gemini' && 'Optional - Uses .env configuration or Google AI Studio free tier'}
                 {['openai', 'anthropic'].includes(provider) && '⚠️ Required - Get your key from the provider'}
               </p>
             </div>

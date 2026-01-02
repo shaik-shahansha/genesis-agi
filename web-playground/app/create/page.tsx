@@ -201,27 +201,6 @@ export default function CreateMindPage() {
       cost: 'Free',
       speed: 'Ultra Fast'
     },
-    { 
-      value: 'google/gemini-2.5-pro', 
-      label: 'Google Gemini 2.5 Pro',
-      description: 'Free • Advanced thinking • Best for complex reasoning',
-      cost: 'Free',
-      speed: 'Fast'
-    },
-    { 
-      value: 'google/gemini-2.5-flash', 
-      label: 'Google Gemini 2.5 Flash',
-      description: 'Free • Best price-performance • Fast & intelligent',
-      cost: 'Free',
-      speed: 'Very Fast'
-    },
-    { 
-      value: 'pollinations/default', 
-      label: 'Pollinations AI (Default)',
-      description: 'Free • No API key • Multi-model access • Best all-around',
-      cost: 'Free',
-      speed: 'Fast'
-    },
     // Premium Options
     { 
       value: 'openai/gpt-5.2', 
@@ -603,51 +582,6 @@ export default function CreateMindPage() {
                       console.anthropic.com
                     </a>
                     {' '}• Claude Sonnet 4.5, Claude Haiku 4.5
-                  </p>
-                </div>
-              )}
-
-              {(formData.reasoning_model.startsWith('google/') || formData.fast_model.startsWith('google/')) && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl">✨</span>
-                    <h3 className="text-white font-bold text-lg">Google Gemini API Key</h3>
-                    <Badge variant="success">Free</Badge>
-                  </div>
-                  <input
-                    type="password"
-                    value={formData.api_keys.gemini || ''}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      api_keys: { ...formData.api_keys, gemini: e.target.value }
-                    })}
-                    placeholder="Enter your Gemini API key"
-                    className="input"
-                  />
-                  <p className="text-sm text-gray-300">
-                    Get a free API key at{' '}
-                    <a 
-                      href="https://aistudio.google.com/apikey" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-purple-400 hover:underline"
-                    >
-                      aistudio.google.com
-                    </a>
-                    {' '}• Gemini 2.5 Pro, Gemini 2.5 Flash (Free tier available)
-                  </p>
-                </div>
-              )}
-
-              {(formData.reasoning_model.startsWith('pollinations/') || formData.fast_model.startsWith('pollinations/')) && (
-                <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl">🌸</span>
-                    <h3 className="text-green-300 font-bold">Pollinations AI - No API Key Needed!</h3>
-                  </div>
-                  <p className="text-sm text-gray-300">
-                    Pollinations AI is 100% free and doesn't require an API key. 
-                    You can proceed to the next step!
                   </p>
                 </div>
               )}
