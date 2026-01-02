@@ -79,6 +79,24 @@ export default function NotificationBell() {
     setShowDropdown(false);
   };
 
+  const handleClearAll = async () => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/system/notifications/mark-all-read?user_email=${encodeURIComponent(userEmail)}`,
+        { method: 'POST' }
+      );
+      
+      if (response.ok) {
+        // Clear all notifications from UI
+        setNotifications([]);
+      } else {
+        console.error('Error clearing notifications:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
+  };
+
   const unreadCount = notifications.length;
 
   return (
@@ -108,8 +126,17 @@ export default function NotificationBell() {
           
           {/* Dropdown */}
           <div className="absolute right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
-            <div className="p-3 border-b border-slate-700">
+            <div className="p-3 border-b border-slate-700 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-white">Notifications</h3>
+              {notifications.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white rounded transition-colors"
+                  title="Mark all as read"
+                >
+                  Clear All
+                </button>
+              )}
             </div>
             
             {loading ? (

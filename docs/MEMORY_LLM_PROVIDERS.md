@@ -3,12 +3,12 @@
 ## Overview
 
 Genesis's enhanced memory system is **100% LLM agnostic**! You can use ANY LLM provider:
-- ✅ **Groq** (fastest, free tier available)
-- ✅ **OpenAI** (GPT-4, GPT-4o, GPT-3.5)
-- ✅ **Anthropic** (Claude models)
-- ✅ **Ollama** (100% local, private)
-- ✅ **Google Gemini** (Gemini 1.5 Pro/Flash)
-- ✅ **Any other provider** supported by Genesis
+- [Done] **Groq** (fastest, free tier available)
+- [Done] **OpenAI** (GPT-4, GPT-4o, GPT-3.5)
+- [Done] **Anthropic** (Claude models)
+- [Done] **Ollama** (100% local, private)
+- [Done] **Google Gemini** (Gemini 1.5 Pro/Flash)
+- [Done] **Any other provider** supported by Genesis
 
 ## Memory Components
 
@@ -49,9 +49,9 @@ genesis birth my-mind \
 ```
 
 **What you get:**
-- ✅ Automatic memory extraction
-- ✅ Core memory blocks
-- ✅ Agent self-editing
+- [Done] Automatic memory extraction
+- [Done] Core memory blocks
+- [Done] Agent self-editing
 - ⚠️ No mem0 compression (requires embeddings)
 
 ### Enable mem0 Compression (90% Token Savings)
@@ -218,7 +218,7 @@ genesis birth local-mind \
 
 ### "MemoryExtractor: 'ModelOrchestrator' object has no attribute 'get_client'"
 
-**Status:** ✅ Fixed in latest version
+**Status:** [Done] Fixed in latest version
 
 **Solution:** Update to latest Genesis version or manually fix:
 ```bash
@@ -228,7 +228,7 @@ git pull origin main
 
 ### mem0 compression not working with Groq
 
-**Status:** ✅ Fixed - Groq now fully supported!
+**Status:** [Done] Fixed - Groq now fully supported!
 
 mem0 compression now works with Groq for the LLM. You just need:
 - Groq API key for reasoning/generation
@@ -255,9 +255,9 @@ mem0 compression now works with Groq for the LLM. You just need:
 
 | Feature | Default Enabled | Requires |
 |---------|----------------|----------|
-| **Automatic Extraction** | ✅ Yes | Any LLM |
-| **Core Memory Blocks** | ✅ Yes | Nothing |
-| **Agent Self-Editing** | ✅ Yes | Nothing |
+| **Automatic Extraction** | [Done] Yes | Any LLM |
+| **Core Memory Blocks** | [Done] Yes | Nothing |
+| **Agent Self-Editing** | [Done] Yes | Nothing |
 | **mem0 Compression** | ⚠️ No | Ollama OR OpenAI |
 
 ## Summary
@@ -265,8 +265,8 @@ mem0 compression now works with Groq for the LLM. You just need:
 **You asked:** "do we need openAI key for this, cant we use any llm api?"
 
 **Answer:** 
-- ✅ **You can use ANY LLM provider** for the main Mind reasoning (Groq, Anthropic, Ollama, Gemini, etc.)
-- ✅ **3 out of 4 memory features** work with zero extra setup
+- [Done] **You can use ANY LLM provider** for the main Mind reasoning (Groq, Anthropic, Ollama, Gemini, etc.)
+- [Done] **3 out of 4 memory features** work with zero extra setup
 - ⚠️ **mem0 compression** (90% token savings) requires embeddings:
   - Option 1: Ollama (free, local, recommended)
   - Option 2: OpenAI (only for embeddings, not for main LLM)

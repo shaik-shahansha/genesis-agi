@@ -286,8 +286,8 @@ except Exception as e:
             f"- Tools created: {stats['total_tools']}",
             f"- Tools executed: {stats.get('total_executions', 0)}",
             "",
-            "✅ You can CREATE tools with Python code",
-            "✅ Tools ACTUALLY EXECUTE (real code execution!)",
+            "[Done] You can CREATE tools with Python code",
+            "[Done] Tools ACTUALLY EXECUTE (real code execution!)",
             "⚠️  Execution timeout: {self.execution_timeout}s",
             f"⚠️  Allowed imports: {', '.join(self.allowed_imports)}",
         ]

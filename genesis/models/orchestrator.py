@@ -10,6 +10,7 @@ from genesis.models.groq_provider import GroqProvider
 from genesis.models.ollama_provider import OllamaProvider
 from genesis.models.gemini_provider import GeminiProvider
 from genesis.models.pollinations_provider import PollinationsProvider
+from genesis.models.openrouter_provider import OpenRouterProvider
 
 
 class ModelOrchestrator:
@@ -17,6 +18,7 @@ class ModelOrchestrator:
     Orchestrates multiple model providers and intelligently routes requests.
 
     Supports:
+    - OpenRouter (unified access to many models, many free options)
     - OpenAI (GPT-4, etc.)
     - Anthropic (Claude)
     - Google Gemini (Gemini 1.5 Pro/Flash)
@@ -36,8 +38,27 @@ class ModelOrchestrator:
         self.settings = get_settings()
         self.api_keys = api_keys or {}
         self.providers: dict[str, ModelProvider] = {}
+        
+        # Debug logging
+        if self.api_keys:
+            print(f"[DEBUG orchestrator] Initializing with API keys for providers: {list(self.api_keys.keys())}")
 
         # Initialize providers (prefer passed api_keys over settings)
+        # OpenRouter first (recommended for free models)
+        openrouter_key = self.api_keys.get('openrouter') or self.settings.openrouter_api_key
+        if openrouter_key:
+            try:
+                print(f"[DEBUG orchestrator] Initializing OpenRouter provider")
+                self.providers["openrouter"] = OpenRouterProvider(api_key=openrouter_key)
+                print(f"[DEBUG orchestrator] OpenRouter provider initialized successfully")
+            except ImportError as e:
+                print(f"[WARNING] OpenRouter provider unavailable: {e}")
+                print("Install openai package: pip install openai")
+            except Exception as e:
+                print(f"[ERROR] Failed to initialize OpenRouter provider: {e}")
+                import traceback
+                traceback.print_exc()
+
         openai_key = self.api_keys.get('openai') or self.settings.openai_api_key
         if openai_key:
             self.providers["openai"] = OpenAIProvider(api_key=openai_key)
@@ -63,6 +84,9 @@ class ModelOrchestrator:
         ollama = OllamaProvider(base_url=self.settings.ollama_base_url)
         if ollama.is_available():
             self.providers["ollama"] = ollama
+        
+        # Debug: Show all initialized providers
+        print(f"[DEBUG orchestrator] Providers initialized: {list(self.providers.keys())}")
 
     def parse_model_string(self, model: str) -> tuple[str, str]:
         """

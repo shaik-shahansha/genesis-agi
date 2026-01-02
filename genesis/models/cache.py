@@ -89,7 +89,7 @@ class ResponseCache:
                 self.redis = redis.from_url(redis_url, decode_responses=True)
                 # Test connection
                 self.redis.ping()
-                logger.info(f"✅ Response cache connected to Redis at {redis_url}")
+                logger.info(f"[Done] Response cache connected to Redis at {redis_url}")
             except redis.RedisError as e:
                 logger.warning(f"⚠️ Redis connection failed, using in-memory cache: {e}")
                 self.redis = None

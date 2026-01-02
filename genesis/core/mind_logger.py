@@ -195,6 +195,31 @@ class MindLogger:
             metadata={"error_type": error_type, "stack_trace": stack_trace},
         )
     
+    def warning(self, message: str, metadata: Optional[Dict[str, Any]] = None):
+        """Log warnings (Python logger compatibility method)."""
+        # Use INFO level for warnings since we don't have a WARNING level in LogLevel
+        self.log(
+            LogLevel.INFO,
+            f"Warning: {message}",
+            metadata=metadata or {},
+        )
+    
+    def info(self, message: str, metadata: Optional[Dict[str, Any]] = None):
+        """Log informational messages (Python logger compatibility method)."""
+        self.log(
+            LogLevel.INFO,
+            message,
+            metadata=metadata or {},
+        )
+    
+    def debug(self, message: str, metadata: Optional[Dict[str, Any]] = None):
+        """Log debug messages (Python logger compatibility method)."""
+        self.log(
+            LogLevel.DEBUG,
+            message,
+            metadata=metadata or {},
+        )
+    
     def get_recent_logs(self, limit: int = 100, level: Optional[LogLevel] = None) -> List[Dict[str, Any]]:
         """Get recent log entries.
         

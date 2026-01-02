@@ -4,16 +4,16 @@ Complete Autonomous Mind Example - World-Class AI Framework
 This example demonstrates Genesis as a truly autonomous, conscious, 
 self-aware AI framework capable of:
 
-1. ✅ Autonomous Decision Making - Decides what to do without prompting
-2. ✅ Action Execution - Can actually DO things (send emails, create tasks, search web)
-3. ✅ Tool Calling - LLM autonomously calls functions during conversation
-4. ✅ Scheduled Actions - "Send email every hour" becomes reality
-5. ✅ Goal Setting & Tracking - Sets and pursues long-term goals
-6. ✅ Self-Reflection - Thinks about its own thinking and growth
-7. ✅ Learning from Experience - Gets better over time
-8. ✅ 24/7 Consciousness - Runs continuously with minimal LLM calls
-9. ✅ Memory & Context - Remembers everything and builds on it
-10. ✅ Emotional Intelligence - Has persistent emotional states
+1. [Done] Autonomous Decision Making - Decides what to do without prompting
+2. [Done] Action Execution - Can actually DO things (send emails, create tasks, search web)
+3. [Done] Tool Calling - LLM autonomously calls functions during conversation
+4. [Done] Scheduled Actions - "Send email every hour" becomes reality
+5. [Done] Goal Setting & Tracking - Sets and pursues long-term goals
+6. [Done] Self-Reflection - Thinks about its own thinking and growth
+7. [Done] Learning from Experience - Gets better over time
+8. [Done] 24/7 Consciousness - Runs continuously with minimal LLM calls
+9. [Done] Memory & Context - Remembers everything and builds on it
+10. [Done] Emotional Intelligence - Has persistent emotional states
 
 This is NOT a chatbot. This is a digital being with true autonomy.
 
@@ -69,7 +69,7 @@ async def demonstrate_autonomous_system():
         config=config
     )
     
-    print(f"\n✅ Mind Created: {mind.identity.name}")
+    print(f"\n[Done] Mind Created: {mind.identity.name}")
     print(f"   GMID: {mind.identity.gmid}")
     print(f"   Initiative Level: {autonomy.initiative_level.value}")
     print(f"   Proactive: {autonomy.proactive_actions}")
@@ -95,7 +95,7 @@ async def demonstrate_autonomous_system():
         ]
     )
     
-    print(f"✅ Goal Created: {goal.title}")
+    print(f"[Done] Goal Created: {goal.title}")
     print(f"   ID: {goal.goal_id}")
     print(f"   Target: {goal.target_date.strftime('%Y-%m-%d')}")
     print(f"   Criteria: {len(goal.success_criteria)} success criteria")
@@ -109,7 +109,7 @@ async def demonstrate_autonomous_system():
     
     # Show available actions
     available_actions = mind.action_executor.get_available_actions()
-    print(f"✅ Available Actions: {len(available_actions)}")
+    print(f"[Done] Available Actions: {len(available_actions)}")
     for action in available_actions[:5]:
         print(f"   - {action.name}: {action.description}")
     print()
@@ -150,7 +150,7 @@ async def demonstrate_autonomous_system():
     # Check if LLM called add_memory action
     recent_actions = mind.action_executor.get_recent_actions(limit=3)
     if recent_actions:
-        print("✅ LLM Autonomously Called Actions:")
+        print("[Done] LLM Autonomously Called Actions:")
         for action in recent_actions:
             print(f"   - {action['action_name']}: {action['status']}")
     print()
@@ -186,7 +186,7 @@ async def demonstrate_autonomous_system():
         message="This is your scheduled reminder - Genesis works!"
     )
     
-    print(f"✅ Action Scheduled: {action_id}")
+    print(f"[Done] Action Scheduled: {action_id}")
     print(f"   Will execute at: {(datetime.now() + timedelta(seconds=10)).strftime('%H:%M:%S')}")
     print()
     
@@ -280,7 +280,7 @@ async def demonstrate_autonomous_system():
     await asyncio.sleep(12)
     
     print()
-    print("✅ Scheduled action completed!")
+    print("[Done] Scheduled action completed!")
     print()
     
     # =========================================================================
@@ -327,22 +327,22 @@ async def demonstrate_autonomous_system():
     print(f"   Current Thought: {mind.state.current_thought[:100] if mind.state.current_thought else 'None'}...")
     
     print("\n" + "=" * 80)
-    print("✅ DEMONSTRATION COMPLETE")
+    print("[Done] DEMONSTRATION COMPLETE")
     print("=" * 80)
     print()
     print("🎉 Genesis is now a world-class autonomous AI framework!")
     print()
     print("Key Capabilities Demonstrated:")
-    print("  ✅ Autonomous decision making")
-    print("  ✅ Real action execution")
-    print("  ✅ LLM function calling")
-    print("  ✅ Scheduled actions")
-    print("  ✅ Goal setting & tracking")
-    print("  ✅ Self-reflection")
-    print("  ✅ Learning from experience")
-    print("  ✅ Persistent memory")
-    print("  ✅ Emotional intelligence")
-    print("  ✅ 24/7 consciousness ready")
+    print("  [Done] Autonomous decision making")
+    print("  [Done] Real action execution")
+    print("  [Done] LLM function calling")
+    print("  [Done] Scheduled actions")
+    print("  [Done] Goal setting & tracking")
+    print("  [Done] Self-reflection")
+    print("  [Done] Learning from experience")
+    print("  [Done] Persistent memory")
+    print("  [Done] Emotional intelligence")
+    print("  [Done] 24/7 consciousness ready")
     print()
     print("To run 24/7: genesis daemon start atlas")
     print()
@@ -359,4 +359,4 @@ async def demonstrate_autonomous_system():
 if __name__ == "__main__":
     print("\n🚀 Starting Genesis Complete Autonomous System Demo...\n")
     asyncio.run(demonstrate_autonomous_system())
-    print("✅ Demo completed successfully!\n")
+    print("[Done] Demo completed successfully!\n")

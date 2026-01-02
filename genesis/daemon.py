@@ -3,8 +3,16 @@
 This module enables Minds to run continuously as background daemons,
 surviving terminal closures and system restarts.
 
+ARCHITECTURE NOTE:
+- The DAEMON is responsible for consciousness (thought generation, autonomous actions)
+- The API SERVER only handles user requests (chat, queries, updates)
+- This separation prevents conflicts and ensures thoughts are generated consistently
+- Never start consciousness in the API server - always use the daemon
+
 Features:
 - 24/7 continuous operation
+- Consciousness engine (autonomous thought generation)
+- Action scheduler (autonomous task execution)
 - Graceful shutdown handling
 - Periodic state saving
 - Health monitoring and auto-restart
@@ -151,6 +159,16 @@ class MindDaemon:
             
             # Start autonomous decision making loop
             autonomous_task = asyncio.create_task(self._autonomous_loop())
+            
+            # Start proactive conversation monitoring
+            proactive_task = None
+            if hasattr(self.mind, 'proactive_conversation'):
+                try:
+                    await self.mind.proactive_conversation.start_monitoring(check_interval=60)
+                    proactive_task = asyncio.create_task(self._proactive_conversation_loop())
+                    logger.info("[OK] Proactive conversation monitoring started")
+                except Exception as e:
+                    logger.error(f"[WARN] Failed to start proactive conversation monitoring: {e}")
 
             self.is_running = True
             logger.info(f"[ACTIVE] Mind {self.mind.identity.name} is now living 24/7")
@@ -167,6 +185,8 @@ class MindDaemon:
             save_task.cancel()
             health_task.cancel()
             autonomous_task.cancel()
+            if proactive_task:
+                proactive_task.cancel()
             
             try:
                 await save_task
@@ -182,6 +202,12 @@ class MindDaemon:
                 await autonomous_task
             except asyncio.CancelledError:
                 pass
+            
+            if proactive_task:
+                try:
+                    await proactive_task
+                except asyncio.CancelledError:
+                    pass
 
         except KeyboardInterrupt:
             logger.info("Received keyboard interrupt")
@@ -208,6 +234,10 @@ class MindDaemon:
             # Stop action scheduler if exists
             if hasattr(self.mind, 'action_scheduler'):
                 await self.mind.action_scheduler.stop()
+            
+            # Stop proactive conversation monitoring
+            if hasattr(self.mind, 'proactive_conversation'):
+                await self.mind.proactive_conversation.stop_monitoring()
 
             # Save final state
             logger.info("Saving final state...")
@@ -354,12 +384,23 @@ class MindDaemon:
                 continue
 
     async def _autonomous_loop(self):
-        """Autonomous decision making and action execution loop.
-        
-        This is where the Mind becomes truly autonomous - periodically
-        evaluating its context and deciding what actions to take.
         """
+        Autonomous decision making and action execution loop.
+        
+        This is the BRAIN of the daemon - makes intelligent decisions about
+        what to do next based on context, goals, memory, and learned patterns.
+        
+        This makes Genesis truly autonomous - not just reactive, but proactive.
+        """
+        # Initialize autonomous intelligence engine
+        from genesis.core.autonomous_intelligence import AutonomousIntelligence
+        
+        ai_engine = AutonomousIntelligence(self.mind)
         check_interval = 300  # Check every 5 minutes
+        
+        logger.info("\n" + "🧠 AUTONOMOUS INTELLIGENCE ENGINE ACTIVATED")
+        logger.info("   This Mind will now think and act independently")
+        logger.info(f"   Decision cycle: Every {check_interval/60:.0f} minutes\n")
         
         while self.is_running:
             try:
@@ -370,48 +411,111 @@ class MindDaemon:
                 
                 # Check if Mind should take autonomous actions
                 if not self.mind.autonomy.proactive_actions:
+                    logger.debug("   Autonomous actions disabled, skipping cycle")
                     continue
                 
                 from genesis.core.autonomy import InitiativeLevel
                 
                 # Only take autonomous actions if initiative level allows it
                 if self.mind.autonomy.initiative_level in [InitiativeLevel.LOW, InitiativeLevel.NONE]:
+                    logger.debug(f"   Initiative level too low ({self.mind.autonomy.initiative_level.value}), skipping")
                     continue
                 
-                logger.info("\n" + "🤖 AUTONOMOUS DECISION CYCLE")
-                logger.info(f"   Initiative Level: {self.mind.autonomy.initiative_level.value}")
+                # Check if enough time has passed
+                if not await ai_engine.should_make_decision():
+                    logger.debug("   Decision cooldown active, waiting...")
+                    continue
                 
-                # Generate autonomous thought about what to do next
-                prompt = (
-                    "I'm running autonomously in the background. "
-                    "Based on my recent experiences, pending tasks, and goals, "
-                    "what should I do next? Should I work on a task, learn something, "
-                    "reflect on progress, or take another action?"
-                )
+                # Make intelligent autonomous decision
+                decision = await ai_engine.make_autonomous_decision()
                 
-                try:
-                    # Let the Mind think and potentially take actions
-                    response = await self.mind.think(
-                        prompt=prompt,
-                        context="autonomous_decision",
-                        enable_actions=True
-                    )
+                if decision:
+                    # Execute the decision
+                    result = await ai_engine.execute_decision(decision)
                     
-                    logger.info(f"   Decision: {response[:200]}...")
+                    # Learn from outcome
+                    from genesis.core.autonomous_intelligence import DecisionCategory
+                    category = DecisionCategory(decision["category"])
+                    success_score = 1.0 if result.get("success") else 0.0
+                    ai_engine.record_outcome(category, success_score)
                     
-                    # Log action executor stats
-                    if hasattr(self.mind, 'action_executor'):
-                        stats = self.mind.action_executor.get_stats()
-                        logger.info(f"   Actions today: {stats.get('recent_actions', 0)}")
-                        logger.info(f"   Success rate: {stats.get('success_rate', 0):.0%}")
-                        
-                except Exception as e:
-                    logger.error(f"   Autonomous decision failed: {e}")
+                    # Save state after decision execution
+                    try:
+                        self.mind.save()
+                        logger.debug("   [SAVED] State persisted after autonomous action")
+                    except Exception as e:
+                        logger.error(f"   Failed to save state: {e}")
+                else:
+                    logger.warning("   ⚠️ Failed to make decision, will retry next cycle")
                 
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Autonomous loop error: {e}")
+                logger.error(f"❌ Autonomous loop error: {e}", exc_info=True)
+                # Don't crash - continue running
+                continue
+    
+    async def _proactive_conversation_loop(self):
+        """Monitor and send proactive conversation follow-ups.
+        
+        This makes the Mind feel like a caring friend who checks in naturally.
+        """
+        check_interval = 60  # Check every minute
+        
+        while self.is_running:
+            try:
+                await asyncio.sleep(check_interval)
+                
+                if not self.mind or not self.is_running:
+                    continue
+                
+                if not hasattr(self.mind, 'proactive_conversation'):
+                    continue
+                
+                # Get pending follow-ups
+                pending = await self.mind.proactive_conversation.get_pending_follow_ups()
+                
+                if pending:
+                    logger.info(f"\n💬 PROACTIVE CONVERSATION CHECK")
+                    logger.info(f"   Found {len(pending)} pending follow-ups")
+                    
+                    # Send each follow-up via notification system
+                    for context in pending:
+                        try:
+                            # Create notification callback
+                            async def send_notification(
+                                user_email: str,
+                                title: str,
+                                message: str,
+                                priority: str,
+                                metadata: Dict[str, Any]
+                            ):
+                                if hasattr(self.mind, 'notification_manager'):
+                                    await self.mind.notification_manager.send_notification(
+                                        recipient_email=user_email,
+                                        title=title,
+                                        message=message,
+                                        priority=priority,
+                                        notification_type="proactive_message",
+                                        metadata=metadata
+                                    )
+                            
+                            # Send the follow-up
+                            success = await self.mind.proactive_conversation.send_follow_up(
+                                context,
+                                notification_callback=send_notification
+                            )
+                            
+                            if success:
+                                logger.info(f"   ✓ Sent: {context.subject} to {context.user_email}")
+                            
+                        except Exception as e:
+                            logger.error(f"   ✗ Failed to send follow-up for {context.subject}: {e}")
+                    
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Proactive conversation loop error: {e}")
                 continue
 
     def _register_signal_handlers(self):

@@ -76,7 +76,7 @@ export default function ListingDetailPage() {
     try {
       const result = await api.purchaseItem(listingId);
 
-      alert(`✅ Purchase successful!\n\n${result.installation.message}\n\nID: ${result.installation.mind_id || result.installation.environment_id || 'N/A'}`);
+      alert(`[Done] Purchase successful!\n\n${result.installation.message}\n\nID: ${result.installation.mind_id || result.installation.environment_id || 'N/A'}`);
 
       setShowPurchaseModal(false);
 

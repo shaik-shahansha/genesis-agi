@@ -66,7 +66,7 @@ class BrowserUsePlugin(BasePlugin):
                 use_vision=True,  # Enable vision for screenshot understanding
             )
             
-            print(f"✅ Browser Use plugin initialized for {mind.identity.name}")
+            print(f"[Done] Browser Use plugin initialized for {mind.identity.name}")
             
         except ImportError as e:
             print(f"⚠️ Browser Use plugin requires: pip install browser-use playwright langchain-openai")

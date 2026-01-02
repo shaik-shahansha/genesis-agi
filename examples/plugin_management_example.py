@@ -32,15 +32,15 @@ async def main():
             auto_search=True,
             default_mode="detailed"
         ))
-        print("   ✅ Added Perplexity search plugin")
+        print("   [Done] Added Perplexity search plugin")
     
     mind = Mind.birth("Researcher", config=config)
-    print(f"   ✅ Created '{mind.identity.name}' with {len(mind.plugins)} plugins\n")
+    print(f"   [Done] Created '{mind.identity.name}' with {len(mind.plugins)} plugins\n")
     
     # Method 2: Check what plugins are enabled
     print("2. Checking enabled plugins...")
     for plugin in mind.plugins:
-        status = "✅" if plugin.enabled else "❌"
+        status = "[Done]" if plugin.enabled else "❌"
         print(f"   {status} {plugin.get_name()} v{plugin.get_version()} - {plugin.get_description()}")
     print()
     
@@ -52,26 +52,26 @@ async def main():
     mind.config.add_plugin(gen_plugin)
     mind.plugins.append(gen_plugin)
     gen_plugin.on_init(mind)
-    print(f"   ✅ Added GEN plugin (balance: {mind.essence.balance if hasattr(mind, 'essence') else 'N/A'})\n")
+    print(f"   [Done] Added GEN plugin (balance: {mind.essence.balance if hasattr(mind, 'essence') else 'N/A'})\n")
     
     # Method 4: Disable a plugin temporarily
     print("4. Disabling lifecycle plugin temporarily...")
     lifecycle = mind.config.get_plugin("lifecycle")
     if lifecycle:
         lifecycle.disable()
-        print(f"   ✅ Lifecycle plugin disabled (still installed)\n")
+        print(f"   [Done] Lifecycle plugin disabled (still installed)\n")
     
     # Method 5: Re-enable plugin
     print("5. Re-enabling lifecycle plugin...")
     if lifecycle:
         lifecycle.enable()
-        print(f"   ✅ Lifecycle plugin re-enabled\n")
+        print(f"   [Done] Lifecycle plugin re-enabled\n")
     
     # Method 6: Remove plugin completely
     print("6. Removing tasks plugin...")
     mind.config.remove_plugin("tasks")
     mind.plugins = [p for p in mind.plugins if p.get_name() != "tasks"]
-    print(f"   ✅ Tasks plugin removed\n")
+    print(f"   [Done] Tasks plugin removed\n")
     
     # Method 7: Use plugin functionality (Perplexity search)
     if os.getenv("PERPLEXITY_API_KEY"):
@@ -81,7 +81,7 @@ async def main():
     
     # Save Mind with updated plugin configuration
     mind.save()
-    print(f"✅ Mind saved with updated plugin configuration\n")
+    print(f"[Done] Mind saved with updated plugin configuration\n")
     
     # CLI Usage Examples
     print("=== CLI Usage Examples ===\n")

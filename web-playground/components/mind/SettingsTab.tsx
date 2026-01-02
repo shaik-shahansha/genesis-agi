@@ -74,6 +74,14 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   };
 
   const providerModels: Record<string, string[]> = {
+    openrouter: [
+      'deepseek/deepseek-chat',
+      'xiaomi/mimo-v2-flash:free',
+      'mistralai/devstral-2512:free',
+      'nex-agi/deepseek-v3.1-nex-n1:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'allenai/olmo-3.1-32b-think:free',
+    ],
     groq: [
       'mixtral-8x7b-32768',
       'llama3-70b-8192',
@@ -264,11 +272,12 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
                 }}
                 className="input w-full"
               >
+                <option value="openrouter">🌟 OpenRouter (Many Free Models - RECOMMENDED)</option>
                 <option value="groq">Groq (Fast & Free)</option>
                 <option value="pollinations">Pollinations AI (Free Multi-Model)</option>
+                <option value="gemini">Google Gemini (Free)</option>
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic (Claude)</option>
-                <option value="gemini">Google Gemini</option>
               </select>
             </div>
 

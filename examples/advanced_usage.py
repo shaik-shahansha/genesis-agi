@@ -110,7 +110,7 @@ async def main():
     # 9. Load Mind
     print("9. Loading Mind from disk...\n")
     loaded_mind = Mind.load(save_path)
-    print(f"✅ Loaded Mind: {loaded_mind.identity.name}")
+    print(f" Loaded Mind: {loaded_mind.identity.name}")
     print(f"   Memories preserved: {len(loaded_mind.memory.memories)}")
     print(f"   Dreams preserved: {len(loaded_mind.dreams)}\n")
 

@@ -139,7 +139,7 @@ async def main():
         model="gpt-4"
     )
 
-    print(f"✅ Created {mind.name} with GMID: {mind.identity.gmid}")
+    print(f"[Done] Created {mind.name} with GMID: {mind.identity.gmid}")
 
     # Use features
 
@@ -186,7 +186,7 @@ async def main():
     await mind.save()
     await mind.terminate()
 
-    print("\n✅ Advanced Mind created and saved!")
+    print("\n[Done] Advanced Mind created and saved!")
 
 if __name__ == "__main__":
     import os

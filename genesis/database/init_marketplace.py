@@ -28,7 +28,7 @@ def init_marketplace_tables():
         ]
     )
 
-    print("✅ Marketplace tables created successfully!")
+    print("[Done] Marketplace tables created successfully!")
 
 
 if __name__ == "__main__":

@@ -339,7 +339,7 @@ class ActionScheduler:
                             **msg.get('metadata', {})
                         )
 
-                        logger.info(f"✅ Auto-responded to {integration_type} message")
+                        logger.info(f"[Done] Auto-responded to {integration_type} message")
 
         except Exception as e:
             logger.error(f"Failed to check/respond to messages: {e}")

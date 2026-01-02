@@ -230,7 +230,7 @@ async def main():
         mind_gmid=zenith.identity.gmid, mind_name=zenith.identity.name
     )
     if visit_result["success"]:
-        print(f"   ✅ Successfully entered!")
+        print(f"   [Done] Successfully entered!")
         print(f"   Current inhabitants: {[i['name'] for i in visit_result['current_inhabitants']]}")
     else:
         print(f"   ❌ Access denied: {visit_result['reason']}")
@@ -241,7 +241,7 @@ async def main():
         mind_gmid=aurora.identity.gmid, mind_name=aurora.identity.name
     )
     if visit_result["success"]:
-        print(f"   ✅ Successfully entered!")
+        print(f"   [Done] Successfully entered!")
         print(f"   Current inhabitants: {[i['name'] for i in visit_result['current_inhabitants']]}")
 
     # All Minds enter the public collaboration hub
@@ -427,14 +427,14 @@ async def main():
     nova_path = nova.save()
 
     print(f"\n💾 Saved all Minds with complete metaverse state:")
-    print(f"   ✅ {aurora.identity.name}: {aurora_path}")
+    print(f"   [Done] {aurora.identity.name}: {aurora_path}")
     print(f"      - Environments: {len(aurora.environments.environments)}")
     print(f"      - Relationships: {len(aurora.relationships.relationships)}")
     print(f"      - Experiences: {len(aurora.experiences.experiences)}")
-    print(f"\n   ✅ {zenith.identity.name}: {zenith_path}")
+    print(f"\n   [Done] {zenith.identity.name}: {zenith_path}")
     print(f"      - Environments: {len(zenith.environments.environments)}")
     print(f"      - Relationships: {len(zenith.relationships.relationships)}")
-    print(f"\n   ✅ {nova.identity.name}: {nova_path}")
+    print(f"\n   [Done] {nova.identity.name}: {nova_path}")
     print(f"      - Environments: {len(nova.environments.environments)}")
     print(f"      - Relationships: {len(nova.relationships.relationships)}")
 

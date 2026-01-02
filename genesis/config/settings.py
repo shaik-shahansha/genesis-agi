@@ -34,15 +34,16 @@ class Settings(BaseSettings):
     vector_db_path: str = "./chroma_db"
 
     # Model Providers - API Keys
+    openrouter_api_key: Optional[str] = None  # Free models available from https://openrouter.ai/
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None  # Free from Google AI Studio
     groq_api_key: Optional[str] = None
     pollinations_api_key: Optional[str] = None  # Free from https://enter.pollinations.ai/
 
-    # Model Defaults
-    default_reasoning_model: str = "groq/openai/gpt-oss-120b"
-    default_fast_model: str = "groq/llama-3.1-8b-instant"
+    # Model Defaults  
+    default_reasoning_model: str = "openrouter/meta-llama/llama-3.3-70b-instruct:free"  # ✓ Works - Clean JSON output
+    default_fast_model: str = "openrouter/meta-llama/llama-3.3-70b-instruct:free"  # ✓ Fast & reliable
     default_local_model: str = "ollama/llama3.1"
     ollama_base_url: str = "http://localhost:11434"
 

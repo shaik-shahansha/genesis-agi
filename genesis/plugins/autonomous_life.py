@@ -87,7 +87,7 @@ class AutonomousLifePlugin(Plugin):
         # Attach to mind for easy access
         mind.autonomous_life = self._autonomous_life
 
-        logger.info(f"✅ Autonomous Life initialized")
+        logger.info(f"[Done] Autonomous Life initialized")
         logger.info(f"   - Routines: {'enabled' if self.enable_routines else 'disabled'}")
         logger.info(f"   - Goals: {'enabled' if self.enable_goals else 'disabled'}")
         logger.info(f"   - LLM Budget: {self.llm_budget_per_day} calls/day")

@@ -146,7 +146,7 @@ async def main():
             importance=mem_data["importance"],
             tags=mem_data["tags"],
         )
-        print(f"   ✅ Stored ({mem_data['type']}): {mem_data['content'][:60]}...")
+        print(f"   [Done] Stored ({mem_data['type']}): {mem_data['content'][:60]}...")
         if memory.mem0_id:
             print(f"      mem0 ID: {memory.mem0_id}")
 
@@ -328,7 +328,7 @@ async def main():
     print("=" * 80)
     print()
 
-    print("✅ Implemented Features:")
+    print("[Done] Implemented Features:")
     print()
     print("1️⃣  mem0 Compression:")
     print("   • 90% token savings (proven by LOCOMO benchmark)")

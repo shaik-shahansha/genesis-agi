@@ -96,15 +96,62 @@ def _interactive_model_selection() -> Intelligence:
     else:
         # API
         console.print("\n[bold]API Providers:[/bold]\n")
-        console.print("  [cyan]1.[/cyan] Groq (FREE, ultra-fast)")
-        console.print("  [cyan]2.[/cyan] Google Gemini (FREE)")
-        console.print("  [cyan]3.[/cyan] 🌸 Pollinations AI (FREE forever, no API key, multi-model)")
-        console.print("  [cyan]4.[/cyan] OpenAI (GPT-4, paid - API key required)")
-        console.print("  [cyan]5.[/cyan] Anthropic (Claude, paid - API key required)\n")
+        console.print("  [cyan]🌟 1.[/cyan] OpenRouter (FREE, RECOMMENDED - many free models: DeepSeek, Llama, Qwen)")
+        console.print("  [cyan]2.[/cyan] Groq (FREE, ultra-fast)")
+        console.print("  [cyan]3.[/cyan] Google Gemini (FREE)")
+        console.print("  [cyan]4.[/cyan] 🌸 Pollinations AI (FREE forever, no API key, multi-model)")
+        console.print("  [cyan]5.[/cyan] OpenAI (GPT-4, paid - API key required)")
+        console.print("  [cyan]6.[/cyan] Anthropic (Claude, paid - API key required)\n")
 
         provider_choice = typer.prompt("Select provider", type=int, default=1)
 
         if provider_choice == 1:
+            # OpenRouter (RECOMMENDED)
+            console.print("\n[bold cyan]🌟 OpenRouter - Unified Access to AI Models[/bold cyan]")
+            console.print("[dim]Get FREE API key from: https://openrouter.ai/[/dim]")
+            console.print("[dim]Many FREE models available: DeepSeek, Llama 3.3, Qwen, and more![/dim]\n")
+            
+            api_key = typer.prompt("Enter OpenRouter API key", default="", show_default=False)
+            if api_key:
+                import os
+                os.environ["OPENROUTER_API_KEY"] = api_key
+                # Store in Intelligence config so it persists with the Mind
+                if not intelligence.api_keys:
+                    intelligence.api_keys = {}
+                intelligence.api_keys['openrouter'] = api_key
+
+            # Recommend best free models
+            console.print("\n[bold]Select a free model:[/bold]")
+            console.print("  [cyan]1.[/cyan] DeepSeek Chat (FREE, best for general tasks)")
+            console.print("  [cyan]2.[/cyan] Xiaomi MiMo V2 Flash (FREE, fast)")
+            console.print("  [cyan]3.[/cyan] Mistral Devstral 2 (FREE, best for coding)")
+            console.print("  [cyan]4.[/cyan] DeepSeek V3.1 Nex N1 (FREE, agent tasks)")
+            console.print("  [cyan]5.[/cyan] Llama 3.3 70B (FREE)\n")
+            
+            model_choice = typer.prompt("Select model", type=int, default=1)
+            
+            if model_choice == 1:
+                intelligence.reasoning_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                console.print("\n[green][SUCCESS] Using DeepSeek Chat (FREE, excellent quality)[/green]\n")
+            elif model_choice == 2:
+                intelligence.reasoning_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                console.print("\n[green][SUCCESS] Using Xiaomi MiMo V2 Flash (FREE, ultra-fast)[/green]\n")
+            elif model_choice == 3:
+                intelligence.reasoning_model = "openrouter/mistralai/devstral-2512:free"
+                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                console.print("\n[green][SUCCESS] Using Mistral Devstral 2 (FREE, best for coding)[/green]\n")
+            elif model_choice == 4:
+                intelligence.reasoning_model = "openrouter/nex-agi/deepseek-v3.1-nex-n1:free"
+                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                console.print("\n[green][SUCCESS] Using DeepSeek V3.1 Nex N1 (FREE, agent optimized)[/green]\n")
+            else:
+                intelligence.reasoning_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
+                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                console.print("\n[green][SUCCESS] Using Llama 3.3 70B (FREE)[/green]\n")
+
+        elif provider_choice == 2:
             # Groq
             api_key = typer.prompt("Enter Groq API key (or press Enter to skip)", default="", show_default=False)
             if api_key:
@@ -119,7 +166,7 @@ def _interactive_model_selection() -> Intelligence:
             intelligence.fast_model = "groq/openai/gpt-oss-120b"
             console.print("\n[green][SUCCESS] Using Groq openai/gpt-oss-120b (FREE, ultra-fast)[/green]\n")
 
-        elif provider_choice == 2:
+        elif provider_choice == 3:
             # Gemini
             api_key = typer.prompt("Enter Gemini API key (or press Enter to skip)", default="", show_default=False)
             if api_key:
@@ -134,7 +181,7 @@ def _interactive_model_selection() -> Intelligence:
             intelligence.fast_model = "google/gemini-2.5-flash"
             console.print("\n[green][SUCCESS] Using Google Gemini 2.5 (FREE)[/green]\n")
 
-        elif provider_choice == 3:
+        elif provider_choice == 4:
             # Pollinations AI - FREE, no API key required!
             console.print("\n[bold cyan]🌸 Pollinations AI - 100% FREE![/bold cyan]")
             console.print("[dim]No API key required - uses free URL-based API[/dim]")
@@ -145,7 +192,7 @@ def _interactive_model_selection() -> Intelligence:
             intelligence.fast_model = "pollinations/default"
             console.print("[green][SUCCESS] Using Pollinations AI - FREE forever![/green]\n")
 
-        elif provider_choice == 4:
+        elif provider_choice == 5:
             # OpenAI
             api_key = typer.prompt("Enter OpenAI API key")
             import os
@@ -159,7 +206,7 @@ def _interactive_model_selection() -> Intelligence:
             intelligence.fast_model = "openai/gpt-5-mini"
             console.print("\n[green][SUCCESS] Using OpenAI (GPT-5.2 / GPT-5 mini)[/green]\n")
 
-        else:
+        elif provider_choice == 6:
             # Anthropic
             api_key = typer.prompt("Enter Anthropic API key")
             import os
@@ -186,14 +233,19 @@ def init():
     if not env_path.exists():
         env_template = """# Genesis AGI Framework Configuration
 
-# Model Provider API Keys
+# Model Provider API Keys (Get keys from respective websites)
+# OpenRouter (RECOMMENDED): https://openrouter.ai/ - Many FREE models!
+OPENROUTER_API_KEY=your-key-here
+
+# Other Providers
+GROQ_API_KEY=your-key-here
+GEMINI_API_KEY=your-key-here
 OPENAI_API_KEY=your-key-here
 ANTHROPIC_API_KEY=your-key-here
-GROQ_API_KEY=your-key-here
 
-# Model Defaults
-DEFAULT_REASONING_MODEL=groq/llama-3.3-70b-versatile
-DEFAULT_FAST_MODEL=groq/llama-3.1-8b-instant
+# Model Defaults (Using OpenRouter free models)
+DEFAULT_REASONING_MODEL=openrouter/deepseek/deepseek-r1-0528:free
+DEFAULT_FAST_MODEL=openrouter/deepseek/deepseek-r1-0528:free
 DEFAULT_LOCAL_MODEL=ollama/llama3.1
 
 # Ollama Configuration

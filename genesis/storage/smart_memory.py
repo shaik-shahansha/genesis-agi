@@ -65,7 +65,7 @@ class SmartMemoryManager(MemoryManager):
                 self.vector_store,
                 similarity_threshold=self.config.deduplication_threshold
             )
-            print(f"[OK] Smart deduplication enabled (threshold: {self.config.deduplication_threshold})")
+            # Deduplication enabled silently
         else:
             self.deduplicator = None
         
@@ -79,14 +79,15 @@ class SmartMemoryManager(MemoryManager):
                     self.orchestrator,
                     self.model
                 )
-                print("[OK] LLM-based reranking enabled")
+                # LLM reranking enabled silently
             except Exception as e:
-                print(f"[WARN] Failed to initialize reranker: {e}")
+                # Only log warnings
+                pass
         
         # 3. Memory Consolidator (for periodic cleanup)
         if self.config.enable_consolidation:
             self.consolidator = MemoryConsolidator(self)
-            print("[OK] Memory consolidation enabled")
+            # Consolidation enabled silently
         else:
             self.consolidator = None
     

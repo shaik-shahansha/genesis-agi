@@ -40,7 +40,7 @@ async def main():
         related_task_id=task.task_id
     )
 
-    print(f"✅ Completed task: {task.title}")
+    print(f"[Done] Completed task: {task.title}")
     print(f"💰 Earned: {gen_earned} GEN")
     print(f"💎 New balance: {mind.gen.balance.current_balance}\n")
 

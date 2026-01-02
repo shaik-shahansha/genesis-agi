@@ -32,6 +32,18 @@ interface ProactiveMessage {
   metadata: any;
 }
 
+interface Environment {
+  env_id: string;
+  name: string;
+  env_type: string;
+  description?: string;
+  owner_gmid: string;
+  is_public: boolean;
+  max_occupancy?: number;
+  current_occupancy?: number;
+  created_at?: string;
+}
+
 export default function ChatPage() {
   const params = useParams();
   const mindId = params.id as string;
@@ -40,6 +52,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('Analyzing...');
   const [userEmail, setUserEmail] = useState<string>('');
   const [showEmailPrompt, setShowEmailPrompt] = useState(true);
   const [selectedEnvironment, setSelectedEnvironment] = useState<string | null>(null);
@@ -47,9 +60,35 @@ export default function ChatPage() {
   const [showEnvironmentSelect, setShowEnvironmentSelect] = useState(false);
   const [proactiveMessages, setProactiveMessages] = useState<ProactiveMessage[]>([]);
   const [websocket, setWebsocket] = useState<WebSocket | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  // Cycling loading messages
+  useEffect(() => {
+    if (!loading) return;
+
+    const loadingMessages = [
+      'Analyzing your message...',
+      'Thinking deeply...',
+      'Preparing response...',
+      'Reasoning through context...',
+      'Synthesizing information...',
+      'Processing your request...'
+    ];
+
+    let currentIndex = 0;
+    setLoadingText(loadingMessages[0]);
+
+    const interval = setInterval(() => {
+      currentIndex = (currentIndex + 1) % loadingMessages.length;
+      setLoadingText(loadingMessages[currentIndex]);
+    }, 5000); // Change message every 1.5 seconds
+
+    return () => clearInterval(interval);
+  }, [loading]);
 
   useEffect(() => {
     fetchMind();
@@ -67,15 +106,14 @@ export default function ChatPage() {
 
   // WebSocket connection for proactive messages
   useEffect(() => {
-    if (mindId) {
-      // Use userEmail if set, otherwise use default
-      const wsUserEmail = userEmail || 'web_user@genesis.local';
-      const wsUrl = `${API_URL.replace('http', 'ws')}/api/v1/minds/${mindId}/stream?user_email=${encodeURIComponent(wsUserEmail)}`;
+    if (mindId && userEmail) {  // Only connect after email is set
+      const wsUrl = `${API_URL.replace('http', 'ws')}/api/v1/minds/${mindId}/stream?user_email=${encodeURIComponent(userEmail)}`;
       
+      console.log('[WebSocket] Connecting with email:', userEmail);
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
-        console.log('WebSocket connected for proactive messages with email:', wsUserEmail);
+        console.log('[WebSocket] Connected successfully with email:', userEmail);
         setWebsocket(ws);
       };
       
@@ -83,11 +121,55 @@ export default function ChatPage() {
         try {
           const data = JSON.parse(event.data);
           
+          console.log('[WebSocket] Received message:', data.type, data);
+          
           if (data.type === 'proactive_message') {
             const proactiveMsg: ProactiveMessage = data;
             setProactiveMessages(prev => [...prev, proactiveMsg]);
             
             // Auto-scroll to show new message
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          } 
+          else if (data.type === 'task_progress') {
+            // Task progress update - show in UI
+            console.log(`[Task ${data.task_id}] Progress: ${(data.progress * 100).toFixed(0)}% - ${data.message}`);
+            
+            // You can add a toast/notification here or update a progress bar
+            // For now, we'll add it as a proactive message
+            setProactiveMessages(prev => [...prev, {
+              type: 'proactive_message',
+              notification_id: data.task_id,
+              mind_id: data.mind_id || mindId,
+              mind_name: data.mind_name || mind?.name || 'Genesis',
+              title: `⏳ Task Progress: ${(data.progress * 100).toFixed(0)}%`,
+              message: data.message,
+              priority: 'normal',
+              timestamp: data.timestamp || new Date().toISOString(),
+              metadata: { task_id: data.task_id, progress: data.progress }
+            }]);
+            
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }
+          else if (data.type === 'task_complete') {
+            // Task completed - show result
+            console.log(`[Task ${data.task_id}] Completed!`, data);
+            
+            setProactiveMessages(prev => [...prev, {
+              type: 'proactive_message',
+              notification_id: data.task_id,
+              mind_id: data.mind_id || mindId,
+              mind_name: data.mind_name || mind?.name || 'Genesis',
+              title: '✅ Task Completed',
+              message: data.message,
+              priority: 'high',
+              timestamp: data.timestamp || new Date().toISOString(),
+              metadata: { task_id: data.task_id, result: data.result }
+            }]);
+            
             setTimeout(() => {
               messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, 100);
@@ -121,24 +203,49 @@ export default function ChatPage() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    setAttachedFiles(prev => [...prev, ...selected]);
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if ((!input.trim() && attachedFiles.length === 0) || loading) return;
 
-    const userMessage: Message = {
-      role: 'user',
-      content: input
-    };
-
-    setMessages(prev => [...prev, userMessage]);
     const currentInput = input;
+    const currentFiles = attachedFiles;
     setInput('');
+    setAttachedFiles([]);
     setLoading(true);
 
     try {
-      // Pass user email and environment_id to the API
+      let uploadedFileInfo = [];
+      
+      // Upload files first if any
+      if (currentFiles.length > 0) {
+        const uploadPromises = currentFiles.map(file => api.uploadFile(mindId, file));
+        const uploadResults = await Promise.all(uploadPromises);
+        uploadedFileInfo = uploadResults.map(result => `📎 ${result.filename}`);
+      }
+
+      // Build message with file references
+      const messageContent = currentInput + 
+        (uploadedFileInfo.length > 0 ? `\n\n${uploadedFileInfo.join('\n')}` : '');
+
+      const userMessage: Message = {
+        role: 'user',
+        content: messageContent
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+
+      // Send message with context about uploaded files
       const data = await api.chatWithEnvironment(
         mindId, 
-        currentInput, 
+        messageContent, 
         userEmail || undefined,
         selectedEnvironment || undefined
       );
@@ -368,28 +475,31 @@ export default function ChatPage() {
           )}
 
           {/* Render all messages and proactive notifications in chronological order */}
-          {[...messages.map((msg, index) => ({ ...msg, index, type: 'chat' as const })),
-             ...proactiveMessages.map((msg, index) => ({ ...msg, index, type: 'proactive' as const }))]
+          {[...messages.map((msg, index) => ({ 
+              ...msg, 
+              index, 
+              type: 'chat' as const,
+              sortOrder: index  // Preserve original order
+            })),
+             ...proactiveMessages.map((msg, index) => ({ 
+              ...msg, 
+              index, 
+              type: 'proactive' as const,
+              sortOrder: messages.length + index  // Come after chat messages
+            }))]
             .sort((a, b) => {
-              // Sort by timestamp if available, otherwise by index
-              if (a.type === 'proactive' && b.type === 'proactive') {
-                return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-              } else if (a.type === 'proactive') {
-                return 1; // Proactive messages after chat messages for now
-              } else if (b.type === 'proactive') {
-                return -1;
-              }
-              return (a as any).index - (b as any).index;
+              // Sort by sortOrder to maintain chronological order (oldest to newest)
+              return a.sortOrder - b.sortOrder;
             })
             .map((item) => {
               if (item.type === 'chat') {
-                const message = item as Message & { index: number };
+                const message = item as Message & { index: number; sortOrder: number };
                 return (
                   <div key={`chat-${message.index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 shadow-md ${
                       message.role === 'user' 
-                        ? 'bg-purple-600 text-white' 
-                        : 'bg-slate-700 text-gray-100'
+                        ? 'bg-purple-600 text-white rounded-br-sm' 
+                        : 'bg-slate-700 text-gray-100 rounded-bl-sm'
                     }`}>
                       {message.role === 'assistant' ? (
                         <MarkdownRenderer content={message.content} />
@@ -402,22 +512,24 @@ export default function ChatPage() {
               } else {
                 const proactiveMsg = item as unknown as ProactiveMessage & { index: number };
                 return (
-                  <div key={`proactive-${proactiveMsg.index}`} className="flex justify-center">
-                    <div className="max-w-[90%] bg-blue-900/50 border border-blue-700 rounded-lg px-4 py-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-blue-400 font-medium text-sm">{proactiveMsg.title}</span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(proactiveMsg.timestamp).toLocaleTimeString()}
+                  <div key={`proactive-${proactiveMsg.index}`} className="flex justify-start animate-fade-in">
+                    <div className="max-w-[80%]">
+                      {/* Proactive message indicator */}
+                      <div className="flex items-center gap-2 mb-1 ml-1">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                        <span className="text-xs text-blue-400 font-medium">
+                          {proactiveMsg.title || 'Checking in'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(proactiveMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-200 whitespace-pre-wrap">
-                        {proactiveMsg.message}
-                      </div>
-                      {proactiveMsg.metadata?.type && (
-                        <div className="mt-2 text-xs text-gray-400">
-                          Type: {proactiveMsg.metadata.type}
+                      {/* Message bubble - looks like regular assistant message but with subtle indicator */}
+                      <div className="bg-slate-700 text-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-md border-l-4 border-blue-500">
+                        <div className="text-sm whitespace-pre-wrap">
+                          {proactiveMsg.message}
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -426,8 +538,17 @@ export default function ChatPage() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-slate-700 rounded-lg px-4 py-3">
-                <div className="spinner"></div>
+              <div className="bg-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                  <span className="text-sm text-gray-300 animate-pulse">
+                    {loadingText}
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -437,23 +558,62 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Send a message..."
-          className="input flex-1"
-          disabled={loading}
-        />
-        <button
-          onClick={sendMessage}
-          disabled={!input.trim() || loading}
-          className="btn-primary"
-        >
-          {loading ? 'Sending...' : 'Send'}
-        </button>
+      <div className="space-y-2">
+        {/* File Attachments Preview */}
+        {attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 p-2 bg-slate-800 rounded border border-slate-700">
+            {attachedFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 bg-slate-700 px-3 py-1 rounded text-sm"
+              >
+                <span className="text-gray-300">📎 {file.name}</span>
+                <button
+                  onClick={() => removeFile(index)}
+                  className="text-red-400 hover:text-red-300"
+                  title="Remove file"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Input Area */}
+        <div className="flex gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            multiple
+            className="hidden"
+            accept="*/*"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition"
+            title="Attach files"
+          >
+            📎
+          </button>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Send a message..."
+            className="input flex-1"
+            disabled={loading}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={(!input.trim() && attachedFiles.length === 0) || loading}
+            className="btn-primary"
+          >
+            {loading ? 'Sending...' : 'Send'}
+          </button>
+        </div>
       </div>
       </div>
     </AuthRequired>

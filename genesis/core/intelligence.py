@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Intelligence(BaseModel):
@@ -10,12 +10,13 @@ class Intelligence(BaseModel):
 
     # Model selection
     reasoning_model: str = Field(
-        default="groq/openai/gpt-oss-120b",
+        default="openrouter/meta-llama/llama-3.3-70b-instruct:free",
         description="Model for complex reasoning tasks",
     )
 
     fast_model: str = Field(
-        default="groq/openai/gpt-oss-120b", description="Model for quick responses"
+        default="openrouter/meta-llama/llama-3.3-70b-instruct:free",
+        description="Model for quick responses"
     )
 
     vision_model: Optional[str] = Field(
@@ -41,7 +42,7 @@ class Intelligence(BaseModel):
 
     # Generation parameters
     default_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    default_max_tokens: int = Field(default=1000, ge=1)
+    default_max_tokens: int = Field(default=2000, ge=1)  # Increased for DeepSeek R1 reasoning models
 
     # Capabilities
     multimodal_enabled: bool = Field(default=False, description="Enable vision/audio")

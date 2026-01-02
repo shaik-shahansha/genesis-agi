@@ -83,6 +83,21 @@ class MindIdentity(BaseModel):
                 self.gmid, self.birth_timestamp, self.creator
             )
 
+    @property
+    def age(self) -> str:
+        """Get human-readable age."""
+        return self.get_age_description()
+    
+    @property
+    def birth_date(self) -> str:
+        """Get formatted birth date."""
+        return self.birth_timestamp.strftime("%Y-%m-%d %H:%M:%S")
+    
+    @property
+    def age_days(self) -> int:
+        """Get age in days."""
+        return self.get_age_days()
+
     def get_age_days(self) -> int:
         """Get age in days."""
         return (datetime.now() - self.birth_timestamp).days

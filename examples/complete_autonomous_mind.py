@@ -65,7 +65,7 @@ async def main():
         config=config
     )
 
-    print(f"✅ Mind created: {mind.name} ({mind.identity.gmid})\n")
+    print(f"[Done] Mind created: {mind.name} ({mind.identity.gmid})\n")
 
     # 5. Setup Integrations
     mind.integrations = IntegrationManager(mind)
@@ -82,7 +82,7 @@ async def main():
             'enabled': True
         }
         mind.integrations.register(IntegrationType.EMAIL, EmailIntegration(email_config))
-        print("✅ Email integration configured")
+        print("[Done] Email integration configured")
 
     # Slack Integration (optional - requires bot token)
     if os.getenv("SLACK_BOT_TOKEN"):
@@ -92,7 +92,7 @@ async def main():
             'enabled': True
         }
         mind.integrations.register(IntegrationType.SLACK, SlackIntegration(slack_config))
-        print("✅ Slack integration configured")
+        print("[Done] Slack integration configured")
 
     # Calendar Integration (optional - requires Google API credentials)
     if os.path.exists("./credentials/token.json"):
@@ -103,7 +103,7 @@ async def main():
             'enabled': True
         }
         mind.integrations.register(IntegrationType.CALENDAR, CalendarIntegration(calendar_config))
-        print("✅ Calendar integration configured")
+        print("[Done] Calendar integration configured")
 
     print()
 
@@ -111,7 +111,7 @@ async def main():
     print("🌟 Starting Mind (24/7 operation)...\n")
     await mind.start_living()
 
-    print(f"✅ {mind.name} is now living 24/7!")
+    print(f"[Done] {mind.name} is now living 24/7!")
     print(f"   - Consciousness: Active (thoughts every hour)")
     print(f"   - Action Scheduler: Active (proactive behavior)")
     print(f"   - Initiative Level: {mind.autonomy.initiative_level}")
@@ -132,7 +132,7 @@ async def main():
                 IntegrationType.SLACK,
                 message=f"🌅 Morning Report from {mind.name}:\n\n{thought}"
             )
-            print("✅ Sent morning report to Slack")
+            print("[Done] Sent morning report to Slack")
 
     # Schedule for tomorrow morning
     tomorrow_9am = datetime.now().replace(hour=9, minute=0, second=0) + timedelta(days=1)
@@ -143,7 +143,7 @@ async def main():
         priority="high"
     )
 
-    print(f"✅ Scheduled morning report for {tomorrow_9am}")
+    print(f"[Done] Scheduled morning report for {tomorrow_9am}")
     print(f"   Action ID: {action_id}\n")
 
     # 8. Autonomous email checking loop
@@ -176,7 +176,7 @@ async def main():
                                 to=email['from'],
                                 subject=f"Re: {email['subject']}"
                             )
-                            print(f"✅ Auto-responded to email")
+                            print(f"[Done] Auto-responded to email")
 
                             # Notify on Slack if configured
                             if IntegrationType.SLACK in mind.integrations.integrations:
@@ -211,7 +211,7 @@ async def main():
                                     IntegrationType.SLACK,
                                     message=f"⏰ Reminder: {event['title']} in {int(time_until.total_seconds() / 60)} minutes"
                                 )
-                                print(f"✅ Sent calendar reminder for: {event['title']}")
+                                print(f"[Done] Sent calendar reminder for: {event['title']}")
 
             except Exception as e:
                 print(f"❌ Error checking calendar: {e}")
@@ -233,7 +233,7 @@ async def main():
         print("\n\n🛑 Stopping Mind...")
         await mind.stop_living()
         mind.save()
-        print("✅ Mind stopped and saved\n")
+        print("[Done] Mind stopped and saved\n")
 
 
 if __name__ == "__main__":

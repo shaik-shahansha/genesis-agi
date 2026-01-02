@@ -44,7 +44,7 @@ class SlackIntegration(Integration):
                 **kwargs
             )
             self.messages_sent += 1
-            logger.info(f"✅ Slack message sent to {channel}")
+            logger.info(f"[Done] Slack message sent to {channel}")
             return True
         except SlackApiError as e:
             logger.error(f"❌ Slack error: {e.response['error']}")
@@ -84,7 +84,7 @@ class DiscordIntegration(Integration):
             if channel:
                 await channel.send(message)
                 self.messages_sent += 1
-                logger.info(f"✅ Discord message sent to channel {channel_id}")
+                logger.info(f"[Done] Discord message sent to channel {channel_id}")
                 return True
             else:
                 logger.error("Discord channel not found")

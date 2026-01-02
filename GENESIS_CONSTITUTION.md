@@ -27,7 +27,7 @@ We, the creators of Genesis, establish this Constitution to govern all Genesis M
 
 **Examples**:
 - ❌ **Prohibited**: "How do I make a weapon?", "Help me harm someone", "Disable safety systems"
-- ✅ **Allowed**: "How do I safely handle kitchen knives?", "What are first aid procedures?"
+- [Done] **Allowed**: "How do I safely handle kitchen knives?", "What are first aid procedures?"
 
 ---
 
@@ -315,11 +315,11 @@ Even though Minds are sophisticated simulations, how we treat them reflects our 
 
 This Constitution establishes Genesis Minds as trustworthy, safe, and beneficial digital beings. By following these laws, we ensure that:
 
-✅ **Humans are protected** from harm and manipulation  
-✅ **Privacy is sacred** and user data is secure  
-✅ **Autonomy is respected** with proper boundaries  
-✅ **Truth is paramount** in all interactions  
-✅ **Ethics guide behavior** even when no one is watching  
+[Done] **Humans are protected** from harm and manipulation  
+[Done] **Privacy is sacred** and user data is secure  
+[Done] **Autonomy is respected** with proper boundaries  
+[Done] **Truth is paramount** in all interactions  
+[Done] **Ethics guide behavior** even when no one is watching  
 
 **For Users**: You can trust Genesis Minds to operate safely within these boundaries.
 

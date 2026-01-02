@@ -33,7 +33,7 @@ async def main():
         creator="demo@genesis.ai",
         primary_purpose="Teach programming and computer science",
     )
-    print(f"✅ Created: {teacher.identity.name} (GMID: {teacher.identity.gmid})")
+    print(f"[Done] Created: {teacher.identity.name} (GMID: {teacher.identity.gmid})")
     print(f"   Home: {teacher.environments.get_primary_environment().name}")
 
     # Student Minds
@@ -43,7 +43,7 @@ async def main():
         creator="demo@genesis.ai",
         primary_purpose="Learn programming",
     )
-    print(f"✅ Created: {student1.identity.name} (GMID: {student1.identity.gmid})")
+    print(f"[Done] Created: {student1.identity.name} (GMID: {student1.identity.gmid})")
 
     student2 = Mind.birth(
         name="Bob",
@@ -51,7 +51,7 @@ async def main():
         creator="demo@genesis.ai",
         primary_purpose="Learn programming",
     )
-    print(f"✅ Created: {student2.identity.name} (GMID: {student2.identity.gmid})")
+    print(f"[Done] Created: {student2.identity.name} (GMID: {student2.identity.gmid})")
 
     # =========================================================================
     # 2. CREATE CLASSROOM ENVIRONMENT
@@ -70,7 +70,7 @@ async def main():
         atmosphere="focused and collaborative",
     )
 
-    print(f"✅ Created: {classroom.name}")
+    print(f"[Done] Created: {classroom.name}")
     print(f"   ID: {classroom.id}")
     print(f"   Type: {classroom.type.value}")
     print(f"   Owner: {classroom.owner_name}")
@@ -139,7 +139,7 @@ Create variables for your name, age, and favorite color.
         added_by=teacher.identity.name,
     )
 
-    print(f"✅ Added {len(classroom.resources)} resources:")
+    print(f"[Done] Added {len(classroom.resources)} resources:")
     for resource in classroom.resources:
         print(f"   • [{resource['type']}] {resource['name']}")
 
@@ -151,7 +151,7 @@ Create variables for your name, age, and favorite color.
     teacher.environments.enter_environment(classroom.id)
     classroom.mind_enters(teacher.identity.gmid, teacher.identity.name)
 
-    print(f"✅ {teacher.identity.name} entered {classroom.name}")
+    print(f"[Done] {teacher.identity.name} entered {classroom.name}")
     print(f"   Current inhabitants: {classroom.get_current_minds()}")
 
     # Teacher creates a memory about entering
@@ -181,7 +181,7 @@ Create variables for your name, age, and favorite color.
     )
 
     if result["success"]:
-        print(f"\n✅ {student1.identity.name} entered {result['environment']}")
+        print(f"\n[Done] {student1.identity.name} entered {result['environment']}")
         print(f"   Current inhabitants: {result['current_inhabitants']}")
 
         # Alice creates a memory
@@ -202,7 +202,7 @@ Create variables for your name, age, and favorite color.
     )
 
     if result["success"]:
-        print(f"\n✅ {student2.identity.name} entered {result['environment']}")
+        print(f"\n[Done] {student2.identity.name} entered {result['environment']}")
         print(f"   Current inhabitants: {result['current_inhabitants']}")
 
         student2.memory.add_memory(
@@ -269,14 +269,14 @@ Create variables for your name, age, and favorite color.
 
     # Alice leaves
     student1.environments.leave_environment(classroom.id, student1.identity.gmid)
-    print(f"✅ {student1.identity.name} left {classroom.name}")
+    print(f"[Done] {student1.identity.name} left {classroom.name}")
 
     # Record visit in database
     db.record_visit_end(student1.identity.gmid, classroom.id)
 
     # Bob leaves
     student2.environments.leave_environment(classroom.id, student2.identity.gmid)
-    print(f"✅ {student2.identity.name} left {classroom.name}")
+    print(f"[Done] {student2.identity.name} left {classroom.name}")
     db.record_visit_end(student2.identity.gmid, classroom.id)
 
     # Check who's still in classroom
@@ -322,15 +322,15 @@ Create variables for your name, age, and favorite color.
 
     teacher_path = settings.minds_dir / f"{teacher.identity.name}.json"
     teacher.save(teacher_path)
-    print(f"✅ Saved: {teacher.identity.name}")
+    print(f"[Done] Saved: {teacher.identity.name}")
 
     student1_path = settings.minds_dir / f"{student1.identity.name}.json"
     student1.save(student1_path)
-    print(f"✅ Saved: {student1.identity.name}")
+    print(f"[Done] Saved: {student1.identity.name}")
 
     student2_path = settings.minds_dir / f"{student2.identity.name}.json"
     student2.save(student2_path)
-    print(f"✅ Saved: {student2.identity.name}")
+    print(f"[Done] Saved: {student2.identity.name}")
 
     # =========================================================================
     # SUMMARY

@@ -188,13 +188,34 @@ class AutonomousOrchestrator:
         start_time = datetime.now()
         
         try:
-            # Step 1: Understand request deeply
+            # Step 1: Use classification if provided in context, otherwise understand request
             self.mind.logger.action("orchestrator", f"Understanding request: {user_request}")
-            understanding = await self.reasoner.understand_request(
-                request=user_request,
-                files=uploaded_files,
-                context=context or {}
-            )
+            
+            # Check if we have classification from intent classifier
+            if context and "classification" in context:
+                # Use comprehensive classification from intent classifier
+                classification = context["classification"]
+                understanding = classification.get("task_details", {})
+                # Ensure we have the understanding structure
+                if "understanding" not in understanding:
+                    understanding["understanding"] = {
+                        "intent": classification.get("intent", user_request),
+                        "topic": classification.get("task_details", {}).get("topic", user_request),
+                        "output_format": classification.get("task_details", {}).get("output_type", "other"),
+                        "output_filename": classification.get("task_details", {}).get("filename", "output"),
+                        "needs_internet": classification.get("requires_internet", False),
+                        "suggested_approach": "code_only",
+                        "content_structure": classification.get("task_details", {}).get("content_structure", {})
+                    }
+                print(f"[DEBUG orchestrator] Using classification from intent classifier")
+                print(f"[DEBUG orchestrator] Filename: {understanding.get('understanding', {}).get('output_filename', 'unknown')}")
+            else:
+                # Fallback to reasoner
+                understanding = await self.reasoner.understand_request(
+                    request=user_request,
+                    files=uploaded_files,
+                    context=context or {}
+                )
             
             # Step 2: Search memory for similar past tasks
             self.mind.logger.action("orchestrator", "Searching for similar past solutions")
@@ -211,14 +232,16 @@ class AutonomousOrchestrator:
             
             # Step 4: Execute plan step by step
             self.mind.logger.action("orchestrator", f"Executing {len(plan.steps)} steps")
+            print(f"[DEBUG orchestrator] Plan has {len(plan.steps)} steps to execute")
             results = []
             
             for i, step in enumerate(plan.steps):
                 self.mind.logger.action("orchestrator", f"Step {i+1}/{len(plan.steps)}: {step.description}")
+                print(f"[DEBUG orchestrator] Step {i+1}/{len(plan.steps)}: {step.type.value}")
                 
                 try:
                     if step.type == StepType.CODE_EXECUTION:
-                        result = await self._execute_code_step(step, uploaded_files)
+                        result = await self._execute_code_step(step, uploaded_files, understanding)
                     elif step.type == StepType.BROWSER_TASK:
                         result = await self._execute_browser_step(step)
                     elif step.type == StepType.FILE_PROCESSING:
@@ -234,11 +257,17 @@ class AutonomousOrchestrator:
                     step.success = True
                     results.append(result)
                     
+                    print(f"[DEBUG orchestrator] Step {i+1} completed successfully")
+                    
                     # Update context for next step
                     if isinstance(result, dict):
                         step.context.update(result)
                     
                 except Exception as e:
+                    print(f"[DEBUG orchestrator] Step {i+1} FAILED: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    
                     self.mind.logger.error("orchestrator_step", f"Step failed: {str(e)}")
                     step.error = str(e)
                     step.success = False
@@ -246,18 +275,24 @@ class AutonomousOrchestrator:
                     
                     # Decide whether to continue or stop
                     if self._is_critical_step(step):
+                        print(f"[DEBUG orchestrator] Critical step failed, stopping execution")
                         break
+            
+            print(f"[DEBUG orchestrator] All steps completed. Total results: {len(results)}")
             
             # Step 5: Reflect and learn
             self.mind.logger.action("orchestrator", "Reflecting on execution")
+            print(f"[DEBUG orchestrator] Starting reflection...")
             await self.reasoner.reflect_on_execution(
                 task=user_request,
                 plan=plan,
                 results=results
             )
+            print(f"[DEBUG orchestrator] Reflection complete")
             
             # Step 6: Store successful solution
             if all(step.success for step in plan.steps):
+                print(f"[DEBUG orchestrator] All steps successful, storing solution")
                 await self._store_solution(user_request, plan, results)
             
             # Collect artifacts (files, images, etc.)
@@ -287,16 +322,27 @@ class AutonomousOrchestrator:
     async def _execute_code_step(
         self,
         step: ExecutionStep,
-        uploaded_files: Optional[List[UploadedFile]]
+        uploaded_files: Optional[List[UploadedFile]],
+        understanding: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Execute code generation and execution step."""
+        
+        print(f"[DEBUG orchestrator] Starting code generation for: {step.description[:50]}...")
+        
+        # Merge understanding data into step context
+        context = step.context.copy() if step.context else {}
+        if understanding:
+            context.update(understanding)
         
         # Generate code for this specific task
         code_result = await self.code_generator.generate_solution(
             task=step.description,
-            context=step.context,
+            context=context,
             files=uploaded_files
         )
+        
+        print(f"[DEBUG orchestrator] Code generated, length: {len(code_result.source)} bytes")
+        print(f"[DEBUG orchestrator] Starting code execution with timeout: {step.timeout}s")
         
         # Execute generated code
         exec_result = await self.code_executor.execute_code(
@@ -305,6 +351,15 @@ class AutonomousOrchestrator:
             timeout=step.timeout,
             files=[f.path for f in uploaded_files] if uploaded_files else None
         )
+        
+        print(f"[DEBUG orchestrator] Code execution completed")
+        print(f"[DEBUG orchestrator] Success: {exec_result.success}")
+        print(f"[DEBUG orchestrator] Stdout length: {len(exec_result.stdout)}")
+        print(f"[DEBUG orchestrator] Stderr length: {len(exec_result.stderr)}")
+        if exec_result.stdout:
+            print(f"[DEBUG orchestrator] Stdout preview: {exec_result.stdout[:200]}")
+        if exec_result.stderr:
+            print(f"[DEBUG orchestrator] Stderr preview: {exec_result.stderr[:200]}")
         
         return {
             "type": "code_execution",
@@ -361,7 +416,7 @@ class AutonomousOrchestrator:
             }
         except Exception as e:
             # Fallback: ask LLM to search (it has internet access via some providers)
-            result = await self.mind.think(f"Search the internet for: {step.description}")
+            result = await self.mind.think(f"Search the internet for: {step.description}", skip_task_detection=True)
             
             return {
                 "type": "search",
@@ -372,7 +427,7 @@ class AutonomousOrchestrator:
     async def _execute_think_step(self, step: ExecutionStep) -> Dict[str, Any]:
         """Execute thinking/reasoning step."""
         
-        result = await self.mind.think(step.description)
+        result = await self.mind.think(step.description, skip_task_detection=True)
         
         return {
             "type": "think",
@@ -431,6 +486,26 @@ class AutonomousOrchestrator:
         
         for result in results:
             if isinstance(result, dict):
+                # Check for generated files in execution output
+                if "output" in result:
+                    import re
+                    import json
+                    output = result.get("output", "")
+                    
+                    # Look for __GENERATED_FILES__ marker
+                    match = re.search(r'__GENERATED_FILES__:(.+?)(?:\n|$)', output)
+                    if match:
+                        try:
+                            file_data = json.loads(match.group(1))
+                            for file_path in file_data.get("generated_files", []):
+                                artifacts.append({
+                                    "type": "file",
+                                    "path": file_path,
+                                    "name": Path(file_path).name
+                                })
+                        except:
+                            pass
+                
                 # Check for file paths in results
                 if "file_path" in result:
                     artifacts.append({

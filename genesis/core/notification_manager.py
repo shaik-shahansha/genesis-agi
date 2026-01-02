@@ -117,7 +117,19 @@ class NotificationManager:
     
     def register_websocket(self, user_email: str, websocket: Any):
         """Register a websocket connection for real-time delivery."""
+        print(f"\n{'='*80}")
+        print(f"[NOTIFICATION_MANAGER] REGISTERING WEBSOCKET")
+        print(f"[NOTIFICATION_MANAGER] Mind: {self.mind_name} ({self.mind_id})")
+        print(f"[NOTIFICATION_MANAGER] User email: {user_email}")
+        print(f"[NOTIFICATION_MANAGER] WebSocket object: {websocket}")
+        print(f"[NOTIFICATION_MANAGER] Before registration - Active connections: {list(self.websocket_connections.keys())}")
+        
         self.websocket_connections[user_email] = websocket
+        
+        print(f"[NOTIFICATION_MANAGER] After registration - Active connections: {list(self.websocket_connections.keys())}")
+        print(f"[NOTIFICATION_MANAGER] ✓ WebSocket registered successfully!")
+        print(f"{'='*80}\n")
+        
         logger.info(f"[WS] WebSocket registered for {user_email} ({self.mind_name})")
     
     def unregister_websocket(self, user_email: str):
@@ -125,6 +137,61 @@ class NotificationManager:
         if user_email in self.websocket_connections:
             del self.websocket_connections[user_email]
             logger.info(f"[WS] WebSocket unregistered for {user_email} ({self.mind_name})")
+    
+    async def send_to_websocket(
+        self,
+        user_email: str,
+        message_type: str,
+        data: Dict[str, Any]
+    ) -> bool:
+        """
+        Send a message directly to a connected WebSocket.
+        
+        This is for immediate delivery without queuing (e.g., progress updates).
+        
+        Args:
+            user_email: User's email
+            message_type: Type of message (e.g., 'task_progress', 'status_update')
+            data: Message data
+            
+        Returns:
+            True if sent successfully, False otherwise
+        """
+        try:
+            websocket = self.websocket_connections.get(user_email)
+            print(f"[DEBUG NOTIF] Looking for WebSocket for {user_email}")
+            print(f"[DEBUG NOTIF] Active connections: {list(self.websocket_connections.keys())}")
+            
+            if not websocket:
+                print(f"[DEBUG NOTIF] No WebSocket found for {user_email}")
+                return False
+            
+            print(f"[DEBUG NOTIF] WebSocket found, checking connection state...")
+            
+            # Check if websocket is still connected
+            if hasattr(websocket, 'client_state') and websocket.client_state.value != 1:  # CONNECTED = 1
+                print(f"[DEBUG NOTIF] WebSocket not connected (state={websocket.client_state.value})")
+                self.unregister_websocket(user_email)
+                return False
+            
+            print(f"[DEBUG NOTIF] Sending message type '{message_type}'...")
+            
+            await websocket.send_json({
+                "type": message_type,
+                "mind_id": self.mind_id,
+                "mind_name": self.mind_name,
+                **data
+            })
+            
+            print(f"[DEBUG NOTIF] ✓ Message sent successfully!")
+            
+            return True
+            
+        except Exception as e:
+            logger.debug(f"Could not send websocket message to {user_email}: {e}")
+            # Clean up on error
+            self.unregister_websocket(user_email)
+            return False
     
     async def cleanup_connections(self):
         """Manually trigger cleanup of stale connections."""

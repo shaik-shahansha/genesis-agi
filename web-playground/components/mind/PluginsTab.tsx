@@ -37,7 +37,7 @@ const availablePlugins = [
     name: 'Tasks', 
     category: 'Core',
     description: 'Goal-oriented task management and execution',
-    emoji: '✅',
+    emoji: '[Done]',
     requiresConfig: false,
   },
   { 

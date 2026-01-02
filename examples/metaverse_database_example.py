@@ -25,7 +25,7 @@ async def main():
 
     # Initialize metaverse database
     metaverse_db = MetaverseDB()
-    print("\n✅ Metaverse database initialized")
+    print("\n[Done] Metaverse database initialized")
 
     # =========================================================================
     # 1. CREATE MINDS - Automatically registered in database
@@ -238,7 +238,7 @@ async def main():
     metaverse_db.update_relationship_interaction(
         from_gmid=alex.identity.gmid, to_gmid=bella.identity.gmid, is_positive=True
     )
-    print(f"\n✅ Recorded positive interaction between {alex.identity.name} and {bella.identity.name}")
+    print(f"\n[Done] Recorded positive interaction between {alex.identity.name} and {bella.identity.name}")
 
     # =========================================================================
     # 6. CREATE SHARED EVENT
@@ -343,7 +343,7 @@ async def main():
     print("🎯 METAVERSE DATABASE - Key Capabilities")
     print("=" * 80)
 
-    print("\n✅ What we demonstrated:")
+    print("\n[Done] What we demonstrated:")
     print("   • Mind registry - All Minds automatically registered on birth")
     print("   • Mind discovery - Search by name, role, template, consciousness")
     print("   • Environment tracking - Real-time occupancy and visit history")

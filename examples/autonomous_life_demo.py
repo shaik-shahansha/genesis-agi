@@ -170,7 +170,7 @@ async def demo_event_driven_responses():
 
     for event in events:
         send_event_to_mind(mind, event)
-        print(f"   ✅ Sent: {event.type} (priority: {event.priority})")
+        print(f"   [Done] Sent: {event.type} (priority: {event.priority})")
 
     print()
     print("⏳ Processing events...")
@@ -210,7 +210,7 @@ async def demo_custom_routines():
         requires_llm=True,  # Learning needs LLM
     )
     add_routine_to_mind(mind, morning_learning)
-    print(f"   ✅ Added: {morning_learning.name} ({morning_learning.start_time} - {morning_learning.end_time})")
+    print(f"   [Done] Added: {morning_learning.name} ({morning_learning.start_time} - {morning_learning.end_time})")
 
     # Add focus time
     focus_time = Routine(
@@ -222,7 +222,7 @@ async def demo_custom_routines():
         requires_llm=True,
     )
     add_routine_to_mind(mind, focus_time)
-    print(f"   ✅ Added: {focus_time.name} ({focus_time.start_time} - {focus_time.end_time})")
+    print(f"   [Done] Added: {focus_time.name} ({focus_time.start_time} - {focus_time.end_time})")
 
     # Add evening reflection
     evening_reflection = Routine(
@@ -234,7 +234,7 @@ async def demo_custom_routines():
         requires_llm=True,
     )
     add_routine_to_mind(mind, evening_reflection)
-    print(f"   ✅ Added: {evening_reflection.name} ({evening_reflection.start_time} - {evening_reflection.end_time})")
+    print(f"   [Done] Added: {evening_reflection.name} ({evening_reflection.start_time} - {evening_reflection.end_time})")
     print()
 
     print("📊 Current time:", datetime.now().strftime("%H:%M"))
@@ -385,7 +385,7 @@ async def main():
     for i, (name, demo_func) in enumerate(demos, 1):
         try:
             await demo_func()
-            print(f"✅ Demo {i}/{len(demos)} complete")
+            print(f"[Done] Demo {i}/{len(demos)} complete")
             print()
             if i < len(demos):
                 await asyncio.sleep(2)  # Pause between demos

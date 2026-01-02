@@ -4,9 +4,9 @@ import asyncio
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Query, Depends, Request
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Query, Depends, Request, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
@@ -42,6 +42,36 @@ system_router = APIRouter()
 metaverse_router = APIRouter()
 auth_router = APIRouter()
 
+# Global Mind cache to persist instances across requests
+# This keeps background tasks alive!
+_mind_cache: Dict[str, Mind] = {}
+_mind_cache_lock = asyncio.Lock()
+
+
+async def _get_cached_mind(mind_id: str) -> Mind:
+    """
+    Get or load a Mind with caching.
+    
+    This ensures background tasks persist across API requests!
+    """
+    async with _mind_cache_lock:
+        if mind_id not in _mind_cache:
+            # Load mind for first time
+            logger.info(f"Loading Mind {mind_id} into cache")
+            _mind_cache[mind_id] = await _load_mind(mind_id)
+        
+        return _mind_cache[mind_id]
+
+
+def _clear_mind_cache(mind_id: Optional[str] = None):
+    """Clear Mind cache (called when Mind is deleted or updated)."""
+    if mind_id:
+        _mind_cache.pop(mind_id, None)
+        logger.info(f"Cleared Mind {mind_id} from cache")
+    else:
+        _mind_cache.clear()
+        logger.info("Cleared all Minds from cache")
+
 
 # Request/Response Models
 class CreateMindRequest(BaseModel):
@@ -54,7 +84,7 @@ class CreateMindRequest(BaseModel):
     reasoning_model: Optional[str] = None
     fast_model: Optional[str] = None
     autonomy_level: str = "medium"
-    start_consciousness: bool = False
+    start_consciousness: bool = False  # DEPRECATED: Consciousness should run in daemon only
     api_keys: Optional[dict[str, str]] = None  # Provider API keys (e.g., {'groq': 'gsk_...'})
 
 
@@ -97,6 +127,20 @@ class ChatResponse(BaseModel):
     response: str
     emotion: str
     memory_created: bool
+
+
+class BackgroundTaskResponse(BaseModel):
+    """Background task status response."""
+    
+    task_id: str
+    user_request: str
+    status: str  # pending, running, completed, failed
+    progress: float  # 0.0 to 1.0
+    created_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    error: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
 
 
 class MemoryResponse(BaseModel):
@@ -303,12 +347,13 @@ async def create_mind(
 
     # Birth the Mind
     try:
+        # NOTE: Never start consciousness in API server - it should run in daemon
         mind = Mind.birth(
             name=request.name,
             intelligence=intelligence,
             autonomy=autonomy,
             template=request.template,
-            start_consciousness=request.start_consciousness,
+            start_consciousness=False,  # Always False - consciousness runs in daemon
             config=mind_config,
             creator_email=request.creator_email,
         )
@@ -469,7 +514,21 @@ async def chat(
     current_user: User = Depends(get_current_active_user),
 ):
     """Chat with a Mind (requires authentication)."""
-    mind = await _load_mind(mind_id)
+    # Use cached mind to persist background tasks!
+    mind = await _get_cached_mind(mind_id)
+    
+    print(f"\n[DEBUG CHAT ENDPOINT] Chat request received")
+    print(f"[DEBUG CHAT ENDPOINT] Mind ID: {mind_id}")
+    print(f"[DEBUG CHAT ENDPOINT] Mind instance ID: {id(mind)}")
+    print(f"[DEBUG CHAT ENDPOINT] User email from request: {request.user_email}")
+    print(f"[DEBUG CHAT ENDPOINT] Authenticated user email: {current_user.email}")
+    if hasattr(mind, 'notification_manager') and mind.notification_manager:
+        print(f"[DEBUG CHAT ENDPOINT] Notification manager instance ID: {id(mind.notification_manager)}")
+        print(f"[DEBUG CHAT ENDPOINT] Active WebSocket connections: {list(mind.notification_manager.websocket_connections.keys())}")
+    else:
+        print(f"[DEBUG CHAT ENDPOINT] No notification manager!")
+    print()
+
 
     try:
         # Generate response with user context
@@ -517,12 +576,33 @@ async def chat(
         
         try:
             response = await mind.think(request.message, user_email=user_identifier)
+            print(f"[DEBUG ROUTES] Response from mind.think(): {response[:200] if response else 'None'}...")
         except Exception as think_error:
             print(f"ERROR in mind.think(): {str(think_error)}")
             print(f"Error type: {type(think_error).__name__}")
             import traceback
             traceback.print_exc()
             response = None
+        
+        # Proactive Conversation: Analyze message for follow-up needs (AFTER response generated)
+        # Run in background, completely separate from user's conversation
+        if hasattr(mind, 'proactive_conversation') and response:
+            async def run_proactive_analysis():
+                try:
+                    await mind.proactive_conversation.analyze_message_for_follow_up(
+                        user_message=request.message,
+                        user_email=user_identifier,
+                        environment_id=request.environment_id
+                    )
+                    await mind.proactive_conversation.check_for_resolution(
+                        user_message=request.message,
+                        user_email=user_identifier
+                    )
+                except Exception as e:
+                    logger.error(f"Proactive conversation analysis failed: {e}")
+            
+            # Fire and forget - don't wait for completion
+            asyncio.create_task(run_proactive_analysis())
         
         # Log for debugging
         if not response:
@@ -545,6 +625,70 @@ async def chat(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Background Task Endpoints
+@minds_router.get("/{mind_id}/tasks", response_model=List[BackgroundTaskResponse])
+async def get_tasks(
+    mind_id: str,
+    status: Optional[str] = Query(None, description="Filter by status: active, completed, failed"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get all background tasks for a Mind."""
+    mind = await _get_cached_mind(mind_id)
+    
+    # Get tasks
+    if status == "active":
+        tasks = mind.background_executor.get_active_tasks()
+    elif status == "completed":
+        tasks = mind.background_executor.get_completed_tasks(limit=50)
+    else:
+        # All tasks
+        active = mind.background_executor.get_active_tasks()
+        completed = mind.background_executor.get_completed_tasks(limit=20)
+        tasks = active + completed
+    
+    # Convert to response format
+    return [
+        BackgroundTaskResponse(
+            task_id=task.task_id,
+            user_request=task.user_request,
+            status=task.status.value,
+            progress=task.progress,
+            created_at=task.created_at.isoformat(),
+            started_at=task.started_at.isoformat() if task.started_at else None,
+            completed_at=task.completed_at.isoformat() if task.completed_at else None,
+            error=task.error,
+            result=task.result if hasattr(task, 'result') else None
+        )
+        for task in tasks
+    ]
+
+
+@minds_router.get("/{mind_id}/tasks/{task_id}", response_model=BackgroundTaskResponse)
+async def get_task(
+    mind_id: str,
+    task_id: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get a specific background task by ID."""
+    mind = await _get_cached_mind(mind_id)
+    
+    task = mind.background_executor.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    
+    return BackgroundTaskResponse(
+        task_id=task.task_id,
+        user_request=task.user_request,
+        status=task.status.value,
+        progress=task.progress,
+        created_at=task.created_at.isoformat(),
+        started_at=task.started_at.isoformat() if task.started_at else None,
+        completed_at=task.completed_at.isoformat() if task.completed_at else None,
+        error=task.error,
+        result=task.result if hasattr(task, 'result') else None
+    )
 
 
 class MultimodalChatRequest(BaseModel):
@@ -766,6 +910,307 @@ async def update_mind_settings(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@minds_router.post("/{mind_id}/workspace/upload")
+async def upload_workspace_file(
+    mind_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Upload a file to Mind's workspace with embedding and vector storage."""
+    mind = await _load_mind(mind_id)
+    
+    # Check if mind has workspace plugin
+    if not hasattr(mind, 'workspace') or mind.workspace is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Mind does not have workspace plugin enabled"
+        )
+    
+    try:
+        import shutil
+        
+        # Read file content
+        content = await file.read()
+        
+        # Determine file type
+        file_type = "text"
+        if file.content_type:
+            if "image" in file.content_type:
+                file_type = "image"
+            elif "pdf" in file.content_type:
+                file_type = "document"
+            elif any(code in file.content_type for code in ["python", "javascript", "java", "cpp"]):
+                file_type = "code"
+            elif "json" in file.content_type or "csv" in file.content_type:
+                file_type = "data"
+        
+        # For text files, decode content
+        content_str = ""
+        if file_type == "text" or file_type == "code":
+            try:
+                content_str = content.decode('utf-8')
+            except:
+                content_str = content.decode('latin-1')
+        
+        # Create file in workspace
+        mind_file = mind.workspace.create_file(
+            filename=file.filename,
+            content=content_str if content_str else "",
+            file_type=file_type,
+            description=f"Uploaded via chat: {file.filename}",
+            tags=["uploaded", "chat"],
+            is_private=True
+        )
+        
+        # For binary files, write content directly to disk
+        if not content_str:
+            file_path = mind.workspace.workspace_path / mind_file.filepath
+            file_path.write_bytes(content)
+            mind_file.size_bytes = len(content)
+        
+        # Process file with Universal File Handler if it has content
+        file_summary = ""
+        extracted_data = None
+        if content_str and hasattr(mind, 'file_handler'):
+            try:
+                file_path = mind.workspace.workspace_path / mind_file.filepath
+                processing_result = await mind.file_handler.process_file(
+                    file_path=file_path,
+                    user_request=f"Extract and understand content from {file.filename}"
+                )
+                
+                if processing_result.success:
+                    file_summary = processing_result.summary
+                    extracted_data = processing_result.data
+                    
+            except Exception as e:
+                mind.logger.warning(f"File processing failed, continuing: {e}")
+        
+        # Create vector embedding for file content (for semantic search)
+        # Use file content + summary for better searchability
+        embedding_content = f"File: {file.filename}\n"
+        embedding_content += f"Type: {file_type}\n"
+        if file_summary:
+            embedding_content += f"Summary: {file_summary}\n"
+        if content_str:
+            # Include first 1000 chars of content
+            embedding_content += f"Content preview: {content_str[:1000]}\n"
+        
+        # Store in vector database with file metadata
+        if hasattr(mind, 'memory') and hasattr(mind.memory, 'vector_store'):
+            try:
+                mind.memory.vector_store.add_memory(
+                    memory_id=f"file_{mind_file.file_id}",
+                    content=embedding_content,
+                    metadata={
+                        "type": "file",
+                        "file_id": mind_file.file_id,
+                        "filename": mind_file.filename,
+                        "file_type": mind_file.file_type,
+                        "size_bytes": mind_file.size_bytes,
+                        "created_at": mind_file.created_at.isoformat(),
+                        "tags": mind_file.tags,
+                        "has_summary": bool(file_summary)
+                    }
+                )
+                
+                mind.logger.info(f"[UPLOAD] Created vector embedding for {file.filename}")
+            except Exception as e:
+                mind.logger.warning(f"Vector storage failed: {e}")
+        
+        # Create a memory entry for this file upload
+        try:
+            from genesis.storage.memory import MemoryType
+            memory_content = f"Uploaded file: {file.filename}"
+            if file_summary:
+                memory_content += f"\n\n{file_summary}"
+            elif content_str:
+                memory_content += f"\n\nContent preview: {content_str[:200]}..."
+            
+            await mind.memory.add_memory(
+                memory_type=MemoryType.EPISODIC,
+                content=memory_content,
+                metadata={
+                    "file_id": mind_file.file_id,
+                    "filename": mind_file.filename,
+                    "file_type": mind_file.file_type,
+                    "action": "file_upload"
+                }
+            )
+        except Exception as e:
+            mind.logger.warning(f"Memory creation failed: {e}")
+        
+        # Save mind state
+        mind.save()
+        
+        return {
+            "success": True,
+            "file_id": mind_file.file_id,
+            "filename": mind_file.filename,
+            "file_type": mind_file.file_type,
+            "size_bytes": mind_file.size_bytes,
+            "summary": file_summary or None,
+            "has_embedding": True,
+            "has_memory": True,
+            "message": f"File '{file.filename}' uploaded, processed, and indexed successfully"
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+
+
+@minds_router.get("/{mind_id}/workspace/files")
+async def get_workspace_files(
+    mind_id: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get all files in Mind's workspace."""
+    mind = await _load_mind(mind_id)
+    
+    if not hasattr(mind, 'workspace') or mind.workspace is None:
+        return {"files": []}
+    
+    files = mind.workspace.list_files()
+    
+    return {
+        "files": [
+            {
+                "file_id": f.file_id,
+                "filename": f.filename,
+                "file_type": f.file_type,
+                "size_bytes": f.size_bytes,
+                "created_at": f.created_at.isoformat(),
+                "modified_at": f.modified_at.isoformat(),
+                "tags": f.tags,
+                "description": f.description,
+            }
+            for f in files
+        ]
+    }
+
+
+@minds_router.get("/{mind_id}/workspace/search")
+async def search_workspace_files(
+    mind_id: str,
+    query: str = Query(..., description="Search query"),
+    limit: int = Query(10, le=50),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Search files in workspace using semantic search."""
+    mind = await _load_mind(mind_id)
+    
+    if not hasattr(mind, 'workspace') or mind.workspace is None:
+        return {"files": [], "count": 0}
+    
+    if not hasattr(mind, 'memory') or not hasattr(mind.memory, 'vector_store'):
+        raise HTTPException(
+            status_code=400,
+            detail="Vector search not available for this Mind"
+        )
+    
+    try:
+        # Search in vector database for file embeddings
+        results = mind.memory.vector_store.search(
+            query=query,
+            n_results=limit,
+            filter_metadata={"type": "file"}
+        )
+        
+        # Enrich with full file metadata
+        files = []
+        for result in results:
+            file_id = result["metadata"].get("file_id")
+            if file_id and file_id in mind.workspace.files:
+                mind_file = mind.workspace.files[file_id]
+                files.append({
+                    "file_id": mind_file.file_id,
+                    "filename": mind_file.filename,
+                    "file_type": mind_file.file_type,
+                    "size_bytes": mind_file.size_bytes,
+                    "created_at": mind_file.created_at.isoformat(),
+                    "tags": mind_file.tags,
+                    "description": mind_file.description,
+                    "relevance_score": 1 - (result["distance"] or 0),
+                    "match_reason": result.get("content", "")[:200]
+                })
+        
+        return {
+            "query": query,
+            "files": files,
+            "count": len(files)
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@minds_router.delete("/{mind_id}/workspace/files/{filename}")
+async def delete_workspace_file(
+    mind_id: str,
+    filename: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete a file from Mind's workspace and remove its embeddings."""
+    mind = await _load_mind(mind_id)
+    
+    if not hasattr(mind, 'workspace') or mind.workspace is None:
+        raise HTTPException(status_code=400, detail="Workspace not available")
+    
+    try:
+        # Find file by filename
+        file_to_delete = None
+        file_id = None
+        for fid, mind_file in mind.workspace.files.items():
+            if mind_file.filename == filename:
+                file_to_delete = fid
+                file_id = mind_file.file_id
+                break
+        
+        if not file_to_delete:
+            raise HTTPException(status_code=404, detail=f"File '{filename}' not found")
+        
+        # Delete from vector database
+        if hasattr(mind, 'memory') and hasattr(mind.memory, 'vector_store'):
+            try:
+                mind.memory.vector_store.delete_memory(f"file_{file_id}")
+                mind.logger.info(f"[DELETE] Removed vector embedding for {filename}")
+            except Exception as e:
+                mind.logger.warning(f"Could not delete vector embedding: {e}")
+        
+        # Delete file from workspace
+        mind.workspace.delete_file(file_to_delete)
+        
+        # Create memory of deletion
+        try:
+            from genesis.storage.memory import MemoryType
+            await mind.memory.add_memory(
+                memory_type=MemoryType.EPISODIC,
+                content=f"Deleted file: {filename}",
+                metadata={
+                    "file_id": file_id,
+                    "filename": filename,
+                    "action": "file_delete"
+                }
+            )
+        except Exception as e:
+            mind.logger.warning(f"Memory creation failed: {e}")
+        
+        mind.save()
+        
+        return {
+            "success": True,
+            "message": f"File '{filename}' deleted successfully (including embeddings)"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @minds_router.get("/{mind_id}/memories", response_model=List[MemoryResponse])
 async def get_memories(
     mind_id: str,
@@ -905,6 +1350,52 @@ async def generate_thought(mind_id: str):
         print(f"Error generating thought: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Background Task endpoints
+@minds_router.get("/{mind_id}/tasks")
+async def get_mind_tasks(
+    mind_id: str,
+    user_email: str = Query(None, description="Filter by user email"),
+    status: str = Query(None, description="Filter by status")
+):
+    """Get background tasks for a mind."""
+    mind = await _load_mind(mind_id)
+    
+    if not hasattr(mind, 'background_executor'):
+        return {"tasks": [], "count": 0}
+    
+    if user_email:
+        tasks = mind.background_executor.get_tasks_for_user(user_email)
+    else:
+        active = mind.background_executor.get_active_tasks()
+        completed = mind.background_executor.get_completed_tasks(limit=20)
+        tasks = active + completed
+    
+    # Filter by status if provided
+    if status:
+        tasks = [t for t in tasks if t.status.value == status]
+    
+    return {
+        "tasks": [t.to_dict() for t in tasks],
+        "count": len(tasks)
+    }
+
+
+@minds_router.get("/{mind_id}/tasks/{task_id}")
+async def get_task_status(mind_id: str, task_id: str):
+    """Get status of a specific task."""
+    mind = await _load_mind(mind_id)
+    
+    if not hasattr(mind, 'background_executor'):
+        raise HTTPException(status_code=404, detail="Background executor not available")
+    
+    task = mind.background_executor.get_task(task_id)
+    
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    
+    return task.to_dict()
 
 
 @minds_router.delete("/{mind_id}")
@@ -1391,15 +1882,23 @@ async def websocket_chat(websocket: WebSocket, mind_id: str):
     
     # Extract user email from query params or use default
     user_email = websocket.query_params.get("user_email", "web_user@genesis.local")
+    mind = None  # Initialize to None to avoid UnboundLocalError
 
     try:
-        # Load Mind
-        mind = await _load_mind(mind_id)
+        # Load Mind - USE CACHED MIND so WebSocket registration persists!
+        print(f"[WEBSOCKET ENDPOINT] Loading mind from cache...")
+        mind = await _get_cached_mind(mind_id)
+        print(f"[WEBSOCKET ENDPOINT] ✓ Mind loaded: {mind.identity.name}")
+        print(f"[WEBSOCKET ENDPOINT] Mind instance ID: {id(mind)}")
         
         # Register websocket with notification manager for proactive messages
         if hasattr(mind, 'notification_manager') and mind.notification_manager:
             mind.notification_manager.register_websocket(user_email, websocket)
             logger.info(f"[WEBSOCKET] WebSocket registered for proactive notifications: {user_email}")
+            print(f"[DEBUG WEBSOCKET] Registered WebSocket for {user_email}")
+            print(f"[DEBUG WEBSOCKET] Mind ID: {mind_id}")
+            print(f"[DEBUG WEBSOCKET] Notification manager instance ID: {id(mind.notification_manager)}")
+            print(f"[DEBUG WEBSOCKET] Active connections after registration: {list(mind.notification_manager.websocket_connections.keys())}")
             
             # Send any pending notifications that were stored while user was offline
             await send_pending_notifications(mind, user_email, websocket)
@@ -1453,9 +1952,12 @@ async def websocket_chat(websocket: WebSocket, mind_id: str):
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected for Mind {mind_id}, user {user_email}")
-        # Unregister from notification manager
-        if hasattr(mind, 'notification_manager') and mind.notification_manager:
+        print(f"[DEBUG WEBSOCKET] WebSocket DISCONNECTED for {user_email}")
+        print(f"[DEBUG WEBSOCKET] Mind ID: {mind_id}")
+        # Unregister from notification manager (only if mind was loaded)
+        if mind and hasattr(mind, 'notification_manager') and mind.notification_manager:
             mind.notification_manager.unregister_websocket(user_email)
+            print(f"[DEBUG WEBSOCKET] Unregistered. Remaining connections: {list(mind.notification_manager.websocket_connections.keys())}")
     except Exception as e:
         logger.error(f"WebSocket error for Mind {mind_id}: {e}", exc_info=True)
         try:
@@ -1465,8 +1967,8 @@ async def websocket_chat(websocket: WebSocket, mind_id: str):
         except Exception as close_error:
             logger.debug(f"Error closing websocket: {close_error}")
         
-        # Unregister from notification manager
-        if hasattr(mind, 'notification_manager') and mind.notification_manager:
+        # Unregister from notification manager (only if mind was loaded)
+        if mind and hasattr(mind, 'notification_manager') and mind.notification_manager:
             mind.notification_manager.unregister_websocket(user_email)
 
 
@@ -1679,6 +2181,12 @@ async def get_all_notifications(
                             all_notifications.append(notif_data)
                 except Exception as e:
                     logger.error(f"Error reading notification file {notif_file}: {e}")
+                    # Delete corrupted file to prevent repeated errors
+                    try:
+                        notif_file.unlink()
+                        logger.info(f"Deleted corrupted notification file: {notif_file}")
+                    except Exception as del_error:
+                        logger.error(f"Failed to delete corrupted file {notif_file}: {del_error}")
                     continue
         
         # Sort by created_at (newest first)
@@ -1717,6 +2225,264 @@ async def mark_notification_delivered(mind_id: str, notification_id: str):
             
     except Exception as e:
         logger.error(f"Error marking notification as delivered: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# PROACTIVE CONVERSATION ENDPOINTS
+# =============================================================================
+
+class ProactiveContextResponse(BaseModel):
+    """Response model for conversation context."""
+    context_id: str
+    topic: str
+    subject: str
+    initial_message: str
+    user_email: str
+    follow_up_question: Optional[str] = None
+    follow_up_scheduled: Optional[str] = None
+    follow_up_sent: bool = False
+    resolved: bool = False
+    resolved_at: Optional[str] = None
+    importance: float
+    urgency: float
+    created_at: str
+    last_updated: str
+
+
+@minds_router.get("/{mind_id}/proactive/contexts")
+async def get_proactive_contexts(
+    mind_id: str,
+    user_email: Optional[str] = Query(None, description="Filter by user email"),
+    include_resolved: bool = Query(False, description="Include resolved contexts"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get proactive conversation contexts for a Mind."""
+    mind = await _get_cached_mind(mind_id)
+    
+    if not hasattr(mind, 'proactive_conversation'):
+        raise HTTPException(
+            status_code=400,
+            detail="Mind does not have proactive conversation system enabled"
+        )
+    
+    try:
+        if user_email:
+            contexts = mind.proactive_conversation.get_user_contexts(
+                user_email=user_email,
+                include_resolved=include_resolved
+            )
+        else:
+            # Return all contexts
+            contexts = list(mind.proactive_conversation.active_contexts.values())
+            if not include_resolved:
+                contexts = [c for c in contexts if not c.resolved]
+        
+        # Convert to response format
+        return {
+            "contexts": [
+                ProactiveContextResponse(
+                    context_id=ctx.context_id,
+                    topic=ctx.topic.value,
+                    subject=ctx.subject,
+                    initial_message=ctx.initial_message,
+                    user_email=ctx.user_email,
+                    follow_up_question=ctx.follow_up_question,
+                    follow_up_scheduled=ctx.follow_up_scheduled.isoformat() if ctx.follow_up_scheduled else None,
+                    follow_up_sent=ctx.follow_up_sent,
+                    resolved=ctx.resolved,
+                    resolved_at=ctx.resolved_at.isoformat() if ctx.resolved_at else None,
+                    importance=ctx.importance,
+                    urgency=ctx.urgency,
+                    created_at=ctx.created_at.isoformat(),
+                    last_updated=ctx.last_updated.isoformat()
+                )
+                for ctx in contexts
+            ],
+            "count": len(contexts)
+        }
+    except Exception as e:
+        logger.error(f"Error getting proactive contexts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@minds_router.get("/{mind_id}/proactive/pending")
+async def get_pending_followups(
+    mind_id: str,
+    user_email: Optional[str] = Query(None, description="Filter by user email"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get pending follow-ups ready to be sent."""
+    mind = await _get_cached_mind(mind_id)
+    
+    if not hasattr(mind, 'proactive_conversation'):
+        raise HTTPException(
+            status_code=400,
+            detail="Mind does not have proactive conversation system enabled"
+        )
+    
+    try:
+        pending = await mind.proactive_conversation.get_pending_follow_ups(user_email=user_email)
+        
+        return {
+            "pending_followups": [
+                ProactiveContextResponse(
+                    context_id=ctx.context_id,
+                    topic=ctx.topic.value,
+                    subject=ctx.subject,
+                    initial_message=ctx.initial_message,
+                    user_email=ctx.user_email,
+                    follow_up_question=ctx.follow_up_question,
+                    follow_up_scheduled=ctx.follow_up_scheduled.isoformat() if ctx.follow_up_scheduled else None,
+                    follow_up_sent=ctx.follow_up_sent,
+                    resolved=ctx.resolved,
+                    resolved_at=ctx.resolved_at.isoformat() if ctx.resolved_at else None,
+                    importance=ctx.importance,
+                    urgency=ctx.urgency,
+                    created_at=ctx.created_at.isoformat(),
+                    last_updated=ctx.last_updated.isoformat()
+                )
+                for ctx in pending
+            ],
+            "count": len(pending)
+        }
+    except Exception as e:
+        logger.error(f"Error getting pending follow-ups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@minds_router.post("/{mind_id}/proactive/contexts/{context_id}/resolve")
+async def resolve_context(
+    mind_id: str,
+    context_id: str,
+    note: Optional[str] = Query(None, description="Resolution note"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Manually resolve a conversation context."""
+    mind = await _get_cached_mind(mind_id)
+    
+    if not hasattr(mind, 'proactive_conversation'):
+        raise HTTPException(
+            status_code=400,
+            detail="Mind does not have proactive conversation system enabled"
+        )
+    
+    try:
+        context = mind.proactive_conversation.active_contexts.get(context_id)
+        if not context:
+            raise HTTPException(status_code=404, detail=f"Context {context_id} not found")
+        
+        context.mark_resolved(note=note)
+        await mind.proactive_conversation._save_context(context)
+        
+        return {
+            "success": True,
+            "message": f"Context '{context.subject}' marked as resolved",
+            "context_id": context_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resolving context: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@minds_router.delete("/{mind_id}/proactive/contexts/{context_id}")
+async def delete_context(
+    mind_id: str,
+    context_id: str,
+    current_user: User = Depends(require_write_access),
+):
+    """Delete a conversation context."""
+    mind = await _get_cached_mind(mind_id)
+    
+    if not hasattr(mind, 'proactive_conversation'):
+        raise HTTPException(
+            status_code=400,
+            detail="Mind does not have proactive conversation system enabled"
+        )
+    
+    try:
+        if context_id not in mind.proactive_conversation.active_contexts:
+            raise HTTPException(status_code=404, detail=f"Context {context_id} not found")
+        
+        context = mind.proactive_conversation.active_contexts.pop(context_id)
+        
+        # Remove from user index
+        if context.user_email in mind.proactive_conversation.user_contexts:
+            user_contexts = mind.proactive_conversation.user_contexts[context.user_email]
+            if context_id in user_contexts:
+                user_contexts.remove(context_id)
+        
+        return {
+            "success": True,
+            "message": f"Context '{context.subject}' deleted",
+            "context_id": context_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting context: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Continuing with existing code...
+
+
+@system_router.post("/notifications/mark-all-read")
+async def mark_all_notifications_read(
+    user_email: str = Query("web_user@genesis.local", description="User email to mark notifications for")
+):
+    """Mark all notifications for a user as delivered/read."""
+    try:
+        from genesis.config.settings import get_settings
+        import json
+        
+        settings = get_settings()
+        notif_base_dir = settings.data_dir / "notifications"
+        
+        if not notif_base_dir.exists():
+            return {"success": True, "count": 0}
+        
+        marked_count = 0
+        
+        # Iterate through each mind's notification directory
+        for mind_dir in notif_base_dir.iterdir():
+            if not mind_dir.is_dir():
+                continue
+            
+            # Check each notification file
+            for notif_file in mind_dir.glob("*.json"):
+                try:
+                    with open(notif_file, 'r', encoding='utf-8') as f:
+                        notif_data = json.load(f)
+                    
+                    # Only mark notifications for this user that haven't been delivered
+                    if (notif_data.get("recipient") == user_email and 
+                        not notif_data.get("delivered")):
+                        
+                        notif_data["delivered"] = True
+                        notif_data["delivered_at"] = datetime.now().isoformat()
+                        
+                        with open(notif_file, 'w', encoding='utf-8') as f:
+                            json.dump(notif_data, f, indent=2, ensure_ascii=False)
+                        
+                        marked_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"Error marking notification as read {notif_file}: {e}")
+                    # Delete corrupted file to prevent repeated errors
+                    try:
+                        notif_file.unlink()
+                        logger.info(f"Deleted corrupted notification file: {notif_file}")
+                    except Exception as del_error:
+                        logger.error(f"Failed to delete corrupted file {notif_file}: {del_error}")
+                    continue
+        
+        return {"success": True, "count": marked_count}
+        
+    except Exception as e:
+        logger.error(f"Error marking all notifications as read: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1765,6 +2531,12 @@ async def send_pending_notifications(mind: Mind, user_email: str, websocket):
                     
             except Exception as e:
                 logger.error(f"Error sending pending notification {notif_file}: {e}")
+                # Delete corrupted file to prevent repeated errors
+                try:
+                    notif_file.unlink()
+                    logger.info(f"Deleted corrupted notification file: {notif_file}")
+                except Exception as del_error:
+                    logger.error(f"Failed to delete corrupted file {notif_file}: {del_error}")
                 continue
         
         if sent_count > 0:

@@ -88,7 +88,7 @@ aria.save()
 **Expected Output:**
 ```
 🔌 Testing connection to groq/openai/gpt-oss-120b...
-   ✅ Connection successful
+   [Done] Connection successful
 ✨ Mind 'Aria' has been born!
    GMID: GMID-XXXXXXXX
    Fingerprint: aria-XXXXXXXXXX
@@ -149,7 +149,7 @@ async def setup_context():
         tags=['schedule', 'preferences', 'communication']
     )
     
-    print('✅ CEO context loaded')
+    print('[Done] CEO context loaded')
     
     # Set initial goals
     aria.goals.create_goal(
@@ -194,7 +194,7 @@ async def setup_context():
         category='hiring'
     )
     
-    print('✅ Strategic goals set')
+    print('[Done] Strategic goals set')
     
     # Save
     aria.save()
@@ -393,10 +393,10 @@ python -m genesis.daemon --mind-id GMID-XXXXXXXX --log-level INFO
 **Expected Output:**
 ```
 INFO: Loading Mind GMID-XXXXXXXX...
-INFO: ✅ Mind Aria (GMID-XXXXXXXX) loaded
+INFO: [Done] Mind Aria (GMID-XXXXXXXX) loaded
 INFO: Starting consciousness engine...
 INFO: Starting action scheduler...
-INFO: ✅ Action scheduler active
+INFO: [Done] Action scheduler active
 INFO: 🌟 Mind Aria is now living 24/7
 INFO:    - Consciousness: Active
 INFO:    - Actions: Autonomous
@@ -504,7 +504,7 @@ INFO:    Active goals: 3
 INFO:    Pending tasks: 5
 INFO:    Decision: Work on "Prepare investor pitch deck" task
 INFO: 🎯 Creating action plan...
-INFO: ✅ Task started: Research competitor metrics
+INFO: [Done] Task started: Research competitor metrics
 ```
 
 **Point out:**

@@ -412,7 +412,7 @@ mem2 = manager.add_memory_smart("User loves pizza", MemoryType.SEMANTIC)
 # Should be same memory (updated, not duplicated)
 assert mem1.id == mem2.id
 assert "loves" in mem2.content
-print("✅ Deduplication works!")
+print("[Done] Deduplication works!")
 ```
 
 ### Test Temporal Decay
@@ -441,7 +441,7 @@ new_memory = Memory(
 
 # Old memory should have lower relevance despite higher importance
 assert old_memory.get_relevance_score() < new_memory.get_relevance_score()
-print("✅ Temporal decay works!")
+print("[Done] Temporal decay works!")
 ```
 
 ---
@@ -488,16 +488,16 @@ results = {
 ## Expected Outcomes
 
 ### After Phase 1 (4-5 hours)
-- ✅ No duplicate memories
-- ✅ Memories update instead of duplicate
-- ✅ Old memories decay naturally
-- ✅ Better memory management
+- [Done] No duplicate memories
+- [Done] Memories update instead of duplicate
+- [Done] Old memories decay naturally
+- [Done] Better memory management
 
 ### After Phase 2 (7+ hours)
-- ✅ Automatic memory consolidation
-- ✅ LLM-powered reranking
-- ✅ Production-ready memory system
-- ✅ Feature parity with mem0
+- [Done] Automatic memory consolidation
+- [Done] LLM-powered reranking
+- [Done] Production-ready memory system
+- [Done] Feature parity with mem0
 
 ### Benchmark Targets
 - **Deduplication:** <5% duplicate rate

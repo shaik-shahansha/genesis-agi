@@ -83,7 +83,7 @@ class OllamaManager:
                         status = data.get("status", "")
                         logger.info(f"  {status}")
 
-            logger.info(f"✅ Model {model_name} downloaded successfully")
+            logger.info(f"[Done] Model {model_name} downloaded successfully")
             return True
 
         except Exception as e:
@@ -110,7 +110,7 @@ class OllamaManager:
                 timeout=30.0
             )
             response.raise_for_status()
-            logger.info(f"✅ Removed model {model_name}")
+            logger.info(f"[Done] Removed model {model_name}")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to remove model: {e}")

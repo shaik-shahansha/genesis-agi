@@ -194,13 +194,13 @@ class ConsciousnessEngine:
                             )
                         
                         await self._revise_memories(memory_manager)
-                        print(f"[{self.mind_name}] ✅ Memory consolidation complete")
+                        print(f"[{self.mind_name}] [Done] Memory consolidation complete")
                         
                         # Send completion notification
                         if self.notification_manager:
                             await self.notification_manager.send_notification(
                                 recipient="web_user@genesis.local",
-                                title=f"✅ {self.mind_name} memory consolidation complete",
+                                title=f"[Done] {self.mind_name} memory consolidation complete",
                                 message="Memory organization and optimization finished",
                                 priority="low",
                                 metadata={"type": "consciousness_activity", "activity": "memory_consolidation_complete"}
@@ -222,13 +222,13 @@ class ConsciousnessEngine:
                             )
                         
                         await self._explore_curiosity(thought, memory_manager)
-                        print(f"[{self.mind_name}] ✅ Curiosity exploration complete")
+                        print(f"[{self.mind_name}] [Done] Curiosity exploration complete")
                         
                         # Send completion notification
                         if self.notification_manager:
                             await self.notification_manager.send_notification(
                                 recipient="web_user@genesis.local",
-                                title=f"✅ {self.mind_name} curiosity exploration complete",
+                                title=f"[Done] {self.mind_name} curiosity exploration complete",
                                 message="Finished investigating interesting thoughts and connections",
                                 priority="low",
                                 metadata={"type": "consciousness_activity", "activity": "curiosity_exploration_complete"}
@@ -480,7 +480,7 @@ Write the dream in first person, present tense. Be creative and symbolic."""
 
             dream_narrative = response.content
             
-            print(f"[{self.mind_name}] ✅ DREAM NARRATIVE GENERATED")
+            print(f"[{self.mind_name}] [Done] DREAM NARRATIVE GENERATED")
             print(f"[{self.mind_name}]   📖 DREAM:\n{dream_narrative}\n")
 
             # Extract insights from the dream
@@ -539,7 +539,7 @@ List 2-3 brief insights (one per line)."""
             
             # Log the dream
             self.dream_count += 1
-            print(f"[{self.mind_name}] ✅ DREAM COMPLETE (total dreams: {self.dream_count})")
+            print(f"[{self.mind_name}] [Done] DREAM COMPLETE (total dreams: {self.dream_count})")
             print(f"{'='*60}\n")
             
             if self.logger:

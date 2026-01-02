@@ -62,7 +62,7 @@ def populate_sample_minds():
             listing.rating = 4.8  # High initial rating
             manager.session.commit()
 
-            print(f"  ✅ Created: {config['name']} (ID: {listing.id})")
+            print(f"  [Done] Created: {config['name']} (ID: {listing.id})")
             created_count += 1
 
         except Exception as e:
@@ -159,7 +159,7 @@ def populate_sample_environments():
             listing.rating = 4.7
             manager.session.commit()
 
-            print(f"  ✅ Created: {env_config['name']} (ID: {listing.id})")
+            print(f"  [Done] Created: {env_config['name']} (ID: {listing.id})")
             created_count += 1
 
         except Exception as e:
@@ -249,7 +249,7 @@ def populate_sample_skills():
             listing.rating = 4.6
             manager.session.commit()
 
-            print(f"  ✅ Created: {skill['name']} (ID: {listing.id})")
+            print(f"  [Done] Created: {skill['name']} (ID: {listing.id})")
             created_count += 1
 
         except Exception as e:
@@ -271,7 +271,7 @@ def main():
     skills_count = populate_sample_skills()
 
     print("\n" + "=" * 60)
-    print(f"  ✅ COMPLETE! Total items created: {minds_count + envs_count + skills_count}")
+    print(f"  [Done] COMPLETE! Total items created: {minds_count + envs_count + skills_count}")
     print(f"     • {minds_count} Minds")
     print(f"     • {envs_count} Environments")
     print(f"     • {skills_count} Skills")

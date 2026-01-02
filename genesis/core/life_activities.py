@@ -1161,7 +1161,7 @@ if __name__ == "__main__":
                 print()
 
             if result["activity_completed"]:
-                print(f"  ✅ Completed! Essence: +{result['essence_earned']}")
+                print(f"  [Done] Completed! Essence: +{result['essence_earned']}")
                 print(f"  Needs fulfilled: {result['needs_fulfilled']}\n")
 
             await asyncio.sleep(0.1)

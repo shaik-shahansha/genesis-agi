@@ -54,7 +54,7 @@ class CompressedMemoryManager(MemoryManager):
                 mem0_config = self._build_mem0_config(provider_name, model_name)
                 
                 self.mem0_client = Mem0Client.from_config(mem0_config)
-                print(f"✅ mem0 compression enabled for Mind {mind_id} using {provider_name}")
+                print(f"[Done] mem0 compression enabled for Mind {mind_id} using {provider_name}")
             except Exception as e:
                 # Gracefully fall back if mem0 fails
                 print(f"⚠️ Failed to initialize mem0: {e}")

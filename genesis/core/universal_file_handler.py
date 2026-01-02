@@ -81,6 +81,16 @@ class UniversalFileHandler:
         """
         
         try:
+            # Validate file_path
+            if file_path is None:
+                return FileProcessingResult(
+                    success=False,
+                    file_type="unknown",
+                    data={},
+                    summary="",
+                    error="No file path provided"
+                )
+            
             # Detect file type
             file_type = self._detect_file_type(file_path)
             
@@ -130,7 +140,9 @@ class UniversalFileHandler:
                 )
                 
         except Exception as e:
-            self.mind.logger.error(f"[FILE_HANDLER] Error: {e}")
+            # Fix logger call - use correct method signature
+            import logging
+            logging.error(f"[FILE_HANDLER] Error: {e}")
             
             return FileProcessingResult(
                 success=False,
@@ -142,6 +154,10 @@ class UniversalFileHandler:
     
     def _detect_file_type(self, file_path: Path) -> str:
         """Detect file type from extension and MIME type."""
+        
+        # Validate file_path
+        if file_path is None:
+            return "unknown"
         
         # Try extension first
         ext = file_path.suffix.lower().lstrip('.')
@@ -220,7 +236,7 @@ except Exception as e:
 Return ONLY the code, no explanations.
 """
         
-        code = await self.mind.think(prompt, temperature=0.2)
+        code = await self.mind.think(prompt, skip_task_detection=True)
         
         # Extract code block
         import re
@@ -244,7 +260,7 @@ Data:
 
 Be concise and helpful."""
         
-        summary = await self.mind.think(prompt, temperature=0.3, max_tokens=100)
+        summary = await self.mind.think(prompt, skip_task_detection=True)
         return summary.strip()
     
     async def _store_file_memory(

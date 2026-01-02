@@ -938,14 +938,14 @@ genesis env add-mind <env_id> MindName
 
 Genesis Environments provide:
 
-✅ **Spatial Context** - Minds know where they are  
-✅ **Access Control** - Secure private spaces with user/Mind permissions  
-✅ **Resources** - Attach files, documents, links, info to environments  
-✅ **Memory Integration** - Location-tagged experiences  
-✅ **Multi-User** - Multiple users and Minds can interact  
-✅ **Templates** - 8 pre-configured environment types  
-✅ **CLI & API** - Complete management tools  
-✅ **Web Integration** - Environment selection in chat interface  
+[Done] **Spatial Context** - Minds know where they are  
+[Done] **Access Control** - Secure private spaces with user/Mind permissions  
+[Done] **Resources** - Attach files, documents, links, info to environments  
+[Done] **Memory Integration** - Location-tagged experiences  
+[Done] **Multi-User** - Multiple users and Minds can interact  
+[Done] **Templates** - 8 pre-configured environment types  
+[Done] **CLI & API** - Complete management tools  
+[Done] **Web Integration** - Environment selection in chat interface  
 
 **Get Started:**
 ```bash

@@ -76,7 +76,7 @@ class MemoryTools:
             if success:
                 return {
                     "success": True,
-                    "message": f"✅ Updated {block_label} block",
+                    "message": f"[Done] Updated {block_label} block",
                     "old_text": old_text,
                     "new_text": new_text,
                 }
@@ -123,7 +123,7 @@ class MemoryTools:
             if success:
                 return {
                     "success": True,
-                    "message": f"✅ Added to {block_label} block",
+                    "message": f"[Done] Added to {block_label} block",
                     "content": content,
                 }
             else:

@@ -148,7 +148,7 @@ async def main():
 
     # Load
     loaded = Mind.load(save_path)
-    print(f"\n✅ Loaded Mind: {loaded.identity.name}")
+    print(f"\n[Done] Loaded Mind: {loaded.identity.name}")
     print(f"   Plugins restored: {[p.get_name() for p in loaded.plugins]}")
     print(f"   Memories preserved: {len(loaded.memory.memories)}")
     print(f"   Conversation turns: {len(loaded.conversation_history) // 2}")
@@ -157,7 +157,7 @@ async def main():
     # Summary
     # ====================================================================
     print("\n\n" + "=" * 70)
-    print("✅ Example Complete!")
+    print("[Done] Example Complete!")
     print("=" * 70)
     print(f"\nKey Takeaways:")
     print(f"  • Minimal config: ~500 tokens (80% savings!)")

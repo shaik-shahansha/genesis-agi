@@ -43,7 +43,7 @@ class SMSIntegration(Integration):
                 to=to
             )
             self.sms_sent += 1
-            logger.info(f"✅ SMS sent to {to}: {msg.sid}")
+            logger.info(f"[Done] SMS sent to {to}: {msg.sid}")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to send SMS: {e}")
@@ -102,7 +102,7 @@ class PushNotificationIntegration(Integration):
             )
             response = self.fcm.send(notification)
             self.notifications_sent += 1
-            logger.info(f"✅ Push notification sent: {response}")
+            logger.info(f"[Done] Push notification sent: {response}")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to send push notification: {e}")

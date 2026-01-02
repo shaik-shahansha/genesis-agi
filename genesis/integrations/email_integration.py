@@ -81,7 +81,7 @@ class EmailIntegration(Integration):
                 await server.send_message(msg, sender=self.email, recipients=recipients)
 
             self.emails_sent += 1
-            logger.info(f"✅ Email sent to {to}")
+            logger.info(f"[Done] Email sent to {to}")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to send email: {e}")

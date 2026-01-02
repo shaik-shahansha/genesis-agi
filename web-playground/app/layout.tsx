@@ -1,10 +1,10 @@
 import './globals.css';
-import { Inter } from 'next/font/google';
 import Link from 'next/link';
 import AuthButton from '@/components/AuthButton';
 import NotificationBell from '@/components/NotificationBell';
 
-const inter = Inter({ subsets: ['latin'] });
+// Use system fonts instead of Google Fonts to avoid SSL certificate issues
+const fontClassName = 'font-sans';
 
 export const metadata = {
   title: 'Genesis AGI - Playground',
@@ -18,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={fontClassName}>
         <div className="min-h-screen bg-slate-900">
           {/* Navigation */}
           <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-800 border-b border-slate-700">

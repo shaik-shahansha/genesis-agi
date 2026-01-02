@@ -69,7 +69,7 @@ class CalendarIntegration(Integration):
             ).execute()
 
             self.events_created += 1
-            logger.info(f"✅ Calendar event created: {created_event['id']}")
+            logger.info(f"[Done] Calendar event created: {created_event['id']}")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to create calendar event: {e}")

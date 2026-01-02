@@ -282,7 +282,7 @@ You seem interested in consciousness and AI development...
 You: exit
 
 Saving Mind state...
-✅ Saved. Goodbye!
+[Done] Saved. Goodbye!
 ```
 
 ---
@@ -375,7 +375,7 @@ genesis dream Atlas
 │   reconstruction                                  │
 ╰───────────────────────────────────────────────────╯
 
-✅ Dream completed and saved.
+[Done] Dream completed and saved.
 ```
 
 ---
@@ -448,9 +448,9 @@ genesis plugin list Atlas
 ┏━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Plugin       ┃ Version ┃ Status    ┃ Description              ┃
 ┡━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ lifecycle    │ 1.0.0   │ ✅ Enabled│ Mortality and urgency    │
-│ gen          │ 1.0.0   │ ✅ Enabled│ Economy system           │
-│ tasks        │ 1.0.0   │ ✅ Enabled│ Task management          │
+│ lifecycle    │ 1.0.0   │ [Done] Enabled│ Mortality and urgency    │
+│ gen          │ 1.0.0   │ [Done] Enabled│ Economy system           │
+│ tasks        │ 1.0.0   │ [Done] Enabled│ Task management          │
 └──────────────┴─────────┴───────────┴──────────────────────────┘
 ```
 
@@ -491,7 +491,7 @@ genesis plugin add Atlas relationships
 
 **Output**:
 ```
-✅ Added plugin 'lifecycle' to Atlas
+[Done] Added plugin 'lifecycle' to Atlas
 Plugin version: 1.0.0
 ```
 
@@ -517,7 +517,7 @@ genesis plugin remove Sage workspace
 
 **Output**:
 ```
-✅ Removed plugin 'tasks' from Atlas
+[Done] Removed plugin 'tasks' from Atlas
 ```
 
 ---
@@ -541,7 +541,7 @@ genesis plugin enable Atlas lifecycle
 
 **Output**:
 ```
-✅ Enabled plugin 'lifecycle' for Atlas
+[Done] Enabled plugin 'lifecycle' for Atlas
 ```
 
 ---
@@ -565,7 +565,7 @@ genesis plugin disable Atlas lifecycle
 
 **Output**:
 ```
-✅ Disabled plugin 'lifecycle' for Atlas
+[Done] Disabled plugin 'lifecycle' for Atlas
 Plugin remains installed but will not be used
 ```
 
@@ -603,7 +603,7 @@ genesis daemon start Atlas --log-level DEBUG
 ```
 Starting daemon for Atlas (gmid_abc123)...
 
-✅ Mind Atlas is now running as daemon
+[Done] Mind Atlas is now running as daemon
 Monitor logs: genesis daemon logs Atlas
 Stop daemon: genesis daemon stop Atlas
 ```
@@ -629,7 +629,7 @@ genesis daemon stop Atlas
 **Output**:
 ```
 Stopping daemon for Atlas...
-✅ Daemon stopped
+[Done] Daemon stopped
 ```
 
 ---
@@ -702,12 +702,12 @@ genesis daemon kill
 🛑 Stopping all Genesis daemons...
 
 Stopping daemon for Mind: gmid_abc123 (PID: 12345)
-✅ Stopped gracefully
+[Done] Stopped gracefully
 
 Stopping daemon for Mind: gmid_def456 (PID: 12346)
-✅ Stopped gracefully
+[Done] Stopped gracefully
 
-✅ Stopped 2 daemon(s)
+[Done] Stopped 2 daemon(s)
 ```
 
 **Notes**:

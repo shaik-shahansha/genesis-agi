@@ -87,7 +87,7 @@ def run(a, b):
             category="utility"
         )
 
-        print(f"✅ Created tool: {tool.name}")
+        print(f"[Done] Created tool: {tool.name}")
 
         # ACTUALLY EXECUTE IT (not fake!)
         try:
@@ -95,7 +95,7 @@ def run(a, b):
                 tool.tool_id,
                 input_data={"a": 42, "b": 27}
             )
-            print(f"✅ Execution result: {result}")
+            print(f"[Done] Execution result: {result}")
             print("   ^ THIS IS REAL EXECUTION, NOT FAKE!")
         except Exception as e:
             print(f"❌ Execution error: {e}")
@@ -108,11 +108,11 @@ def run(a, b):
 
     # Save
     path = custom.save()
-    print(f"✅ Saved to: {path}")
+    print(f"[Done] Saved to: {path}")
 
     # Load
     loaded = Mind.load(path)
-    print(f"✅ Loaded Mind: {loaded.identity.name}")
+    print(f"[Done] Loaded Mind: {loaded.identity.name}")
     print(f"   Plugins: {[p.get_name() for p in loaded.plugins]}")
 
     # ================================================================
@@ -131,7 +131,7 @@ def run(a, b):
     print(f"\nToken savings: {100 - (len(minimal_prompt.split()) / len(standard_prompt.split()) * 100):.0f}% (minimal vs standard)")
 
     print("\n" + "=" * 60)
-    print("✅ Plugin System Demo Complete!")
+    print("[Done] Plugin System Demo Complete!")
     print("=" * 60)
 
 

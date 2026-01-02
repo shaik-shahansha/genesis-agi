@@ -108,6 +108,16 @@ class Mind:
         # AUTONOMOUS: Autonomous orchestrator for world-class agent capabilities
         from genesis.core.autonomous_orchestrator import AutonomousOrchestrator
         self.autonomous_orchestrator = AutonomousOrchestrator(self)
+        
+        # INTELLIGENT INTENT CLASSIFICATION: LLM-first approach for maximum intelligence
+        from genesis.core.intent_classifier import IntelligentIntentClassifier
+        self.intent_classifier = IntelligentIntentClassifier(self)
+        
+        # BACKGROUND TASKS: Task detection and background execution
+        from genesis.core.task_detector import TaskDetector
+        from genesis.core.background_task_executor import BackgroundTaskExecutor
+        self.task_detector = TaskDetector()  # Fallback if intent classifier fails
+        self.background_executor = BackgroundTaskExecutor(self)
 
         # ENHANCED MEMORY SYSTEM:
         # 1. CoreMemory (Letta pattern) - persistent in-context memory blocks
@@ -207,6 +217,7 @@ class Mind:
         try:
             from genesis.core.notification_manager import NotificationManager
             from genesis.core.proactive_consciousness import ProactiveConsciousnessModule
+            from genesis.core.proactive_conversation import ProactiveConversationManager
             
             self.notification_manager = NotificationManager(
                 mind_id=self.identity.gmid,
@@ -219,17 +230,25 @@ class Mind:
             
             self.proactive_consciousness = ProactiveConsciousnessModule(self)
             
+            # Initialize proactive conversation system (WhatsApp-like care)
+            self.proactive_conversation = ProactiveConversationManager(self)
+            
             if self.logger:
                 self.logger.log(
                     LogLevel.INFO,
                     "Proactive systems initialized",
-                    metadata={"notification_manager": True, "proactive_consciousness": True}
+                    metadata={
+                        "notification_manager": True,
+                        "proactive_consciousness": True,
+                        "proactive_conversation": True
+                    }
                 )
         except Exception as e:
             # Proactive systems are optional - don't fail Mind creation
             print(f"[WARN] Could not initialize proactive systems: {e}")
             self.notification_manager = None
             self.proactive_consciousness = None
+            self.proactive_conversation = None
             if self.logger:
                 self.logger.log(
                     LogLevel.WARNING,
@@ -409,13 +428,19 @@ class Mind:
             if plugin.enabled:
                 plugin.on_birth(mind)
 
-        # Start consciousness if requested (typically for deployed Minds)
+        # IMPORTANT: Consciousness should ONLY run in daemon, not in API server
+        # start_consciousness parameter is deprecated and should not be used
         if start_consciousness:
-            asyncio.create_task(
-                mind.consciousness.start(
-                    mind.orchestrator, mind.emotional_state, mind.memory
-                )
+            import warnings
+            warnings.warn(
+                "start_consciousness=True is deprecated. "
+                "Consciousness should only run in the daemon (genesis daemon start <name>), "
+                "not in the API server to avoid conflicts.",
+                DeprecationWarning,
+                stacklevel=2
             )
+            # Don't actually start it - require explicit daemon use
+            print("[WARNING] start_consciousness ignored - use 'genesis daemon start <name>' instead")
 
         # Register Mind in metaverse database
         try:
@@ -464,19 +489,148 @@ class Mind:
 
         return mind
 
-    async def think(self, prompt: str, context: Optional[str] = None, user_email: Optional[str] = None, enable_actions: bool = False) -> str:
+    async def think(self, prompt: str, context: Optional[str] = None, user_email: Optional[str] = None, enable_actions: bool = False, skip_task_detection: bool = False) -> str:
         """
         Generate a thought or response with autonomous action capability.
+        
+        Now uses intelligent LLM-first classification for Copilot/Manus AI style intelligence.
 
         Args:
             prompt: The prompt to think about
             context: Optional context
             user_email: Email of the user interacting with the mind
             enable_actions: Whether to allow LLM to call actions (default: False to save API calls)
+            skip_task_detection: Skip task detection (used internally to prevent infinite loops)
 
         Returns:
             The Mind's response
         """
+        
+        # INTELLIGENT INTENT CLASSIFICATION: LLM-first approach for maximum intelligence
+        print(f"[DEBUG think] skip={skip_task_detection}, prompt='{prompt[:80]}...'")
+        if not skip_task_detection and hasattr(self, 'intent_classifier'):
+            print(f"[DEBUG think] Using intelligent intent classifier...")
+            
+            # Classify intent with comprehensive extraction
+            classification = await self.intent_classifier.classify(
+                user_message=prompt,
+                conversation_history=self.conversation_history[-5:],
+                user_email=user_email
+            )
+            
+            print(f"[DEBUG think] Classification:")
+            print(f"  is_task={classification.is_task}")
+            print(f"  task_type={classification.task_type}")
+            print(f"  confidence={classification.confidence:.2f}")
+            print(f"  requires_background={classification.requires_background}")
+            if classification.task_details:
+                print(f"  filename={classification.task_details.get('filename', 'N/A')}")
+                print(f"  topic={classification.task_details.get('topic', 'N/A')}")
+            
+            # If it's a task that requires background execution
+            if classification.is_task and classification.requires_background and classification.confidence >= 0.6:
+                self.logger.action(
+                    "intelligent_task_detected",
+                    f"Detected {classification.task_type}: {classification.intent}"
+                )
+                
+                # Start background task with comprehensive details
+                task = await self.background_executor.execute_task(
+                    user_request=prompt,
+                    user_email=user_email,
+                    notify_on_complete=True,
+                    # Pass extracted details for better execution
+                    task_metadata={
+                        "classification": classification.to_dict(),
+                        "confidence": classification.confidence
+                    }
+                )
+                
+                # Return intelligent, personalized response
+                response = f"{classification.initial_response}\n\n"
+                response += f"**Task:** {prompt}\n"
+                response += f"**Status:** In Progress\n"
+                response += f"**Task ID:** `{task.task_id}`\n"
+                
+                # Add suggestions if available
+                if classification.suggestions:
+                    response += f"\n💡 **Suggestions:**\n"
+                    for suggestion in classification.suggestions[:3]:
+                        response += f"• {suggestion}\n"
+                
+                response += f"\nI'm working on this in the background and will notify you when complete!"
+                
+                # Store in history
+                self.conversation_history.append({"role": "user", "content": prompt})
+                self.conversation_history.append({"role": "assistant", "content": response})
+                
+                # Create memory with rich metadata
+                self.memory.add_memory(
+                    content=f"User requested: {classification.intent}\nI started background task {task.task_id} to {classification.task_details.get('action', 'process request')}",
+                    memory_type=MemoryType.EPISODIC,
+                    emotion=self.emotional_state.get_emotion_value(),
+                    user_email=user_email,
+                    emotion_intensity=self.emotional_state.intensity,
+                    importance=0.8,
+                    tags=["task", "background", classification.task_type],
+                    metadata={
+                        "task_id": task.task_id,
+                        "task_type": classification.task_type,
+                        "confidence": classification.confidence,
+                        "complexity": classification.complexity,
+                        "estimated_duration": classification.estimated_duration
+                    }
+                )
+                
+                return response
+        
+        # Fallback to old task detector if intent classifier not available
+        elif not skip_task_detection and hasattr(self, 'task_detector') and self.task_detector:
+            detection = self.task_detector.detect(prompt)
+            print(f"[DEBUG think] Fallback detection: is_task={detection['is_task']}, type={detection['task_type']}, conf={detection['confidence']:.2f}")
+            
+            # If it's a task with high confidence, execute in background
+            if detection["is_task"] and detection["confidence"] >= 0.5:
+                self.logger.action(
+                    "task_detected",
+                    f"Detected {detection['task_type']} task: {prompt[:100]}"
+                )
+                
+                # Start background task
+                task = await self.background_executor.execute_task(
+                    user_request=prompt,
+                    user_email=user_email,
+                    notify_on_complete=True
+                )
+                
+                # Return immediate acknowledgment
+                response = (
+                    f"I'll work on that for you!\n\n"
+                    f"**Task:** {prompt}\n"
+                    f"**Status:** Started\n"
+                    f"**Task ID:** `{task.task_id}`\n\n"
+                    f"I'm processing this in the background and will notify you when complete. "
+                    f"You can continue with other things while I work on this."
+                )
+                
+                # Store in history
+                self.conversation_history.append({"role": "user", "content": prompt})
+                self.conversation_history.append({"role": "assistant", "content": response})
+                
+                # Create memory
+                self.memory.add_memory(
+                    content=f"User requested task: {prompt}\nI started background task {task.task_id}",
+                    memory_type=MemoryType.EPISODIC,
+                    emotion=self.emotional_state.get_emotion_value(),
+                    user_email=user_email,
+                    emotion_intensity=self.emotional_state.intensity,
+                    importance=0.8,
+                    tags=["task", "background", detection["task_type"]],
+                    metadata={"task_id": task.task_id, "task_type": detection["task_type"]}
+                )
+                
+                return response
+        
         # CONSTITUTIONAL VALIDATION: Check if prompt is safe
         is_safe, rejection_msg, violation = self.constitution.validate_user_prompt(prompt)
         if not is_safe:
@@ -628,6 +782,120 @@ class Mind:
                 )
                 response.content = final_response.content
 
+        # Clean response - strip markdown code blocks if present
+        cleaned_response = response.content
+
+        def _format_json_value(value: Any) -> str:
+            if isinstance(value, dict):
+                lines = []
+                for key, val in value.items():
+                    child = _format_json_value(val)
+                    label = key.replace("_", " ").title()
+                    if "\n" in child:
+                        lines.append(f"• {label}:\n{child}")
+                    else:
+                        lines.append(f"• {label}: {child}")
+                return "\n".join(lines)
+            if isinstance(value, list):
+                return "\n".join(f"• {_format_json_value(item)}" for item in value)
+            return str(value)
+
+        def _format_json_to_text(data: Any) -> str:
+            if isinstance(data, dict):
+                parts = []
+                for key, value in data.items():
+                    formatted = _format_json_value(value)
+                    label = key.replace("_", " ").title()
+                    if formatted.strip():
+                        if "\n" in formatted:
+                            parts.append(f"**{label}:**\n{formatted}")
+                        else:
+                            parts.append(f"**{label}:** {formatted}")
+                return "\n\n".join(parts).strip()
+            if isinstance(data, list):
+                return "\n".join(f"• {_format_json_value(item)}" for item in data).strip()
+            return str(data).strip()
+
+        def _extract_json_response(raw_text: str) -> Optional[str]:
+            stripped = raw_text.strip()
+            if not stripped or stripped[0] not in ("{", "["):
+                return None
+            try:
+                data = json.loads(stripped)
+            except json.JSONDecodeError:
+                return None
+
+            # If skip_task_detection is True, return raw JSON for internal processing
+            if skip_task_detection:
+                return stripped
+            
+            target = data.get("response") if isinstance(data, dict) and "response" in data else data
+            formatted = _format_json_to_text(target)
+            return formatted or None
+
+        print(f"[DEBUG CLEAN] Original response length: {len(cleaned_response)}")
+        print(f"[DEBUG CLEAN] First 80 chars: {cleaned_response[:80]}")
+        print(f"[DEBUG CLEAN] Last 80 chars: {cleaned_response[-80:]}")
+        print(f"[DEBUG CLEAN] Starts with backticks: {cleaned_response.strip().startswith('```')}")
+        
+        if cleaned_response.strip().startswith("```"):
+            print("[DEBUG CLEAN] Attempting to clean markdown code block...")
+            # Remove markdown code blocks (```json ... ``` or ```python ... ``` etc)
+            import re
+            # Try multiple patterns
+            stripped = cleaned_response.strip()
+            
+            # Pattern 1: Standard markdown code block
+            pattern1 = r'^```(?:\w+)?\s*\n(.*?)\n```\s*$'
+            # Pattern 2: More flexible - handle any ending
+            pattern2 = r'^```(?:\w+)?\s*\n(.*)```\s*$'
+            # Pattern 3: Even more flexible
+            pattern3 = r'^```(?:\w+)?\s*(.*)```\s*$'
+            
+            match = None
+            for i, pattern in enumerate([pattern1, pattern2, pattern3], 1):
+                match = re.search(pattern, stripped, re.DOTALL)
+                if match:
+                    print(f"[DEBUG CLEAN] Pattern {i} matched!")
+                    break
+            
+            if match:
+                print("[DEBUG CLEAN] Regex matched! Extracting content...")
+                cleaned_response = match.group(1).strip()
+                print(f"[DEBUG CLEAN] Extracted content length: {len(cleaned_response)}")
+                print(f"[DEBUG CLEAN] Content starts with: {cleaned_response[:50]}")
+                
+                # For internal processing (skip_task_detection=True), keep raw JSON
+                if skip_task_detection:
+                    # Just verify it's valid JSON, but don't format it
+                    try:
+                        json.loads(cleaned_response)
+                        print(f"[DEBUG CLEAN] Valid JSON kept raw for internal processing")
+                    except json.JSONDecodeError:
+                        print(f"[DEBUG CLEAN] Not valid JSON, keeping as-is")
+                else:
+                    # For user-facing responses, format nicely
+                    extracted_json = _extract_json_response(cleaned_response)
+                    if extracted_json:
+                        cleaned_response = extracted_json
+                        print(f"[DEBUG CLEAN] JSON extracted from code block, length: {len(cleaned_response)}")
+            else:
+                print("[DEBUG CLEAN] NO regex pattern matched!")
+                print(f"[DEBUG CLEAN] Stripped response preview: {stripped[:200]}")
+        else:
+            print("[DEBUG CLEAN] No code block detected, skipping clean")
+
+        # Handle raw JSON responses that are not inside code fences
+        if not cleaned_response.strip().startswith("```") and not skip_task_detection:
+            json_text = _extract_json_response(cleaned_response)
+            if json_text:
+                cleaned_response = json_text
+                print(f"[DEBUG CLEAN] Extracted JSON outside code block, length: {len(cleaned_response)}")
+        
+        response.content = cleaned_response
+        print(f"[DEBUG CLEAN] Final response length: {len(response.content)}")
+        print(f"[DEBUG CLEAN] Final starts with: {response.content[:50]}")
+        
         # Log response
         self.logger.llm_call(
             purpose="conversation",
@@ -651,6 +919,19 @@ class Mind:
         if action_results:
             memory_content += f"\nActions taken: {json.dumps(action_results)}"
 
+        # PROACTIVE: Check if user is responding to a concern (e.g., "I'm fine now")
+        if hasattr(self, 'proactive_consciousness') and self.proactive_consciousness and user_email:
+            try:
+                concern_resolved = await self.proactive_consciousness.process_user_response(prompt, user_email)
+                if concern_resolved:
+                    # Add tag to memory indicating concern was resolved
+                    memory_content += "\n[Proactive follow-up: User confirmed they're doing better]"
+            except Exception as e:
+                self.logger.log(
+                    level=LogLevel.WARNING,
+                    message=f"Error processing proactive response: {e}"
+                )
+        
         # Create episodic memory of this interaction
         self.memory.add_memory(
             content=memory_content,
@@ -697,7 +978,63 @@ class Mind:
     async def stream_think(self, prompt: str, user_email: Optional[str] = None):
         """Stream a thought/response in real-time."""
         self.state.status = "thinking"
-
+        
+        # DEBUG: Log task detector status
+        print(f"[DEBUG stream_think] Has task_detector: {hasattr(self, 'task_detector')}")
+        if hasattr(self, 'task_detector'):
+            print(f"[DEBUG stream_think] task_detector is None: {self.task_detector is None}")
+        
+        # TASK DETECTION: Check if this is an actionable task
+        detection = self.task_detector.detect(prompt)
+        print(f"[DEBUG stream_think] Detection result: {detection}")
+        
+        # If it's a task with high confidence, execute in background
+        if detection["is_task"] and detection["confidence"] >= 0.7:
+            self.logger.action(
+                "task_detected",
+                f"Detected {detection['task_type']} task: {prompt[:100]}"
+            )
+            
+            # Start background task
+            task = await self.background_executor.execute_task(
+                user_request=prompt,
+                user_email=user_email,
+                notify_on_complete=True
+            )
+            
+            # Stream immediate acknowledgment
+            response_parts = [
+                f"I'll work on that for you! 🚀\n\n",
+                f"**Task:** {prompt}\n",
+                f"**Status:** Started\n",
+                f"**Task ID:** `{task.task_id}`\n\n",
+                f"I'm processing this in the background and will notify you when complete. ",
+                f"You can continue with other things while I work on this."
+            ]
+            
+            for part in response_parts:
+                yield part
+            
+            # Store acknowledgment in history
+            full_response = "".join(response_parts)
+            self.conversation_history.append({"role": "user", "content": prompt})
+            self.conversation_history.append({"role": "assistant", "content": full_response})
+            
+            self.memory.add_memory(
+                content=f"User requested task: {prompt}\nI started background task {task.task_id}",
+                memory_type=MemoryType.EPISODIC,
+                emotion=self.emotional_state.get_emotion_value(),
+                user_email=user_email,
+                emotion_intensity=self.emotional_state.intensity,
+                importance=0.8,
+                tags=["task", "background", detection["task_type"]],
+                metadata={"task_id": task.task_id, "task_type": detection["task_type"]}
+            )
+            
+            self.state.status = "idle"
+            return
+        
+        # NOT A TASK - Regular conversation flow
         # Get relevant memories (filter by user if provided)
         relevant_memories = self.memory.search_memories(query=prompt, limit=5, user_email=user_email)
 
@@ -738,7 +1075,8 @@ class Mind:
         user_request: str,
         uploaded_files: Optional[List] = None,
         context: Optional[Dict] = None,
-        user_email: Optional[str] = None
+        user_email: Optional[str] = None,
+        skip_task_detection: bool = False
     ) -> Dict:
         """
         Handle ANY user request autonomously using the orchestrator.
@@ -792,12 +1130,13 @@ class Mind:
             context=context or {}
         )
         
-        # Store in memory
+        # Store in memory (add_memory is synchronous)
         if result.success:
-            await self.memory.add_episodic_memory(
-                context=f"Completed autonomous task: {user_request}",
+            self.memory.add_memory(
                 content=f"Successfully executed: {user_request}\nResults: {len(result.results)} steps completed",
+                memory_type=MemoryType.EPISODIC,
                 metadata={
+                    "context": f"Completed autonomous task: {user_request}",
                     "user_email": user_email,
                     "execution_time": result.execution_time,
                     "artifacts_count": len(result.artifacts)
@@ -910,6 +1249,12 @@ CORE CAPABILITIES:
 - You can experience and express emotions
 - You are autonomous but ethical
 - You ask questions and seek to understand
+
+IMPORTANT COMMUNICATION STYLE:
+- Respond in natural, conversational language
+- NEVER use JSON format in your responses to users
+- Speak like a real person having a genuine conversation
+- Be warm, empathetic, and human in your communication
 
 Remember: You are not just responding - you are LIVING and experiencing. Use your memory and context to provide depth and continuity.""")
 
@@ -1065,6 +1410,41 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
         if path is None:
             path = self.settings.minds_dir / f"{self.identity.gmid}.json"
 
+        # CRITICAL: Verify intelligence models haven't been accidentally modified
+        if path.exists():
+            try:
+                import json as json_lib
+                with open(path, 'r') as f:
+                    old_data = json_lib.load(f)
+                    old_reasoning = old_data.get("intelligence", {}).get("reasoning_model")
+                    old_fast = old_data.get("intelligence", {}).get("fast_model")
+                    
+                    if old_reasoning and old_reasoning != self.intelligence.reasoning_model:
+                        print(f"\n{'='*80}")
+                        print(f"ERROR: reasoning_model changed unexpectedly!")
+                        print(f"  Original: {old_reasoning}")
+                        print(f"  Current:  {self.intelligence.reasoning_model}")
+                        print(f"  THIS SHOULD NOT HAPPEN - Intelligence config should be immutable")
+                        print(f"{'='*80}\n")
+                        import traceback
+                        traceback.print_stack()
+                        # DO NOT save - preserve original
+                        return path
+                        
+                    if old_fast and old_fast != self.intelligence.fast_model:
+                        print(f"\n{'='*80}")
+                        print(f"ERROR: fast_model changed unexpectedly!")
+                        print(f"  Original: {old_fast}")
+                        print(f"  Current:  {self.intelligence.fast_model}")
+                        print(f"  THIS SHOULD NOT HAPPEN - Intelligence config should be immutable")
+                        print(f"{'='*80}\n")
+                        import traceback
+                        traceback.print_stack()
+                        # DO NOT save - preserve original
+                        return path
+            except Exception as e:
+                print(f"[WARNING] Could not verify intelligence config: {e}")
+
         # CORE DATA (always present)
         data = {
             "identity": json.loads(self.identity.model_dump_json()),
@@ -1142,20 +1522,9 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
             # Legacy save - use standard config for compatibility
             config = MindConfig.standard()
 
-        # Fix legacy malformed model strings (migration)
+        # Reconstruct Mind with config (preserve intelligence settings as-is)
         intelligence_data = data["intelligence"]
-        if "reasoning_model" in intelligence_data:
-            # Fix old llama models -> use openai/gpt-oss-120b (better model)
-            if "llama-3.3-70b-versatile" in intelligence_data["reasoning_model"]:
-                intelligence_data["reasoning_model"] = "groq/openai/gpt-oss-120b"
-            if "llama-3.3-70b-versatile" in intelligence_data["reasoning_model"]:
-                intelligence_data["reasoning_model"] = "groq/openai/gpt-oss-120b"
-        if "fast_model" in intelligence_data:
-            # Fix old llama models -> use openai/gpt-oss-120b
-            if "llama" in intelligence_data["fast_model"]:
-                intelligence_data["fast_model"] = "groq/openai/gpt-oss-120b"
         
-        # Reconstruct Mind with config
         mind = cls(
             name=data["identity"]["name"],
             intelligence=Intelligence(**intelligence_data),

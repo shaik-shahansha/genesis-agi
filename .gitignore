@@ -36,6 +36,7 @@ ENV/
 *.swo
 *~
 
+
 # Environment variables
 .env
 .env.local
@@ -45,6 +46,7 @@ ENV/
 genesis.db
 chroma_db/
 
+
 # Logs
 *.log
 logs/
@@ -52,6 +54,7 @@ logs/
 # Node modules
 node_modules/
 web-playground/node_modules/
+web-playground/.next/
 mobile-app/node_modules/
 
 # OS

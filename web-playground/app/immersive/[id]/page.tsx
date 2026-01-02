@@ -34,6 +34,7 @@ export default function ImmersiveChatPage() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<any>(null);
   const [mindAvatarUrl, setMindAvatarUrl] = useState<string>('');
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -42,6 +43,7 @@ export default function ImmersiveChatPage() {
   const voiceOutputRef = useRef<VoiceOutput | null>(null);
   const webcamRef = useRef<WebcamCapture | null>(null);
   const emotionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchMind();
@@ -183,33 +185,58 @@ export default function ImmersiveChatPage() {
     }, 100);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    setAttachedFiles(prev => [...prev, ...selected]);
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const sendMessage = async (text?: string, isVoice: boolean = false) => {
     const messageText = text || input;
-    if (!messageText.trim() || loading) return;
+    if ((!messageText.trim() && attachedFiles.length === 0) || loading) return;
 
-    const userMessage: Message = {
-      role: 'user',
-      content: messageText,
-      timestamp: new Date().toISOString(),
-      voice: isVoice,
-      user_context: currentEmotion ? {
-        emotion: currentEmotion,
-        timestamp: new Date().toISOString(),
-      } : undefined,
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    const currentFiles = attachedFiles;
     setInput('');
+    setAttachedFiles([]);
     setLoading(true);
 
     try {
+      let uploadedFileInfo = [];
+      
+      // Upload files first if any
+      if (currentFiles.length > 0) {
+        const uploadPromises = currentFiles.map(file => api.uploadFile(mindId, file));
+        const uploadResults = await Promise.all(uploadPromises);
+        uploadedFileInfo = uploadResults.map(result => `📎 ${result.filename}`);
+      }
+
+      // Build message with file references
+      const messageContent = messageText + 
+        (uploadedFileInfo.length > 0 ? `\n\n${uploadedFileInfo.join('\n')}` : '');
+
+      const userMessage: Message = {
+        role: 'user',
+        content: messageContent,
+        timestamp: new Date().toISOString(),
+        voice: isVoice,
+        user_context: currentEmotion ? {
+          emotion: currentEmotion,
+          timestamp: new Date().toISOString(),
+        } : undefined,
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+
       const context = {
         emotion: currentEmotion,
         voice_input: isVoice,
         video_context: videoEnabled ? { active: true } : undefined,
       };
 
-      const data = await api.chatWithContext(mindId, messageText, context);
+      const data = await api.chatWithContext(mindId, messageContent, context);
 
       const assistantMessage: Message = {
         role: 'assistant',
@@ -407,7 +434,46 @@ export default function ImmersiveChatPage() {
               {/* Input Area */}
               <div className="p-6 border-t border-gray-800">
                 <div className="max-w-4xl mx-auto">
+                  {/* File Attachments Preview */}
+                  {attachedFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-3 mb-3 bg-gray-800 rounded-xl border border-gray-700">
+                      {attachedFiles.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 bg-gray-700 px-3 py-1 rounded-lg text-sm"
+                        >
+                          <span className="text-gray-300">📎 {file.name}</span>
+                          <button
+                            onClick={() => removeFile(index)}
+                            className="text-red-400 hover:text-red-300"
+                            title="Remove file"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="flex gap-3 items-end">
+                    {/* File Upload Button */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                      multiple
+                      className="hidden"
+                      accept="*/*"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={loading}
+                      className="p-3 rounded-xl transition-all bg-gray-800 text-gray-400 hover:bg-gray-700"
+                      title="Attach files"
+                    >
+                      📎
+                    </button>
+
                     {/* Voice Input Button */}
                     <button
                       onClick={isListening ? stopVoiceInput : startVoiceInput}
@@ -436,7 +502,7 @@ export default function ImmersiveChatPage() {
                     {/* Send Button */}
                     <button
                       onClick={() => sendMessage()}
-                      disabled={!input.trim() || loading}
+                      disabled={(!input.trim() && attachedFiles.length === 0) || loading}
                       className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                     >
                       {loading ? '...' : 'Send'}

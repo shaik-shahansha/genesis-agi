@@ -19,7 +19,7 @@ Transform Genesis from a monolithic "everything included" framework to a modular
 # Current: EVERY Mind gets EVERYTHING
 mind = Mind.birth("Simple")
 # Gets 17+ systems whether needed or not:
-# - consciousness, memory, emotions ✅ (good defaults)
+# - consciousness, memory, emotions [Done] (good defaults)
 # - lifecycle, essence, tasks, workspace ⚠️ (not always needed)
 # - learning, goals, tools, knowledge 🚧 (experimental, forced on user)
 ```
@@ -735,12 +735,12 @@ mind = Mind.birth("Experimental", config=config)
 ## 📦 Plugin Categories
 
 ### Production Plugins (Stable)
-- ✅ LifecyclePlugin
-- ✅ EssencePlugin
-- ✅ TasksPlugin
-- ✅ WorkspacePlugin
-- ✅ RelationshipsPlugin
-- ✅ SensoryPlugin (partial)
+- [Done] LifecyclePlugin
+- [Done] EssencePlugin
+- [Done] TasksPlugin
+- [Done] WorkspacePlugin
+- [Done] RelationshipsPlugin
+- [Done] SensoryPlugin (partial)
 
 ### Experimental Plugins (Use with Caution)
 - 🚧 LearningPlugin (superficial)
@@ -783,15 +783,15 @@ mind = Mind.birth("Experimental", config=config)
 
 ---
 
-## ✅ Success Criteria
+## [Done] Success Criteria
 
-1. ✅ User can create minimal Mind (just core)
-2. ✅ User can compose custom Mind
-3. ✅ 80% token reduction for minimal Mind
-4. ✅ No breaking changes to existing API
-5. ✅ All existing examples work with standard config
-6. ✅ Clear plugin status (production/experimental)
-7. ✅ Plugin development guide available
+1. [Done] User can create minimal Mind (just core)
+2. [Done] User can compose custom Mind
+3. [Done] 80% token reduction for minimal Mind
+4. [Done] No breaking changes to existing API
+5. [Done] All existing examples work with standard config
+6. [Done] Clear plugin status (production/experimental)
+7. [Done] Plugin development guide available
 
 ---
 

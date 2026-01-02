@@ -160,7 +160,7 @@ async def create_maria(
         model="gpt-4"  # Use GPT-4 for best results
     )
 
-    print(f"✅ Maria is ready! GMID: {maria.identity.gmid}")
+    print(f"[Done] Maria is ready! GMID: {maria.identity.gmid}")
 
     return maria
 
@@ -224,7 +224,7 @@ async def setup_students(maria: Mind):
             tags=["biology_class", "10th_grade"]
         )
 
-        print(f"  ✅ Created profile for {name}")
+        print(f"  [Done] Created profile for {name}")
 
     print(f"📊 Total students: {len(students)}")
 
@@ -313,7 +313,7 @@ async def run_class_session(maria: Mind, duration_minutes: int = 10):
         summary=f"Covered photosynthesis with {len(interactions)} student questions. All students participated well."
     )
 
-    print(f"\n✅ Session completed: {session.title}")
+    print(f"\n[Done] Session completed: {session.title}")
     print(f"   Duration: {(datetime.now() - session.start_time).total_seconds() / 60:.1f} minutes")
     print(f"   Interactions: {len(session.interactions)}")
 
@@ -472,7 +472,7 @@ async def main():
     print("\n💾 Saving Maria...")
     await maria.save()
 
-    print("\n✅ Demo complete! Maria has been saved and can be loaded later.")
+    print("\n[Done] Demo complete! Maria has been saved and can be loaded later.")
     print(f"   GMID: {maria.identity.gmid}")
     print("\n💡 Next steps:")
     print("   - Enable camera_enabled=True to test vision")

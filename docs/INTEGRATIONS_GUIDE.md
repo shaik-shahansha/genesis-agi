@@ -487,7 +487,7 @@ print(f"Emails received: {status['emails_received']}")
 
 # List all integrations
 for integration in mind.integrations.list_integrations():
-    print(f"{integration['type']}: {'✅' if integration['enabled'] else '❌'}")
+    print(f"{integration['type']}: {'[Done]' if integration['enabled'] else '❌'}")
 ```
 
 ## Creating Custom Integrations

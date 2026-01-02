@@ -16,10 +16,9 @@ export default function CreateMindPage() {
     name: '',
     creator_email: '',
     template: 'base/curious_explorer',
-    reasoning_model: 'groq/llama-3.3-70b-versatile',
-    fast_model: 'groq/llama-3.1-8b-instant',
+    reasoning_model: 'openrouter/deepseek/deepseek-r1-0528:free',
+    fast_model: 'openrouter/deepseek/deepseek-r1-0528:free',
     autonomy_level: 'medium',
-    start_consciousness: true,
     enable_daemon: false,
     enable_cache: true,
     config: 'standard',
@@ -56,7 +55,7 @@ export default function CreateMindPage() {
       name: 'Tasks', 
       category: 'Core',
       description: 'Goal-oriented task management',
-      emoji: '✅'
+      emoji: '[Done]'
     },
     { 
       id: 'workspace', 
@@ -144,6 +143,43 @@ export default function CreateMindPage() {
   ];
 
   const models = [
+    // OpenRouter Free Models (Recommended at the top)
+    { 
+      value: 'openrouter/deepseek/deepseek-r1-0528:free', 
+      label: '🌟 OpenRouter: DeepSeek Chat',
+      description: 'FREE • RECOMMENDED • Excellent quality • Best for general tasks',
+      cost: 'Free',
+      speed: 'Fast'
+    },
+    { 
+      value: 'openrouter/deepseek/deepseek-r1-0528:free', 
+      label: '🌟 OpenRouter: Xiaomi MiMo V2 Flash',
+      description: 'FREE • Ultra-fast • Great for quick responses',
+      cost: 'Free',
+      speed: 'Very Fast'
+    },
+    { 
+      value: 'openrouter/mistralai/devstral-2512:free', 
+      label: '🌟 OpenRouter: Mistral Devstral 2',
+      description: 'FREE • Best for coding • 256K context',
+      cost: 'Free',
+      speed: 'Fast'
+    },
+    { 
+      value: 'openrouter/nex-agi/deepseek-v3.1-nex-n1:free', 
+      label: '🌟 OpenRouter: DeepSeek V3.1 Nex N1',
+      description: 'FREE • Optimized for agents & tools',
+      cost: 'Free',
+      speed: 'Fast'
+    },
+    { 
+      value: 'openrouter/meta-llama/llama-3.3-70b-instruct:free', 
+      label: '🌟 OpenRouter: Llama 3.3 70B',
+      description: 'FREE • Large model • Strong reasoning',
+      cost: 'Free',
+      speed: 'Fast'
+    },
+    // Other Free Options
     { 
       value: 'groq/openai/gpt-oss-120b', 
       label: 'Groq OpenAI GPT-OSS-120B',
@@ -186,6 +222,7 @@ export default function CreateMindPage() {
       cost: 'Free',
       speed: 'Fast'
     },
+    // Premium Options
     { 
       value: 'openai/gpt-5.2', 
       label: 'OpenAI GPT-5.2',
@@ -207,6 +244,7 @@ export default function CreateMindPage() {
       cost: '$$$',
       speed: 'Fast'
     },
+    // Local
     { 
       value: 'ollama/llama3.1', 
       label: 'Ollama Llama 3.1',
@@ -228,7 +266,7 @@ export default function CreateMindPage() {
         reasoning_model: formData.reasoning_model,
         fast_model: formData.fast_model,
         autonomy_level: formData.autonomy_level,
-        start_consciousness: formData.start_consciousness,
+        start_consciousness: false,  // Always false - consciousness runs in daemon
         config: formData.config,
         api_keys: Object.keys(formData.api_keys).length > 0 ? formData.api_keys : undefined,
       };
@@ -438,6 +476,39 @@ export default function CreateMindPage() {
                   Similar to the CLI, you need to provide API keys for the selected model providers.
                 </p>
               </div>
+
+              {/* OpenRouter API Key (show if using OpenRouter models) */}
+              {(formData.reasoning_model.startsWith('openrouter/') || formData.fast_model.startsWith('openrouter/')) && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🌟</span>
+                    <h3 className="text-white font-bold text-lg">OpenRouter API Key</h3>
+                    <Badge variant="success">FREE Models Available</Badge>
+                  </div>
+                  <input
+                    type="password"
+                    value={formData.api_keys.openrouter || ''}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      api_keys: { ...formData.api_keys, openrouter: e.target.value }
+                    })}
+                    placeholder="Enter your OpenRouter API key (e.g., sk-or-v1-...)"
+                    className="input"
+                  />
+                  <p className="text-sm text-gray-300">
+                    Get a FREE API key at{' '}
+                    <a 
+                      href="https://openrouter.ai/keys" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-purple-400 hover:underline"
+                    >
+                      openrouter.ai/keys
+                    </a>
+                    {' '}• Many free models: DeepSeek, Llama 3.3, Mistral, and more!
+                  </p>
+                </div>
+              )}
 
               {/* Detect selected provider and show relevant key input */}
               {(formData.reasoning_model.startsWith('groq/') || formData.fast_model.startsWith('groq/')) && (
@@ -665,20 +736,17 @@ export default function CreateMindPage() {
 
               {/* Options */}
               <div className="space-y-4">
-                <div className="flex items-start gap-3 p-4 glass-hover rounded-lg cursor-pointer"
-                     onClick={() => setFormData({ ...formData, start_consciousness: !formData.start_consciousness })}>
-                  <input
-                    type="checkbox"
-                    checked={formData.start_consciousness}
-                    onChange={(e) => setFormData({ ...formData, start_consciousness: e.target.checked })}
-                    className="w-5 h-5 rounded mt-1"
-                  />
-                  <div className="flex-1">
-                    <div className="text-white font-bold text-base mb-1">
-                      🧠 Start Consciousness Engine v2
-                    </div>
-                    <div className="text-sm text-gray-300">
-                      Enable bio-inspired 24/7 thinking with 90-95% cost reduction
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <span className="text-2xl">ℹ️</span>
+                    <div>
+                      <div className="text-blue-300 font-semibold mb-1">
+                        Consciousness Engine
+                      </div>
+                      <div className="text-sm text-gray-300">
+                        The consciousness engine (thought generation) runs in the daemon, not the API server.
+                        Start the daemon with: <code className="bg-black/30 px-2 py-1 rounded">genesis daemon start &lt;name&gt;</code>
+                      </div>
                     </div>
                   </div>
                 </div>

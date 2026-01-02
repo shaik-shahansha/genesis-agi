@@ -202,16 +202,33 @@ class MemoryManager:
         self.memories[memory.id] = memory
 
         # Add to vector store for semantic search
+        # Build metadata - ChromaDB requires all values to be non-None
+        vector_metadata = {
+            "type": memory_type.value,
+            "importance": float(importance),
+            "timestamp": memory.timestamp.isoformat(),
+            "tags": ",".join(tags) if tags else "",
+        }
+        
+        # Only add emotion if it's not None
+        if emotion is not None:
+            vector_metadata["emotion"] = str(emotion)
+        
+        # Merge with any additional metadata provided, filtering out None values
+        if metadata:
+            for key, value in metadata.items():
+                if value is not None:
+                    # Ensure all values are proper types
+                    if isinstance(value, (str, int, float, bool)):
+                        vector_metadata[key] = value
+                    else:
+                        # Convert complex types to strings
+                        vector_metadata[key] = str(value)
+        
         self.vector_store.add_memory(
             memory_id=memory.id,
             content=content,
-            metadata={
-                "type": memory_type.value,
-                "emotion": emotion,
-                "importance": importance,
-                "timestamp": memory.timestamp.isoformat(),
-                "tags": ",".join(tags) if tags else "",  # Convert list to comma-separated string
-            },
+            metadata=vector_metadata,
         )
 
         # Add to working memory if important

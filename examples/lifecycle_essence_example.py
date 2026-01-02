@@ -37,7 +37,7 @@ async def main():
     )
 
     print()
-    print(f"✅ Mind '{mind.identity.name}' has been born!")
+    print(f"[Done] Mind '{mind.identity.name}' has been born!")
     print(f"   GMID: {mind.identity.gmid}")
     print(f"   Lifespan: {mind.identity.lifespan_years} years")
     print()
@@ -106,7 +106,7 @@ async def main():
         description="Assist another Genesis Mind with their challenges"
     )
 
-    print(f"✅ Created {len(mind.tasks.tasks)} tasks:")
+    print(f"[Done] Created {len(mind.tasks.tasks)} tasks:")
     for task_id, task in mind.tasks.tasks.items():
         print(f"   - {task.title} ({task.difficulty.value}) - {task.gen_reward} GEN")
     print()
@@ -135,7 +135,7 @@ async def main():
         related_task_id=task1.task_id
     )
 
-    print(f"✅ Completed: {task1.title}")
+    print(f"[Done] Completed: {task1.title}")
     print(f"   Quality: {task1_completed.outcome_quality:.2f}")
     print(f"   Earned: {gen_earned} GEN (base: {task1.gen_reward}, bonus: {task1.bonus_gen})")
     print(f"   New Balance: {transaction.balance_after} GEN")
@@ -156,7 +156,7 @@ async def main():
         related_task_id=task3.task_id
     )
 
-    print(f"✅ Completed: {task3.title}")
+    print(f"[Done] Completed: {task3.title}")
     print(f"   Earned: {gen_earned3} GEN")
     print(f"   New Balance: {mind.gen.balance.current_balance} GEN")
     print()
@@ -205,7 +205,7 @@ async def main():
         tags=["learning", "python"]
     )
 
-    print(f"✅ Created {len(mind.workspace.files)} files:")
+    print(f"[Done] Created {len(mind.workspace.files)} files:")
     for file_id, file in mind.workspace.files.items():
         print(f"   - {file.filename} ({file.size_bytes} bytes)")
 
@@ -292,7 +292,7 @@ async def main():
     # Load the Mind back
     mind_reloaded = Mind.load(save_path)
 
-    print(f"✅ Mind reloaded successfully!")
+    print(f"[Done] Mind reloaded successfully!")
     print(f"   Name: {mind_reloaded.identity.name}")
     print(f"   Essence Balance: {mind_reloaded.essence.balance.current_balance}")
     print(f"   Tasks Completed: {len(mind_reloaded.tasks.get_completed_tasks())}")
@@ -311,7 +311,7 @@ async def main():
     print("   1. ⏰ Lifecycle tracking with 5-year default lifespan")
     print("   2. 🚨 Urgency levels based on time to death")
     print("   3. 💎 Essence currency system for motivation")
-    print("   4. ✅ Task system with rewards")
+    print("   4. [Done] Task system with rewards")
     print("   5. 📁 Personal workspace for file management")
     print("   6. 🏛️  Genesis Core governance for fair economy")
     print("   7. 💾 Complete persistence in database and files")

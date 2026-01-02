@@ -222,10 +222,10 @@ Body: {
 
 | Feature | Chrome | Firefox | Safari | Edge |
 |---------|--------|---------|--------|------|
-| Voice Input | ✅ | ✅ | ✅ | ✅ |
-| Voice Output | ✅ | ✅ | ✅ | ✅ |
-| Webcam | ✅ | ✅ | ✅ | ✅ |
-| Audio Recording | ✅ | ✅ | ⚠️ | ✅ |
+| Voice Input | [Done] | [Done] | [Done] | [Done] |
+| Voice Output | [Done] | [Done] | [Done] | [Done] |
+| Webcam | [Done] | [Done] | [Done] | [Done] |
+| Audio Recording | [Done] | [Done] | ⚠️ | [Done] |
 
 ⚠️ = May require additional permissions
 

@@ -27,7 +27,7 @@ async def main():
     # ========================================
     # 1. BIRTH A MIND WITH AGI CAPABILITIES
     # ========================================
-    print("📍 Step 1: Birthing an intelligent Mind")
+    print(" Step 1: Birthing an intelligent Mind")
     print("-" * 80)
 
     mind = Mind.birth(
@@ -36,17 +36,17 @@ async def main():
         creator="AGI_Demo"
     )
 
-    print(f"✅ {mind.identity.name} has been born with full AGI capabilities!")
-    print(f"   - Learning System: ✅")
-    print(f"   - Goal Manager: ✅")
-    print(f"   - Tool System: ✅")
-    print(f"   - Knowledge Graph: ✅")
+    print(f"[Done] {mind.identity.name} has been born with full AGI capabilities!")
+    print(f"   - Learning System: [Done]")
+    print(f"   - Goal Manager: [Done]")
+    print(f"   - Tool System: [Done]")
+    print(f"   - Knowledge Graph: [Done]")
     print()
 
     # ========================================
     # 2. LEARNING & SKILL ACQUISITION
     # ========================================
-    print("📍 Step 2: Learning Skills")
+    print(" Step 2: Learning Skills")
     print("-" * 80)
 
     # Register skills from templates
@@ -98,7 +98,7 @@ async def main():
         learning_quality=0.9
     )
 
-    print(f"✅ Completed task and learned!")
+    print(f"[Done] Completed task and learned!")
     print(f"   ML Skill: {new_prof:.2f} proficiency")
     print()
 
@@ -114,7 +114,7 @@ async def main():
     # ========================================
     # 3. AUTONOMOUS GOAL SETTING
     # ========================================
-    print("📍 Step 3: Autonomous Goal Generation")
+    print(" Step 3: Autonomous Goal Generation")
     print("-" * 80)
 
     # Mind generates its own goals!
@@ -175,7 +175,7 @@ async def main():
     # ========================================
     # 4. TOOL CREATION & USAGE
     # ========================================
-    print("📍 Step 4: Creating and Using Tools")
+    print(" Step 4: Creating and Using Tools")
     print("-" * 80)
 
     # Create a sentiment analyzer tool
@@ -268,7 +268,7 @@ def analyze_sentiment(text):
     # ========================================
     # 5. KNOWLEDGE GRAPH CONSTRUCTION
     # ========================================
-    print("📍 Step 5: Building Knowledge Graph")
+    print(" Step 5: Building Knowledge Graph")
     print("-" * 80)
 
     # Add entities
@@ -344,7 +344,7 @@ def analyze_sentiment(text):
     # ========================================
     # 6. INTEGRATION: LEARNING → GOALS → TOOLS → KNOWLEDGE
     # ========================================
-    print("📍 Step 6: Demonstrating System Integration")
+    print(" Step 6: Demonstrating System Integration")
     print("-" * 80)
 
     print("🔄 Full AGI Cycle:")
@@ -366,29 +366,29 @@ def analyze_sentiment(text):
     # ========================================
     # 7. SAVE EVERYTHING
     # ========================================
-    print("📍 Step 7: Persisting All Intelligence")
+    print(" Step 7: Persisting All Intelligence")
     print("-" * 80)
 
     save_path = mind.save()
 
     print(f"💾 Saved complete Mind state to: {save_path}")
     print(f"   Includes:")
-    print(f"   ✅ All learned skills and proficiency")
-    print(f"   ✅ All goals and plans")
-    print(f"   ✅ All created tools")
-    print(f"   ✅ Complete knowledge graph")
-    print(f"   ✅ All previous systems (memory, essence, tasks, etc.)")
+    print(f"   [Done] All learned skills and proficiency")
+    print(f"   [Done] All goals and plans")
+    print(f"   [Done] All created tools")
+    print(f"   [Done] Complete knowledge graph")
+    print(f"   [Done] All previous systems (memory, essence, tasks, etc.)")
     print()
 
     # ========================================
     # 8. DEMONSTRATE PERSISTENCE
     # ========================================
-    print("📍 Step 8: Loading and Verifying Persistence")
+    print(" Step 8: Loading and Verifying Persistence")
     print("-" * 80)
 
     mind_loaded = Mind.load(save_path)
 
-    print(f"✅ Successfully loaded {mind_loaded.identity.name}")
+    print(f"[Done] Successfully loaded {mind_loaded.identity.name}")
     print(f"   Skills: {len(mind_loaded.learning.skills)}")
     print(f"   Goals: {len(mind_loaded.goals.goals)}")
     print(f"   Tools: {len(mind_loaded.tools.tools)}")
@@ -439,10 +439,10 @@ def analyze_sentiment(text):
     print("After:  70% AGI Complete (Life + Economy + Intelligence)")
     print()
     print("Added Capabilities:")
-    print("   ✅ Learning & Skill Acquisition")
-    print("   ✅ Autonomous Goal Setting & Planning")
-    print("   ✅ Tool Creation & Marketplace")
-    print("   ✅ Structured Knowledge Graphs")
+    print("   [Done] Learning & Skill Acquisition")
+    print("   [Done] Autonomous Goal Setting & Planning")
+    print("   [Done] Tool Creation & Marketplace")
+    print("   [Done] Structured Knowledge Graphs")
     print()
     print("Next Phase: Meta-learning, Reasoning, Collaboration → 85% AGI")
     print()

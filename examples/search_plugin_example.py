@@ -32,7 +32,7 @@ async def main():
     ))
 
     mind = Mind.birth("Researcher", config=config)
-    print(f"✅ Created Mind with plugins: {[p.get_name() for p in mind.plugins]}")
+    print(f"[Done] Created Mind with plugins: {[p.get_name() for p in mind.plugins]}")
 
     # ================================================================
     # 2. Perform Search
@@ -110,14 +110,14 @@ async def main():
     print("-" * 60)
 
     path = mind.save()
-    print(f"✅ Saved Mind with search plugin to: {path}")
+    print(f"[Done] Saved Mind with search plugin to: {path}")
 
     loaded = Mind.load(path)
-    print(f"✅ Loaded Mind: {loaded.identity.name}")
+    print(f"[Done] Loaded Mind: {loaded.identity.name}")
     print(f"   Plugins: {[p.get_name() for p in loaded.plugins]}")
 
     print("\n" + "=" * 60)
-    print("✅ Search Plugin Example Complete!")
+    print("[Done] Search Plugin Example Complete!")
     print("=" * 60)
 
 

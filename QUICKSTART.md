@@ -20,17 +20,24 @@ pip install -e .
 cp .env.example .env
 
 # Edit .env and add at least one API key
-# For free option: Get Groq API key from https://console.groq.com/
+# 🌟 RECOMMENDED: Get OpenRouter API key from https://openrouter.ai/keys (FREE!)
 ```
 
-**Recommended free setup:**
+**⭐ Recommended: OpenRouter (FREE with many models):**
+```env
+OPENROUTER_API_KEY=your-openrouter-key-here  # Get from https://openrouter.ai/keys
+DEFAULT_REASONING_MODEL=openrouter/deepseek/deepseek-r1-0528:free
+DEFAULT_FAST_MODEL=openrouter/deepseek/deepseek-r1-0528:free
+```
+
+**Alternative: Groq (FREE, ultra-fast):**
 ```env
 GROQ_API_KEY=your-groq-key-here  # Free tier, very fast!
 DEFAULT_REASONING_MODEL=groq/llama-3.3-70b-versatile
 DEFAULT_FAST_MODEL=groq/llama-3.1-8b-instant
 ```
 
-**Or use local models (completely free):**
+**Or use local models (completely free, no API key):**
 ```bash
 # Install Ollama from https://ollama.ai
 ollama pull llama3.1

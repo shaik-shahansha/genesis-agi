@@ -127,26 +127,26 @@ Click **"📊 Dashboard"** to see:
 ## 🔧 Troubleshooting
 
 ### "Cannot connect to API"
-✅ **Solution**: Make sure API server is running
+[Done] **Solution**: Make sure API server is running
 ```bash
 genesis server
 ```
 
 ### "WebSocket connection failed"
-✅ **Solution**: Check API URL in `.env.local`
+[Done] **Solution**: Check API URL in `.env.local`
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 ### "Mind creation failed"
-✅ **Solution**: Verify you have API keys configured
+[Done] **Solution**: Verify you have API keys configured
 ```bash
 # Check .env in genesis root
 cat ../.env
 ```
 
 ### Page won't load
-✅ **Solution**: Clear browser cache and restart dev server
+[Done] **Solution**: Clear browser cache and restart dev server
 ```bash
 # Stop server (Ctrl+C)
 rm -rf .next
@@ -154,7 +154,7 @@ npm run dev
 ```
 
 ### Styling looks broken
-✅ **Solution**: Make sure all dependencies are installed
+[Done] **Solution**: Make sure all dependencies are installed
 ```bash
 npm install
 ```
