@@ -182,7 +182,6 @@ Template structure:
 - Filename: {filename}.pptx
 - Use python-pptx library
 - Include 5-8 slides with proper structure
-- Add images using Pollinations.ai API: https://image.pollinations.ai/prompt/{{description}}
 - Professional design with consistent formatting
 - Content should be focused on {topic}
 - DO NOT create random content
@@ -193,15 +192,43 @@ Template structure:
 3. Content slides (3-5 slides) with key points
 4. Each slide should have:
    - Clear title
-   - Bullet points or text content
-   - Relevant image from Pollinations.ai
+   - Bullet points or text content (2-5 key points per slide)
+   - Professional layout
 5. Conclusion/Summary slide
 
-Image generation:
-- Use requests library to download images from Pollinations.ai
-- Format: https://image.pollinations.ai/prompt/{{url_encoded_description}}
-- Add images to slides using slide.shapes.add_picture()
-- Example: requests.get(f'https://image.pollinations.ai/prompt/{{urllib.parse.quote(description)}}')
+Layout guidelines:
+- Use built-in layouts: presentation.slide_layouts[0] for title, [1] for title+content, [6] for blank
+- Add text boxes using slide.shapes.title and slide.placeholders
+- Use proper text formatting with text_frame.text and paragraphs
+- Keep it simple and professional
+
+Example code pattern:
+```python
+from pptx import Presentation
+from pptx.util import Inches
+
+prs = Presentation()
+
+# Title slide
+title_slide = prs.slides.add_slide(prs.slide_layouts[0])
+title_slide.shapes.title.text = "Your Topic"
+subtitle = title_slide.placeholders[1]
+subtitle.text = "Subtitle text"
+
+# Content slide
+content_slide = prs.slides.add_slide(prs.slide_layouts[1])
+content_slide.shapes.title.text = "Slide Title"
+content = content_slide.placeholders[1].text_frame
+content.text = "First point"
+for point in ["Second point", "Third point"]:
+    p = content.add_paragraph()
+    p.text = point
+    p.level = 0
+
+prs.save('{filename}.pptx')
+```
+
+IMPORTANT: DO NOT try to add images - they cause errors. Focus on text content and layout only.
 """
         elif output_format == "report":
             prompt += f"""\n\nREPORT GENERATION REQUIREMENTS:
@@ -268,11 +295,12 @@ CRITICAL INSTRUCTIONS:
 3. Create EXACTLY what the user asked for - topic is: {topic}
 4. Use the EXACT filename: {filename} (with appropriate extension)
 5. DO NOT use generic names like 'output.docx' or 'generated_document.docx'
-6. For presentations: MUST include images from Pollinations.ai
+6. For presentations: Create text-based slides with clear structure and bullet points
 7. For documents: MUST include proper structure and formatting
 8. Save files to current directory (use Path.cwd())
 9. Print clear success message with file location
 10. Handle all errors gracefully
+11. CRITICAL: DO NOT try to download or add images to presentations - focus on content only
 
 NOTE: If filename already exists, system will automatically version it (e.g., {filename}_v2.docx)
 """

@@ -254,10 +254,22 @@ class AutonomousOrchestrator:
                         result = {"error": f"Unknown step type: {step.type}"}
                         
                     step.result = result
-                    step.success = True
+                    
+                    # Check if the step execution was actually successful
+                    # For code execution, check the execution_success field
+                    if step.type == StepType.CODE_EXECUTION:
+                        step.success = result.get("execution_success", False)
+                    elif "error" in result and result["error"]:
+                        step.success = False
+                    else:
+                        step.success = True
+                    
                     results.append(result)
                     
-                    print(f"[DEBUG orchestrator] Step {i+1} completed successfully")
+                    if step.success:
+                        print(f"[DEBUG orchestrator] Step {i+1} completed successfully")
+                    else:
+                        print(f"[DEBUG orchestrator] Step {i+1} completed with errors")
                     
                     # Update context for next step
                     if isinstance(result, dict):

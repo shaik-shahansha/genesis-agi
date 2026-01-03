@@ -553,10 +553,10 @@ class Mind:
                 response += f"**Task ID:** `{task.task_id}`\n"
                 
                 # Add suggestions if available
-                if classification.suggestions:
-                    response += f"\n💡 **Suggestions:**\n"
-                    for suggestion in classification.suggestions[:3]:
-                        response += f"• {suggestion}\n"
+                # if classification.suggestions:
+                #     response += f"\n💡 **Suggestions:**\n"
+                #     for suggestion in classification.suggestions[:3]:
+                #         response += f"• {suggestion}\n"
                 
                 response += f"\nI'm working on this in the background and will notify you when complete!"
                 

@@ -207,13 +207,21 @@ class BackgroundTaskExecutor:
                 print(f"[DEBUG BG_EXEC] Result type: {type(result)}")
                 print(f"[DEBUG BG_EXEC] Result keys: {result.keys() if isinstance(result, dict) else 'N/A'}")
                 
-                # Task completed successfully
-                task.status = TaskStatus.COMPLETED
+                # Check if task was actually successful
+                task_success = result.get('success', False) if isinstance(result, dict) else False
+                print(f"[DEBUG BG_EXEC] Task success status: {task_success}")
+                
+                # Mark task status based on actual execution result
+                if task_success:
+                    task.status = TaskStatus.COMPLETED
+                    print(f"[DEBUG BG_EXEC] Task marked as COMPLETED")
+                else:
+                    task.status = TaskStatus.FAILED
+                    print(f"[DEBUG BG_EXEC] Task marked as FAILED")
+                
                 task.completed_at = datetime.now()
                 task.progress = 1.0
                 task.result = result
-                
-                print(f"[DEBUG BG_EXEC] Task marked as COMPLETED")
                 
                 # Move to completed
                 self.active_tasks.pop(task.task_id, None)
@@ -229,13 +237,19 @@ class BackgroundTaskExecutor:
                 
                 print(f"[DEBUG BG_EXEC] Preparing completion notification...")
                 
-                # Log success
-                logger.info(f"[TASK {task.task_id[:8]}] ✓ COMPLETED successfully")
-                
-                self.mind.logger.action(
-                    "background_task",
-                    f"Task {task.task_id} completed successfully"
-                )
+                # Log based on actual status
+                if task_success:
+                    logger.info(f"[TASK {task.task_id[:8]}] ✓ COMPLETED successfully")
+                    self.mind.logger.action(
+                        "background_task",
+                        f"Task {task.task_id} completed successfully"
+                    )
+                else:
+                    logger.warning(f"[TASK {task.task_id[:8]}] ✗ FAILED")
+                    self.mind.logger.action(
+                        "background_task",
+                        f"Task {task.task_id} failed"
+                    )
                 
                 print(f"[DEBUG BG_EXEC] Formatting completion message...")
                 

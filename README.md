@@ -682,11 +682,12 @@ stats = mind.memory.get_compression_stats()
 print(f"Token savings: {stats['estimated_token_savings']}")  # "90%"
 ```
 
-### 📚 Documentation
+### 📚 Memory Documentation
 
-- **Full Analysis:** [MEMORY_SYSTEMS_ANALYSIS.md](MEMORY_SYSTEMS_ANALYSIS.md)
-- **Implementation Details:** [ENHANCED_MEMORY_IMPLEMENTATION.md](ENHANCED_MEMORY_IMPLEMENTATION.md)
-- **Working Demo:** [examples/enhanced_memory_demo.py](examples/enhanced_memory_demo.py)
+- **Quick Start:** [docs/QUICK_START.md](docs/QUICK_START.md)
+- **Advanced Features:** [docs/ADVANCED.md](docs/ADVANCED.md)
+- **Basic Demo:** [examples/basic_usage.py](examples/basic_usage.py)
+- **Advanced Demo:** [examples/advanced_usage.py](examples/advanced_usage.py)
 
 ---
 
@@ -772,15 +773,13 @@ Every Mind operates under **15 foundational laws** that are **actively enforced*
 ## 📚 Documentation
 
 | Document | Purpose |
-|----------|------|
-| **[QUICKSTART.md](QUICKSTART.md)** | 5-minute getting started |
-| **[MEMORY_SYSTEMS_ANALYSIS.md](MEMORY_SYSTEMS_ANALYSIS.md)** | Memory architecture deep-dive (937 lines) |
-| **[ENHANCED_MEMORY_IMPLEMENTATION.md](ENHANCED_MEMORY_IMPLEMENTATION.md)** | Implementation details & benchmarks |
-| **[GENESIS_CONSTITUTION.md](GENESIS_CONSTITUTION.md)** | Laws for digital beings |
+|----------|---------|
+| **[docs/QUICK_START.md](docs/QUICK_START.md)** | Quick getting started guide |
 | **[docs/API.md](docs/API.md)** | Complete API reference |
-| **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Production deployment |
-| **[docs/ETHICS.md](docs/ETHICS.md)** | Ethical framework |
-| **[examples/](examples/)** | Complete code examples |
+| **[docs/CLI_COMMANDS.md](docs/CLI_COMMANDS.md)** | CLI usage and commands |
+| **[docs/ADVANCED.md](docs/ADVANCED.md)** | Advanced features (autonomous life, plugins, environments, AGI roadmap) |
+| **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Production deployment guide |
+| **[examples/](examples/)** | 5 focused code examples |
 
 ---
 
@@ -788,16 +787,16 @@ Every Mind operates under **15 foundational laws** that are **actively enforced*
 
 | Feature | ChatGPT API | Agent Frameworks | **Genesis** |
 |---------|------------|------------------|----------|
-| **Memory** | Stateless | Session-only | [Done] Persistent + smart features (deduplication, decay) |
-| **Auto-Extraction** | None | Manual | [Done] LLM-powered (zero work) |
-| **Memory Retrieval** | N/A | ~100ms | [Done] <50ms (ChromaDB optimized) |
-| **Identity** | Prompt-only | Basic profiles | [Done] Self-updating |
-| **Autonomy** | None | Limited | [Done] 24/7 proactive + self-editing |
-| **Emotions** | None | None | [Done] 16 states |
-| **Dependencies** | Standard | Heavy | [Done] Zero external (built-in intelligence) |
-| **Lifecycle** | N/A | N/A | [Done] Finite/urgency |
-| **Multi-Modal** | Limited | Varies | [Done] Vision/speech/touch |
-| **Web Automation** | None | None | [Done] Browser Use plugin |
+| **Memory** | Stateless | Session-only | ✅ Persistent + smart features (deduplication, decay) |
+| **Auto-Extraction** | None | Manual | ✅ LLM-powered (zero work) |
+| **Memory Retrieval** | N/A | ~100ms | ✅ <50ms (ChromaDB optimized) |
+| **Identity** | Prompt-only | Basic profiles | ✅ Self-updating |
+| **Autonomy** | None | Limited | ✅ 24/7 proactive + self-editing |
+| **Emotions** | None | None | ✅ 16 states |
+| **Dependencies** | Standard | Heavy | ✅ Zero external (built-in intelligence) |
+| **Lifecycle** | N/A | N/A | ✅ Finite/urgency |
+| **Multi-Modal** | Limited | Varies | ✅ Vision/speech/touch |
+| **Web Automation** | None | None | ✅ Browser Use plugin |
 | **Open Source** | ❌ | Varies | [Done] MIT License |
 
 **Genesis = Complete autonomous digital beings with built-in intelligence & zero dependency bloat**
