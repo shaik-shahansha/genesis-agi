@@ -504,3 +504,130 @@ class GenesisCore(Base):
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ConversationMessage(Base):
+    """
+    Conversation message storage for scalable history.
+    
+    Replaces in-memory conversation_history for better scalability.
+    """
+    __tablename__ = "conversation_messages"
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Message identification
+    mind_gmid = Column(String(50), ForeignKey("minds.gmid"), nullable=False, index=True)
+    user_email = Column(String(255), nullable=True, index=True)
+    environment_id = Column(String(100), nullable=True)
+    
+    # Message content
+    role = Column(String(20), nullable=False)  # 'user', 'assistant', 'system'
+    content = Column(Text, nullable=False)
+    
+    # Timestamps
+    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    
+    # Optional metadata
+    extra_data = Column(JSON, default=dict)  # Renamed from 'metadata' (SQLAlchemy reserved word)
+    
+    # Indexes for efficient queries
+    __table_args__ = (
+        Index("ix_conv_mind_time", "mind_gmid", "timestamp"),
+        Index("ix_conv_user_time", "user_email", "timestamp"),
+        Index("ix_conv_env_time", "environment_id", "timestamp"),
+    )
+
+
+class ConcernRecord(Base):
+    """
+    Proactive concern tracking in SQLite for better querying and scalability.
+    
+    Replaces JSON file storage for concerns.
+    """
+    __tablename__ = "concerns"
+    
+    # Primary key
+    concern_id = Column(String(100), primary_key=True)
+    
+    # Association
+    mind_gmid = Column(String(50), ForeignKey("minds.gmid"), nullable=False, index=True)
+    user_email = Column(String(255), nullable=True, index=True)
+    
+    # Concern details
+    concern_type = Column(String(50), nullable=False, index=True)  # 'health', 'emotion', 'task', 'relationship'
+    content = Column(Text, nullable=False)
+    context = Column(Text, nullable=True)
+    
+    # Priority and urgency
+    priority = Column(Float, default=0.5)  # 0.0-1.0
+    confidence = Column(Float, default=0.5)  # 0.0-1.0
+    
+    # Status tracking
+    status = Column(String(20), default="active", index=True)  # 'active', 'monitoring', 'resolved'
+    
+    # Timing
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    last_checked_at = Column(DateTime, nullable=True)
+    next_check_at = Column(DateTime, nullable=True, index=True)
+    resolved_at = Column(DateTime, nullable=True)
+    
+    # Follow-up tracking
+    check_count = Column(Integer, default=0)
+    follow_up_message = Column(Text, nullable=True)
+    
+    # Metadata
+    extra_data = Column(JSON, default=dict)  # Renamed from 'metadata' (SQLAlchemy reserved word)
+    
+    # Indexes
+    __table_args__ = (
+        Index("ix_concerns_status_priority", "status", "priority"),
+        Index("ix_concerns_next_check", "mind_gmid", "next_check_at"),
+    )
+
+
+class BackgroundTaskRecord(Base):
+    """
+    Background task execution tracking for persistence across restarts.
+    
+    Enables daemon to resume tasks after crashes/restarts.
+    """
+    __tablename__ = "background_tasks"
+    
+    # Primary key
+    task_id = Column(String(100), primary_key=True)
+    
+    # Association
+    mind_gmid = Column(String(50), ForeignKey("minds.gmid"), nullable=False, index=True)
+    user_email = Column(String(255), nullable=True, index=True)
+    
+    # Task details
+    user_request = Column(Text, nullable=False)
+    
+    # Status tracking
+    status = Column(String(20), default="pending", index=True)  # 'pending', 'running', 'completed', 'failed', 'retrying'
+    progress = Column(Float, default=0.0)  # 0.0-1.0
+    
+    # Timing
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Results
+    result = Column(JSON, nullable=True)
+    error = Column(Text, nullable=True)
+    
+    # Retry logic
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=2)
+    
+    # Context
+    context = Column(JSON, default=dict)
+    extra_data = Column(JSON, default=dict)  # Renamed from 'metadata' (SQLAlchemy reserved word)
+    
+    # Indexes
+    __table_args__ = (
+        Index("ix_bg_tasks_status_created", "status", "created_at"),
+        Index("ix_bg_tasks_mind_status", "mind_gmid", "status"),
+    )

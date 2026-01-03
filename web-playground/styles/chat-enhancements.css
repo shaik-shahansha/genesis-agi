@@ -1,0 +1,300 @@
+/* WhatsApp-Style Chat Enhancements */
+
+/* Smooth fade-in animation for new messages */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* Typing indicator animation */
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+.typing-dot {
+  animation: typing-bounce 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Pulse animation for proactive message indicator */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 6px rgba(96, 165, 250, 0);
+  }
+}
+
+.pulse-indicator {
+  animation: pulse-glow 2s infinite;
+}
+
+/* Message bubble styles */
+.message-bubble {
+  max-width: 75%;
+  word-wrap: break-word;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.message-bubble:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* User message bubble (right side, purple) */
+.message-user {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  border-radius: 18px 18px 4px 18px;
+  padding: 10px 14px;
+  margin-left: auto;
+}
+
+/* Assistant message bubble (left side, gray) */
+.message-assistant {
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+  color: #e5e7eb;
+  border-radius: 18px 18px 18px 4px;
+  padding: 10px 14px;
+  margin-right: auto;
+}
+
+/* Proactive/spontaneous message bubble */
+.message-proactive {
+  background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+  color: #dbeafe;
+  border-radius: 18px 18px 18px 4px;
+  padding: 10px 14px;
+  margin-right: auto;
+  border-left: 4px solid #60a5fa;
+  position: relative;
+}
+
+.message-proactive::before {
+  content: '💭';
+  position: absolute;
+  left: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+}
+
+/* Timestamp styling */
+.message-timestamp {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Read receipt checkmarks */
+.read-receipt {
+  display: inline-flex;
+  align-items: center;
+}
+
+.checkmark {
+  width: 12px;
+  height: 12px;
+  color: #60a5fa;
+}
+
+/* Smooth scroll behavior */
+.messages-container {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for messages */
+.messages-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Typing indicator container */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #374151;
+  border-radius: 18px 18px 18px 4px;
+  width: fit-content;
+  margin-right: auto;
+}
+
+.typing-indicator-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.typing-indicator-dots div {
+  width: 8px;
+  height: 8px;
+  background: #9ca3af;
+  border-radius: 50%;
+}
+
+/* Proactive message badge */
+.proactive-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(96, 165, 250, 0.1);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: #60a5fa;
+  margin-bottom: 6px;
+}
+
+.proactive-badge-dot {
+  width: 6px;
+  height: 6px;
+  background: #60a5fa;
+  border-radius: 50%;
+  animation: pulse-glow 2s infinite;
+}
+
+/* Message group spacing */
+.message-group {
+  margin-bottom: 16px;
+}
+
+.message-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Input area enhancements */
+.chat-input-container {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid #334155;
+  padding: 16px;
+  position: sticky;
+  bottom: 0;
+}
+
+.chat-input {
+  background: #1e293b;
+  border: 2px solid #334155;
+  border-radius: 24px;
+  padding: 12px 20px;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.chat-input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+/* Send button enhancement */
+.send-button {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.send-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Emoji and reactions */
+.emoji-indicator {
+  font-size: 1.1rem;
+  margin-right: 4px;
+}
+
+/* Message delivery status */
+.message-status {
+  font-size: 0.7rem;
+  color: #6b7280;
+  text-align: right;
+  margin-top: 2px;
+}
+
+.message-status.delivered {
+  color: #60a5fa;
+}
+
+.message-status.read {
+  color: #34d399;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .message-bubble {
+    max-width: 85%;
+  }
+  
+  .chat-input-container {
+    padding: 12px;
+  }
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+  .message-assistant {
+    background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+  }
+  
+  .message-proactive {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+  }
+}

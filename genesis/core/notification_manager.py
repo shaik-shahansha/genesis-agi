@@ -22,9 +22,29 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from enum import Enum
 from collections import deque
+from pathlib import Path
 import json
 
 logger = logging.getLogger(__name__)
+
+
+def make_json_serializable(obj: Any) -> Any:
+    """
+    Convert objects to JSON-serializable format.
+    Handles Path objects, datetime objects, and other common non-serializable types.
+    """
+    if isinstance(obj, Path):
+        return str(obj)
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: make_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [make_json_serializable(item) for item in obj]
+    elif isinstance(obj, Enum):
+        return obj.value
+    else:
+        return obj
 
 
 class NotificationChannel(str, Enum):
@@ -176,11 +196,14 @@ class NotificationManager:
             
             print(f"[DEBUG NOTIF] Sending message type '{message_type}'...")
             
+            # Ensure data is JSON serializable (convert Path objects, etc.)
+            serializable_data = make_json_serializable(data)
+            
             await websocket.send_json({
                 "type": message_type,
                 "mind_id": self.mind_id,
                 "mind_name": self.mind_name,
-                **data
+                **serializable_data
             })
             
             print(f"[DEBUG NOTIF] ✓ Message sent successfully!")
@@ -383,6 +406,9 @@ class NotificationManager:
                 return False
             
             # Send proactive message
+            # Ensure metadata is JSON serializable (convert Path objects, etc.)
+            serializable_metadata = make_json_serializable(notification.metadata)
+            
             await websocket.send_json({
                 "type": "proactive_message",
                 "notification_id": notification.notification_id,
@@ -392,7 +418,7 @@ class NotificationManager:
                 "message": notification.message,
                 "priority": notification.priority.value,
                 "timestamp": notification.created_at.isoformat(),
-                "metadata": notification.metadata
+                "metadata": serializable_metadata
             })
             
             return True
@@ -472,6 +498,9 @@ class NotificationManager:
             notif_file = notif_dir / f"{notification.notification_id}.json"
             
             # Serialize notification
+            # Ensure metadata is JSON serializable (convert Path objects, etc.)
+            serializable_metadata = make_json_serializable(notification.metadata)
+            
             notif_data = {
                 "notification_id": notification.notification_id,
                 "mind_id": self.mind_id,
@@ -482,7 +511,7 @@ class NotificationManager:
                 "title": notification.title,
                 "message": notification.message,
                 "created_at": notification.created_at.isoformat(),
-                "metadata": notification.metadata,
+                "metadata": serializable_metadata,
                 "delivered": False
             }
             

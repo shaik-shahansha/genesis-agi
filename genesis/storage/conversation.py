@@ -1,0 +1,294 @@
+"""
+Conversation management with SQLite for scalability.
+
+Replaces in-memory conversation_history list with database storage
+for better scalability and querying capabilities.
+"""
+
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
+
+from genesis.database.base import get_session
+from genesis.database.models import ConversationMessage
+
+
+class ConversationManager:
+    """
+    Manages conversation history in SQLite for scalability.
+    
+    Replaces:
+        mind.conversation_history = []  # In-memory list (bloats JSON)
+    
+    With:
+        mind.conversation = ConversationManager(mind_id)  # SQLite-backed
+    
+    Features:
+    - Efficient pagination (get last N messages)
+    - Time-based queries (messages from last week)
+    - User filtering (conversation with specific user)
+    - Environment filtering (messages in specific environment)
+    - Automatic retention policies (delete old messages)
+    """
+    
+    def __init__(self, mind_gmid: str):
+        """
+        Initialize conversation manager for a Mind.
+        
+        Args:
+            mind_gmid: Genesis Mind ID
+        """
+        self.mind_gmid = mind_gmid
+    
+    def add_message(
+        self,
+        role: str,
+        content: str,
+        user_email: Optional[str] = None,
+        environment_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        timestamp: Optional[datetime] = None
+    ) -> ConversationMessage:
+        """
+        Add a message to conversation history.
+        
+        Args:
+            role: Message role ('user', 'assistant', 'system')
+            content: Message content
+            user_email: Email of user (if user message)
+            environment_id: Environment where message was sent
+            metadata: Additional metadata
+            timestamp: Message timestamp (default: now)
+            
+        Returns:
+            Created message record
+        """
+        with get_session() as session:
+            message = ConversationMessage(
+                mind_gmid=self.mind_gmid,
+                user_email=user_email,
+                environment_id=environment_id,
+                role=role,
+                content=content,
+                timestamp=timestamp or datetime.now(),
+                extra_data=metadata or {}
+            )
+            session.add(message)
+            session.commit()
+            session.refresh(message)
+            return message
+    
+    def get_recent_messages(
+        self,
+        limit: int = 50,
+        user_email: Optional[str] = None,
+        environment_id: Optional[str] = None,
+        role: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recent messages.
+        
+        Args:
+            limit: Maximum number of messages to return
+            user_email: Filter by specific user
+            environment_id: Filter by environment
+            role: Filter by role ('user', 'assistant', 'system')
+            
+        Returns:
+            List of message dictionaries (newest first)
+        """
+        with get_session() as session:
+            query = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid
+            )
+            
+            # Apply filters
+            if user_email:
+                query = query.filter(ConversationMessage.user_email == user_email)
+            if environment_id:
+                query = query.filter(ConversationMessage.environment_id == environment_id)
+            if role:
+                query = query.filter(ConversationMessage.role == role)
+            
+            # Order by timestamp descending and limit
+            messages = query.order_by(
+                ConversationMessage.timestamp.desc()
+            ).limit(limit).all()
+            
+            # Convert to dict (reverse to chronological order)
+            return [self._message_to_dict(msg) for msg in reversed(messages)]
+    
+    def get_messages_since(
+        self,
+        since: datetime,
+        user_email: Optional[str] = None,
+        environment_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get messages since a specific time.
+        
+        Args:
+            since: Get messages after this timestamp
+            user_email: Filter by specific user
+            environment_id: Filter by environment
+            
+        Returns:
+            List of message dictionaries (chronological order)
+        """
+        with get_session() as session:
+            query = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid,
+                ConversationMessage.timestamp >= since
+            )
+            
+            # Apply filters
+            if user_email:
+                query = query.filter(ConversationMessage.user_email == user_email)
+            if environment_id:
+                query = query.filter(ConversationMessage.environment_id == environment_id)
+            
+            # Order chronologically
+            messages = query.order_by(ConversationMessage.timestamp.asc()).all()
+            
+            return [self._message_to_dict(msg) for msg in messages]
+    
+    def get_conversation_context(
+        self,
+        max_messages: int = 10,
+        user_email: Optional[str] = None,
+        environment_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recent conversation context for LLM.
+        
+        This is used in Mind.think() to provide conversation history.
+        
+        Args:
+            max_messages: Maximum messages to include
+            user_email: Filter by specific user conversation
+            environment_id: Filter by environment
+            
+        Returns:
+            List of message dicts in format: [{"role": "user", "content": "..."}]
+        """
+        return self.get_recent_messages(
+            limit=max_messages,
+            user_email=user_email,
+            environment_id=environment_id
+        )
+    
+    def delete_old_messages(
+        self,
+        older_than_days: int = 90,
+        keep_minimum: int = 100
+    ) -> int:
+        """
+        Delete old messages for retention policy.
+        
+        Args:
+            older_than_days: Delete messages older than this many days
+            keep_minimum: Always keep at least this many recent messages
+            
+        Returns:
+            Number of messages deleted
+        """
+        cutoff_date = datetime.now() - timedelta(days=older_than_days)
+        
+        with get_session() as session:
+            # Count total messages
+            total = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid
+            ).count()
+            
+            # Don't delete if we'd go below minimum
+            if total <= keep_minimum:
+                return 0
+            
+            # Get IDs of messages to keep (most recent)
+            keep_ids = [
+                msg.id for msg in session.query(ConversationMessage.id).filter(
+                    ConversationMessage.mind_gmid == self.mind_gmid
+                ).order_by(
+                    ConversationMessage.timestamp.desc()
+                ).limit(keep_minimum).all()
+            ]
+            
+            # Delete old messages not in keep list
+            deleted = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid,
+                ConversationMessage.timestamp < cutoff_date,
+                ~ConversationMessage.id.in_(keep_ids)
+            ).delete(synchronize_session=False)
+            
+            session.commit()
+            return deleted
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get conversation statistics.
+        
+        Returns:
+            Dictionary with stats (total messages, by role, by user, etc.)
+        """
+        with get_session() as session:
+            total = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid
+            ).count()
+            
+            # Count by role
+            user_msgs = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid,
+                ConversationMessage.role == 'user'
+            ).count()
+            
+            assistant_msgs = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid,
+                ConversationMessage.role == 'assistant'
+            ).count()
+            
+            system_msgs = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid,
+                ConversationMessage.role == 'system'
+            ).count()
+            
+            # Get oldest and newest
+            oldest = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid
+            ).order_by(ConversationMessage.timestamp.asc()).first()
+            
+            newest = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid
+            ).order_by(ConversationMessage.timestamp.desc()).first()
+            
+            return {
+                "total_messages": total,
+                "user_messages": user_msgs,
+                "assistant_messages": assistant_msgs,
+                "system_messages": system_msgs,
+                "oldest_message": oldest.timestamp.isoformat() if oldest else None,
+                "newest_message": newest.timestamp.isoformat() if newest else None
+            }
+    
+    def clear_all(self) -> int:
+        """
+        Clear all conversation history (use with caution).
+        
+        Returns:
+            Number of messages deleted
+        """
+        with get_session() as session:
+            deleted = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid
+            ).delete()
+            session.commit()
+            return deleted
+    
+    def _message_to_dict(self, msg: ConversationMessage) -> Dict[str, Any]:
+        """Convert database message to dictionary."""
+        return {
+            "role": msg.role,
+            "content": msg.content,
+            "user_email": msg.user_email,
+            "environment_id": msg.environment_id,
+            "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+            "metadata": msg.extra_data
+        }

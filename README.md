@@ -200,6 +200,62 @@ User Request → Autonomous Orchestrator
 
 **See**: [AUTONOMOUS_AGENT_README.md](AUTONOMOUS_AGENT_README.md) for complete documentation
 
+### Data Persistence Architecture (Scalable for 24/7 Operation)
+
+Genesis uses a **three-tier storage architecture** optimized for scalability, performance, and 24/7 daemon operation:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  CHROMADB (Vector Store) - Semantic Memory              │
+│  • Memory embeddings & content (persistent)             │
+│  • Automatic vector search                              │
+│  • Scales to millions of memories                       │
+│  • Path: .genesis/data/chroma/{mind_id}/               │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│  SQLITE (Relational DB) - Structured Data               │
+│  • Conversations (paginated, time-retention)            │
+│  • Concerns (proactive follow-ups)                      │
+│  • Background tasks (crash recovery)                    │
+│  • Metaverse registry (minds, environments)             │
+│  • Economy (GEN transactions)                           │
+│  • Efficient queries, indexes, relationships            │
+│  • Path: .genesis/genesis.db                           │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│  JSON FILES (Configuration) - Lightweight State         │
+│  • Mind identity & emotional state                      │
+│  • Plugin configurations                                │
+│  • Settings and preferences                             │
+│  • NO memories/conversations (prevents bloat)           │
+│  • Typically < 50 KB per Mind                          │
+│  • Path: .genesis/minds/{gmid}.json                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Decision Matrix:**
+
+| Data Type | ChromaDB | SQLite | JSON | Why? |
+|-----------|----------|--------|------|------|
+| **Memories (content)** | ✅ | ❌ | ❌ | Semantic search, vector similarity |
+| **Conversations** | ❌ | ✅ | ❌ | Pagination, time-based retention |
+| **Concerns** | ❌ | ✅ | ❌ | Status queries, time-based follow-ups |
+| **Background Tasks** | ❌ | ✅ | ❌ | Crash recovery, status tracking |
+| **Metaverse Registry** | ❌ | ✅ | ❌ | Relationships, shared environments |
+| **Mind Identity** | ❌ | ❌ | ✅ | Small, rarely changes |
+| **Emotional State** | ❌ | ❌ | ✅ | Current state, frequent updates |
+| **Plugin Config** | ❌ | ❌ | ✅ | Configuration data |
+
+**Key Benefits:**
+- 🚀 **Scalable**: Handles years of 24/7 operation without JSON bloat
+- 💾 **Persistent**: Everything survives daemon restarts and crashes
+- 🔍 **Queryable**: Efficient time-based, status, and semantic searches
+- 📦 **Compact**: Mind JSON files stay < 50 KB (was growing to MBs)
+- ⚡ **Fast**: ChromaDB for semantic search, SQLite for structured queries
+- 🔄 **Recovery**: Background tasks resume after crashes
+
 ---
 
 ## 🏗️ Architecture

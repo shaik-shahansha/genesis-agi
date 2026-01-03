@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  timestamp: string;
 }
 
 interface Mind {
@@ -59,6 +60,7 @@ export default function ChatPage() {
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [showEnvironmentSelect, setShowEnvironmentSelect] = useState(false);
   const [proactiveMessages, setProactiveMessages] = useState<ProactiveMessage[]>([]);
+  const [allMessages, setAllMessages] = useState<Array<{type: 'chat', data: Message} | {type: 'proactive', data: ProactiveMessage}>>([]);
   const [websocket, setWebsocket] = useState<WebSocket | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -102,7 +104,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, proactiveMessages]);
+  }, [allMessages]);
 
   // WebSocket connection for proactive messages
   useEffect(() => {
@@ -126,6 +128,7 @@ export default function ChatPage() {
           if (data.type === 'proactive_message') {
             const proactiveMsg: ProactiveMessage = data;
             setProactiveMessages(prev => [...prev, proactiveMsg]);
+            setAllMessages(prev => [...prev, { type: 'proactive', data: proactiveMsg }]);
             
             // Auto-scroll to show new message
             setTimeout(() => {
@@ -138,8 +141,8 @@ export default function ChatPage() {
             
             // You can add a toast/notification here or update a progress bar
             // For now, we'll add it as a proactive message
-            setProactiveMessages(prev => [...prev, {
-              type: 'proactive_message',
+            const taskProgressMsg = {
+              type: 'proactive_message' as const,
               notification_id: data.task_id,
               mind_id: data.mind_id || mindId,
               mind_name: data.mind_name || mind?.name || 'Genesis',
@@ -148,7 +151,9 @@ export default function ChatPage() {
               priority: 'normal',
               timestamp: data.timestamp || new Date().toISOString(),
               metadata: { task_id: data.task_id, progress: data.progress }
-            }]);
+            };
+            setProactiveMessages(prev => [...prev, taskProgressMsg]);
+            setAllMessages(prev => [...prev, { type: 'proactive', data: taskProgressMsg }]);
             
             setTimeout(() => {
               messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -158,8 +163,8 @@ export default function ChatPage() {
             // Task completed - show result
             console.log(`[Task ${data.task_id}] Completed!`, data);
             
-            setProactiveMessages(prev => [...prev, {
-              type: 'proactive_message',
+            const taskCompleteMsg = {
+              type: 'proactive_message' as const,
               notification_id: data.task_id,
               mind_id: data.mind_id || mindId,
               mind_name: data.mind_name || mind?.name || 'Genesis',
@@ -168,7 +173,9 @@ export default function ChatPage() {
               priority: 'high',
               timestamp: data.timestamp || new Date().toISOString(),
               metadata: { task_id: data.task_id, result: data.result }
-            }]);
+            };
+            setProactiveMessages(prev => [...prev, taskCompleteMsg]);
+            setAllMessages(prev => [...prev, { type: 'proactive', data: taskCompleteMsg }]);
             
             setTimeout(() => {
               messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -237,10 +244,12 @@ export default function ChatPage() {
 
       const userMessage: Message = {
         role: 'user',
-        content: messageContent
+        content: messageContent,
+        timestamp: new Date().toISOString()
       };
 
       setMessages(prev => [...prev, userMessage]);
+      setAllMessages(prev => [...prev, { type: 'chat', data: userMessage }]);
 
       // Send message with context about uploaded files
       const data = await api.chatWithEnvironment(
@@ -250,16 +259,22 @@ export default function ChatPage() {
         selectedEnvironment || undefined
       );
 
-      setMessages(prev => [...prev, {
+      const assistantMessage: Message = {
         role: 'assistant',
-        content: data.response || data.message || 'No response'
-      }]);
+        content: data.response || data.message || 'No response',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      setAllMessages(prev => [...prev, { type: 'chat', data: assistantMessage }]);
     } catch (error: any) {
       console.error('Error sending message:', error);
-      setMessages(prev => [...prev, {
+      const errorMessage: Message = {
         role: 'assistant',
-        content: error.message || 'Error: Could not connect to Genesis server'
-      }]);
+        content: error.message || 'Error: Could not connect to Genesis server',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setAllMessages(prev => [...prev, { type: 'chat', data: errorMessage }]);
     } finally {
       setLoading(false);
     }
@@ -466,66 +481,67 @@ export default function ChatPage() {
 
         {/* Messages */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-lg mb-4" style={{ height: 'calc(100vh - 320px)' }}>
-        <div className="h-full overflow-y-auto p-6 space-y-6">
-          {messages.length === 0 && proactiveMessages.length === 0 && (
+        <div className="h-full overflow-y-auto p-6 space-y-4 messages-container">
+          {allMessages.length === 0 && (
             <div className="text-center py-12 text-gray-400">
-              <p>Start a conversation with {mind.name}</p>
-              <p className="text-sm mt-2">Proactive thoughts and consciousness activity will appear here</p>
+              <p className="text-lg mb-2">👋 Start a conversation with {mind.name}</p>
+              <p className="text-sm">I'll be proactive, thoughtful, and spontaneously engage with you</p>
             </div>
           )}
 
-          {/* Render all messages and proactive notifications in chronological order */}
-          {[...messages.map((msg, index) => ({ 
-              ...msg, 
-              index, 
-              type: 'chat' as const,
-              sortOrder: index  // Preserve original order
-            })),
-             ...proactiveMessages.map((msg, index) => ({ 
-              ...msg, 
-              index, 
-              type: 'proactive' as const,
-              sortOrder: messages.length + index  // Come after chat messages
-            }))]
-            .sort((a, b) => {
-              // Sort by sortOrder to maintain chronological order (oldest to newest)
-              return a.sortOrder - b.sortOrder;
-            })
-            .map((item) => {
+          {/* Render all messages in chronological order */}
+          {allMessages.map((item, index) => {
               if (item.type === 'chat') {
-                const message = item as Message & { index: number; sortOrder: number };
+                const message = item.data;
+                const timestamp = new Date(message.timestamp).toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                });
+                
                 return (
-                  <div key={`chat-${message.index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 shadow-md ${
-                      message.role === 'user' 
-                        ? 'bg-purple-600 text-white rounded-br-sm' 
-                        : 'bg-slate-700 text-gray-100 rounded-bl-sm'
-                    }`}>
-                      {message.role === 'assistant' ? (
-                        <MarkdownRenderer content={message.content} />
-                      ) : (
-                        <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                      )}
+                  <div key={`chat-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+                    <div className="message-group">
+                      <div className={`message-bubble ${message.role === 'user' ? 'message-user' : 'message-assistant'}`}>
+                        {message.role === 'assistant' ? (
+                          <MarkdownRenderer content={message.content} />
+                        ) : (
+                          <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                        )}
+                        <div className="message-timestamp">
+                          <span>{timestamp}</span>
+                          {message.role === 'user' && (
+                            <span className="read-receipt">
+                              <svg className="checkmark" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                              </svg>
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
               } else {
-                const proactiveMsg = item as unknown as ProactiveMessage & { index: number };
+                const proactiveMsg = item.data;
+                const timestamp = new Date(proactiveMsg.timestamp).toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                });
+                const isSpontaneous = proactiveMsg.metadata?.spontaneous || false;
+                
                 return (
-                  <div key={`proactive-${proactiveMsg.index}`} className="flex justify-start animate-fade-in">
-                    <div className="max-w-[80%]">
-                      {/* Proactive message indicator */}
-                      <div className="flex items-center gap-2 mb-1 ml-1">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                        <span className="text-xs text-blue-400 font-medium">
-                          {proactiveMsg.title || 'Checking in'}
+                  <div key={`proactive-${index}`} className="flex justify-start animate-fade-in-up">
+                    <div className="message-group">
+                      {/* Proactive message badge */}
+                      <div className="proactive-badge">
+                        <div className="proactive-badge-dot"></div>
+                        <span>
+                          {isSpontaneous ? '💭 Thought' : proactiveMsg.title || '💚 Checking in'}
                         </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(proactiveMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        <span className="text-gray-400 ml-1">{timestamp}</span>
                       </div>
-                      {/* Message bubble - looks like regular assistant message but with subtle indicator */}
-                      <div className="bg-slate-700 text-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-md border-l-4 border-blue-500">
+                      {/* Message bubble */}
+                      <div className="message-bubble message-proactive">
                         <div className="text-sm whitespace-pre-wrap">
                           {proactiveMsg.message}
                         </div>
@@ -537,18 +553,16 @@ export default function ChatPage() {
             })}
 
           {loading && (
-            <div className="flex justify-start">
-              <div className="bg-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
-                  <span className="text-sm text-gray-300 animate-pulse">
-                    {loadingText}
-                  </span>
+            <div className="flex justify-start animate-fade-in-up">
+              <div className="typing-indicator">
+                <div className="typing-indicator-dots">
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
                 </div>
+                <span className="text-sm text-gray-300 ml-3 animate-pulse">
+                  {loadingText}
+                </span>
               </div>
             </div>
           )}
@@ -558,7 +572,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <div className="space-y-2">
+      <div className="chat-input-container space-y-2">
         {/* File Attachments Preview */}
         {attachedFiles.length > 0 && (
           <div className="flex flex-wrap gap-2 p-2 bg-slate-800 rounded border border-slate-700">
@@ -581,7 +595,7 @@ export default function ChatPage() {
         )}
 
         {/* Input Area */}
-        <div className="flex gap-2">
+        <div className="flex gap-3 items-end">
           <input
             type="file"
             ref={fileInputRef}
@@ -592,7 +606,7 @@ export default function ChatPage() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition"
+            className="px-3 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-full transition flex-shrink-0"
             title="Attach files"
           >
             📎
@@ -602,16 +616,17 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Send a message..."
-            className="input flex-1"
+            placeholder="Type a message..."
+            className="chat-input flex-1"
             disabled={loading}
           />
           <button
             onClick={sendMessage}
             disabled={(!input.trim() && attachedFiles.length === 0) || loading}
-            className="btn-primary"
+            className="send-button flex-shrink-0"
+            title="Send message"
           >
-            {loading ? 'Sending...' : 'Send'}
+            {loading ? '⏳' : '➤'}
           </button>
         </div>
       </div>

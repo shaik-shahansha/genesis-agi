@@ -383,25 +383,52 @@ class MemoryManager:
         return self.consolidate_memories()
 
     def to_dict(self) -> Dict[str, Any]:
-        """Export all memories."""
+        """
+        Export memory metadata ONLY (not full memory content).
+        
+        ARCHITECTURE CHANGE:
+        - Memories are stored in ChromaDB (persistent vector store)
+        - JSON files only store lightweight metadata for quick restore
+        - Prevents JSON bloat as Mind runs 24/7 with thousands of memories
+        
+        Returns:
+            Lightweight metadata dictionary
+        """
         return {
             "mind_id": self.mind_id,
-            "memories": {mid: mem.to_dict() for mid, mem in self.memories.items()},
-            "working_memory": self.working_memory,
+            "total_memories": len(self.memories),
+            "working_memory_ids": self.working_memory,  # Just IDs, not full content
+            "memory_types_count": {
+                mem_type.value: sum(1 for m in self.memories.values() if m.type == mem_type)
+                for mem_type in MemoryType
+            },
+            # Don't serialize full memory dict - ChromaDB already persists everything
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MemoryManager":
-        """Import memories from dictionary."""
+        """
+        Import memories from ChromaDB (not from JSON).
+        
+        ARCHITECTURE CHANGE:
+        - ChromaDB is the source of truth for memories
+        - JSON metadata is only for quick stats
+        - On load, memories will be fetched from ChromaDB as needed
+        
+        Args:
+            data: Metadata dictionary (not full memories)
+            
+        Returns:
+            MemoryManager with ChromaDB connection (memories lazy-loaded)
+        """
         manager = cls(mind_id=data["mind_id"])
 
-        # Restore memories
-        for mem_data in data.get("memories", {}).values():
-            memory = Memory.from_dict(mem_data)
-            manager.memories[memory.id] = memory
-
-        # Restore working memory
-        manager.working_memory = data.get("working_memory", [])
+        # Restore working memory IDs (content fetched from ChromaDB on-demand)
+        manager.working_memory = data.get("working_memory_ids", [])
+        
+        # NOTE: Full memories are NOT restored from JSON
+        # They remain in ChromaDB and are loaded on-demand via search/get operations
+        # This prevents memory bloat in JSON files
 
         return manager
     

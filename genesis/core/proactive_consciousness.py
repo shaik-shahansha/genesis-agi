@@ -18,10 +18,12 @@ Example Flow:
 """
 
 import asyncio
+import json
 import logging
+from pathlib import Path
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from datetime import datetime, timedelta
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import re
 
 if TYPE_CHECKING:
@@ -49,6 +51,23 @@ class ProactiveConcern:
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        data = asdict(self)
+        # Convert datetime objects to ISO format strings
+        data['created_at'] = self.created_at.isoformat()
+        data['follow_up_at'] = self.follow_up_at.isoformat()
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'ProactiveConcern':
+        """Create from dictionary."""
+        # Convert ISO format strings back to datetime objects
+        data = data.copy()
+        data['created_at'] = datetime.fromisoformat(data['created_at'])
+        data['follow_up_at'] = datetime.fromisoformat(data['follow_up_at'])
+        return cls(**data)
 
 
 class ProactiveConsciousnessModule:
@@ -81,12 +100,30 @@ class ProactiveConsciousnessModule:
     def __init__(self, mind: 'Mind'):
         """Initialize proactive consciousness."""
         self.mind = mind
-        self.active_concerns: List[ProactiveConcern] = []
-        self.resolved_concerns: List[ProactiveConcern] = []
+        self.active_concerns: List[ProactiveConcern] = []  # In-memory cache
+        self.resolved_concerns: List[ProactiveConcern] = []  # In-memory cache
         
         # Initialize LLM-based concern analyzer
         from genesis.core.concern_analyzer import LLMConcernAnalyzer
         self.concern_analyzer = LLMConcernAnalyzer(mind)
+        
+        # Initialize intelligent timing engine
+        from genesis.core.intelligent_timing import IntelligentTimingEngine
+        self.timing_engine = IntelligentTimingEngine(mind)
+        
+        # Initialize scenario handlers
+        from genesis.core.scenario_handlers import (
+            HealthScenarioHandler,
+            ExamScenarioHandler,
+            TaskScenarioHandler,
+            ConversationScenarioHandler,
+            ScenarioState
+        )
+        self.health_handler = HealthScenarioHandler(mind)
+        self.exam_handler = ExamScenarioHandler(mind)
+        self.task_handler = TaskScenarioHandler(mind)
+        self.conversation_handler = ConversationScenarioHandler(mind)
+        self.active_scenarios: Dict[str, ScenarioState] = {}  # concern_id -> scenario
         
         # Configuration
         self.check_interval = 300  # Check every 5 minutes
@@ -99,7 +136,10 @@ class ProactiveConsciousnessModule:
         self._task: Optional[asyncio.Task] = None
         self.last_memory_check: Optional[datetime] = None
         
-        logger.info("[PROACTIVE] Initialized with LLM-based concern analyzer")
+        # Load persisted concerns from SQLite
+        self._load_concerns()
+        
+        logger.info(f"[PROACTIVE] Initialized with LLM-based concern analyzer, intelligent timing, and scenario handlers ({len(self.active_concerns)} active concerns loaded)")
     
     async def start(self):
         """Start proactive monitoring."""
@@ -236,39 +276,104 @@ class ProactiveConsciousnessModule:
         """Create a new concern to track."""
         import uuid
         
-        # For tasks with deadlines, adjust follow-up time based on urgency
-        if concern_type == "task" and deadline:
-            time_until_deadline = (deadline - datetime.now()).total_seconds() / 3600
-            
-            if urgency == 'critical':
-                # Check in halfway to deadline or in 2 minutes (whichever is sooner)
-                follow_up_hours = min(0.03, time_until_deadline / 2)  # 0.03 hours = ~2 minutes
-            elif urgency == 'high':
-                # Check in at 75% of time to deadline
-                follow_up_hours = max(0.5, time_until_deadline * 0.75)
-            else:
-                # Normal tasks: check in at 50% of time or 6 hours
-                follow_up_hours = min(6, time_until_deadline * 0.5)
+        # USE INTELLIGENT TIMING ENGINE for better timing decisions
+        timing_decision = self.timing_engine.decide_timing(
+            concern_type=concern_type,
+            severity=severity,
+            urgency=urgency,
+            user_email=user_email,
+            context={
+                "deadline": deadline.isoformat() if deadline else None,
+                "description": description
+            }
+        )
+        
+        # Calculate follow-up time from timing decision
+        if timing_decision.send_at:
+            follow_up_at = timing_decision.send_at
+        else:
+            # Fallback to hours-based calculation
+            follow_up_at = datetime.now() + timedelta(hours=follow_up_hours)
+        
+        logger.info(f"[TIMING] {timing_decision.reason}")
+        logger.info(f"[TIMING] Will follow up at: {follow_up_at.strftime('%Y-%m-%d %I:%M %p')}")
+        
+        concern_id = str(uuid.uuid4())
         
         concern = ProactiveConcern(
-            concern_id=str(uuid.uuid4()),
+            concern_id=concern_id,
             concern_type=concern_type,
             user_email=user_email,
             description=description,
             severity=severity,
             created_at=datetime.now(),
-            follow_up_at=datetime.now() + timedelta(hours=follow_up_hours),
+            follow_up_at=follow_up_at,  # Use timing engine decision
             memory_id=memory_id,
             metadata={
                 "memory_content": memory_content,
-                "llm_followup_message": llm_followup_message
-            } if memory_content or llm_followup_message else {},
-            deadline=deadline,
-            task_status="pending" if concern_type == "task" else "pending",
+                "llm_followup_message": llm_followup_message,
+                "timing_reason": timing_decision.reason,
+                "timing_type": timing_decision.timing.value
+            } if memory_content or llm_followup_message else {"timing_reason": timing_decision.reason, "timing_type": timing_decision.timing.value},
             urgency=urgency
         )
         
         self.active_concerns.append(concern)
+        
+        # INITIALIZE SCENARIO HANDLER for specialized follow-ups
+        try:
+            scenario_context = {
+                "severity": severity,
+                "urgency": urgency,
+                "deadline": deadline,
+                "description": description
+            }
+            
+            if concern_type == "health":
+                scenario_context["symptom"] = description.split()[0] if description else "illness"
+                scenario = await self.health_handler.initialize(
+                    user_message=memory_content or description,
+                    user_email=user_email,
+                    context=scenario_context
+                )
+                self.active_scenarios[concern_id] = scenario
+                
+                # Generate and store initial response
+                initial_response = await self.health_handler.generate_initial_response(scenario)
+                concern.metadata["scenario_initial_response"] = initial_response
+                logger.info(f"[SCENARIO] Health scenario initialized for concern {concern_id[:8]}")
+                
+            elif concern_type == "task" and "exam" in description.lower():
+                # Exam scenario
+                scenario = await self.exam_handler.initialize(
+                    user_message=memory_content or description,
+                    user_email=user_email,
+                    context=scenario_context
+                )
+                self.active_scenarios[concern_id] = scenario
+                
+                initial_response = await self.exam_handler.generate_initial_response(scenario)
+                concern.metadata["scenario_initial_response"] = initial_response
+                logger.info(f"[SCENARIO] Exam scenario initialized for concern {concern_id[:8]}")
+                
+            elif concern_type == "task":
+                # General task scenario
+                scenario = await self.task_handler.initialize(
+                    user_message=memory_content or description,
+                    user_email=user_email,
+                    context=scenario_context
+                )
+                self.active_scenarios[concern_id] = scenario
+                
+                initial_response = await self.task_handler.generate_initial_response(scenario)
+                concern.metadata["scenario_initial_response"] = initial_response
+                logger.info(f"[SCENARIO] Task scenario initialized for concern {concern_id[:8]}")
+                
+        except Exception as e:
+            logger.warning(f"[SCENARIO] Could not initialize scenario handler: {e}")
+        
+        # Save to disk
+        self._save_concerns()
         
         urgency_emoji = {"critical": "🔴", "high": "🟠", "normal": "🟡", "low": "🟢"}
         emoji = urgency_emoji.get(urgency, "⚪")
@@ -292,11 +397,32 @@ class ProactiveConsciousnessModule:
     async def _send_follow_up(self, concern: ProactiveConcern):
         """Send a proactive follow-up message."""
         try:
-            # Use LLM-generated message if available, otherwise generate new one
-            follow_up_message = concern.metadata.get("llm_followup_message")
+            follow_up_message = None
             
+            # TRY SCENARIO HANDLER FIRST for specialized follow-ups
+            if concern.concern_id in self.active_scenarios:
+                scenario = self.active_scenarios[concern.concern_id]
+                
+                try:
+                    # Get scenario-specific follow-up
+                    if concern.concern_type == "health":
+                        follow_up_message = await self.health_handler.generate_followup(scenario)
+                    elif concern.concern_type == "task" and "exam" in concern.description.lower():
+                        follow_up_message = await self.exam_handler.generate_followup(scenario)
+                    elif concern.concern_type == "task":
+                        follow_up_message = await self.task_handler.generate_followup(scenario)
+                    
+                    if follow_up_message:
+                        logger.info(f"[SCENARIO] Using scenario handler for follow-up")
+                except Exception as e:
+                    logger.warning(f"[SCENARIO] Scenario handler failed, falling back: {e}")
+            
+            # FALLBACK: Use LLM-generated message if available
             if not follow_up_message:
-                # Generate contextual follow-up message using LLM
+                follow_up_message = concern.metadata.get("llm_followup_message")
+            
+            # FALLBACK: Generate contextual follow-up message using LLM
+            if not follow_up_message:
                 context = self._build_follow_up_context(concern)
                 
                 follow_up_prompt = f"""Based on our previous conversation, I noticed: {concern.description}
@@ -318,9 +444,12 @@ Follow-up message:"""
                 
                 follow_up_message = response.content if response else None
             
+            # FINAL FALLBACK: Template-based message
             if not follow_up_message:
-                # Fallback to template-based message
                 follow_up_message = self._generate_template_follow_up(concern)
+            
+            # Record message sent for timing engine
+            self.timing_engine.record_message_sent(concern.user_email)
             
             # Send via notification manager
             if hasattr(self.mind, 'notification_manager'):
@@ -353,6 +482,8 @@ Follow-up message:"""
                 concern.resolved = True
                 self.active_concerns.remove(concern)
                 self.resolved_concerns.append(concern)
+                # Save to disk
+                self._save_concerns()
             else:
                 # Schedule next follow-up
                 multiplier = 2 ** concern.follow_up_count  # Exponential backoff
@@ -362,6 +493,9 @@ Follow-up message:"""
                     concern.follow_up_at = datetime.now() + timedelta(hours=self.emotion_followup_hours * multiplier)
                 else:
                     concern.follow_up_at = datetime.now() + timedelta(hours=self.task_followup_hours * multiplier)
+                
+                # Save updated concern state
+                self._save_concerns()
             
         except Exception as e:
             logger.error(f"Error sending follow-up: {e}", exc_info=True)
@@ -418,7 +552,70 @@ Follow-up message:"""
         
         Returns True if a concern was resolved.
         """
-        # Patterns indicating user is fine/concern resolved
+        # Find active concerns for this user
+        user_concerns = [c for c in self.active_concerns if c.user_email == user_email and not c.resolved]
+        
+        if not user_concerns:
+            return False
+        
+        # Get the most recent concern (assume user is responding to latest)
+        concern = user_concerns[-1]
+        
+        # USE SCENARIO HANDLER to process response if available
+        if concern.concern_id in self.active_scenarios:
+            scenario = self.active_scenarios[concern.concern_id]
+            
+            try:
+                # Update scenario with user response
+                if concern.concern_type == "health":
+                    scenario = await self.health_handler.process_response(scenario, user_message)
+                    should_continue = self.health_handler.should_continue(scenario)
+                elif concern.concern_type == "task" and "exam" in concern.description.lower():
+                    scenario = await self.exam_handler.process_response(scenario, user_message)
+                    should_continue = self.exam_handler.should_continue(scenario)
+                elif concern.concern_type == "task":
+                    scenario = await self.task_handler.process_response(scenario, user_message)
+                    should_continue = self.task_handler.should_continue(scenario)
+                else:
+                    should_continue = True
+                
+                # Update scenario state
+                self.active_scenarios[concern.concern_id] = scenario
+                
+                # If scenario says we're done, resolve the concern
+                if scenario.state == "resolved" or not should_continue:
+                    concern.resolved = True
+                    self.active_concerns.remove(concern)
+                    self.resolved_concerns.append(concern)
+                    self._save_concerns()
+                    
+                    # Remove scenario
+                    del self.active_scenarios[concern.concern_id]
+                    
+                    logger.info(f"[SCENARIO] ✅ Concern resolved via scenario handler: {concern.concern_type}")
+                    
+                    # Send positive acknowledgment
+                    if hasattr(self.mind, 'notification_manager'):
+                        from genesis.core.notification_manager import NotificationChannel, NotificationPriority
+                        
+                        await self.mind.notification_manager.send_notification(
+                            recipient=user_email,
+                            title="Glad to hear that! 💚",
+                            message="I'm happy things are better! I'll keep an eye out for you.",
+                            channel=NotificationChannel.WEBSOCKET,
+                            priority=NotificationPriority.LOW,
+                            metadata={"concern_resolved": concern.concern_id}
+                        )
+                    
+                    return True
+                
+                return False
+                
+            except Exception as e:
+                logger.warning(f"[SCENARIO] Error processing response with scenario handler: {e}")
+                # Fall through to pattern matching
+        
+        # FALLBACK: Pattern-based resolution detection
         RESOLUTION_PATTERNS = [
             r'\b(?:i\'m|i am|im)\s+(?:fine|good|better|ok|okay|alright|well|much better|feeling better)\b',
             r'\b(?:feel|feeling)\s+(?:better|good|fine|great|much better|so much better|a lot better)\b',
@@ -445,6 +642,9 @@ Follow-up message:"""
         concern.resolved = True
         self.active_concerns.remove(concern)
         self.resolved_concerns.append(concern)
+        
+        # Save to disk
+        self._save_concerns()
         
         logger.info(f"✅ Resolved concern: {concern.concern_type} for {user_email}")
         
@@ -474,4 +674,146 @@ Follow-up message:"""
                 "task": len([c for c in self.active_concerns if c.concern_type == "task"])
             },
             "last_memory_check": self.last_memory_check.isoformat() if self.last_memory_check else None
+        }
+    
+    def _get_concerns_file(self) -> Path:
+        """Get path to concerns persistence file."""
+        from genesis.config.settings import get_settings
+        settings = get_settings()
+        concerns_dir = settings.data_dir / "concerns" / self.mind.identity.gmid
+        concerns_dir.mkdir(parents=True, exist_ok=True)
+        return concerns_dir / "concerns.json"
+    
+    def _save_concerns(self):
+        """
+        Save concerns to SQLite (replaces JSON file storage).
+        
+        ARCHITECTURE CHANGE:
+        - Concerns now stored in SQLite for better querying and scalability
+        - No longer using JSON files
+        """
+        from genesis.database.base import get_session
+        from genesis.database.models import ConcernRecord
+        
+        try:
+            with get_session() as session:
+                # Save/update all active concerns
+                for concern in self.active_concerns:
+                    # Check if concern already exists
+                    existing = session.query(ConcernRecord).filter(
+                        ConcernRecord.concern_id == concern.concern_id
+                    ).first()
+                    
+                    if existing:
+                        # Update existing
+                        existing.status = "active" if not concern.resolved else "resolved"
+                        existing.last_checked_at = datetime.now()
+                        existing.check_count = concern.follow_up_count
+                        if concern.resolved:
+                            existing.resolved_at = datetime.now()
+                    else:
+                        # Create new
+                        record = ConcernRecord(
+                            concern_id=concern.concern_id,
+                            mind_gmid=self.mind.identity.gmid,
+                            user_email=concern.user_email,
+                            concern_type=concern.concern_type,
+                            content=concern.description,
+                            priority=concern.severity,
+                            confidence=concern.metadata.get('confidence', 0.5),
+                            status="active" if not concern.resolved else "resolved",
+                            created_at=concern.created_at,
+                            next_check_at=concern.follow_up_at,
+                            check_count=concern.follow_up_count,
+                            extra_data=concern.metadata or {}
+                        )
+                        session.add(record)
+                
+                # Mark resolved concerns
+                for concern in self.resolved_concerns:
+                    existing = session.query(ConcernRecord).filter(
+                        ConcernRecord.concern_id == concern.concern_id
+                    ).first()
+                    
+                    if existing and existing.status != "resolved":
+                        existing.status = "resolved"
+                        existing.resolved_at = datetime.now()
+                
+                session.commit()
+            
+            logger.debug(f"[PROACTIVE] Saved {len(self.active_concerns)} concerns to SQLite")
+        except Exception as e:
+            logger.error(f"[PROACTIVE] Error saving concerns to SQLite: {e}")
+    
+    def _load_concerns(self):
+        """
+        Load concerns from SQLite (replaces JSON file storage).
+        
+        ARCHITECTURE CHANGE:
+        - Concerns loaded from SQLite instead of JSON files
+        - Better querying and scalability
+        """
+        from genesis.database.base import get_session
+        from genesis.database.models import ConcernRecord
+        
+        try:
+            with get_session() as session:
+                # Load active concerns
+                active_records = session.query(ConcernRecord).filter(
+                    ConcernRecord.mind_gmid == self.mind.identity.gmid,
+                    ConcernRecord.status == "active"
+                ).all()
+                
+                self.active_concerns = [
+                    ProactiveConcern(
+                        concern_id=record.concern_id,
+                        concern_type=record.concern_type,
+                        user_email=record.user_email,
+                        description=record.content,
+                        severity=record.priority,
+                        created_at=record.created_at,
+                        follow_up_at=record.next_check_at or datetime.now(),
+                        memory_id=record.extra_data.get('memory_id'),
+                        resolved=False,
+                        follow_up_count=record.check_count,
+                        metadata=record.extra_data or {}
+                    )
+                    for record in active_records
+                ]
+                
+                # Load resolved concerns (last 100 for history)
+                resolved_records = session.query(ConcernRecord).filter(
+                    ConcernRecord.mind_gmid == self.mind.identity.gmid,
+                    ConcernRecord.status == "resolved"
+                ).order_by(ConcernRecord.resolved_at.desc()).limit(100).all()
+                
+                self.resolved_concerns = [
+                    ProactiveConcern(
+                        concern_id=record.concern_id,
+                        concern_type=record.concern_type,
+                        user_email=record.user_email,
+                        description=record.content,
+                        severity=record.priority,
+                        created_at=record.created_at,
+                        follow_up_at=record.next_check_at or datetime.now(),
+                        memory_id=record.extra_data.get('memory_id'),
+                        resolved=True,
+                        follow_up_count=record.check_count,
+                        metadata=record.extra_data or {}
+                    )
+                    for record in resolved_records
+                ]
+            
+            logger.info(f"[PROACTIVE] Loaded {len(self.active_concerns)} active concerns from SQLite")
+        except Exception as e:
+            logger.error(f"[PROACTIVE] Error loading concerns from SQLite: {e}")
+            # Initialize empty if database isn't ready
+            self.active_concerns = []
+            self.resolved_concerns = []
+    
+    def get_all_concerns(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Get all concerns (for API/debugging)."""
+        return {
+            "active": [c.to_dict() for c in self.active_concerns],
+            "resolved": [c.to_dict() for c in self.resolved_concerns]
         }

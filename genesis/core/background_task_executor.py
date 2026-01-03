@@ -70,11 +70,17 @@ class BackgroundTaskExecutor:
     """
     Executes tasks in background and sends notifications.
     
+    ARCHITECTURE CHANGE:
+    - Tasks now persisted to SQLite for crash recovery
+    - Daemon can resume tasks after restart
+    - Better task tracking and querying
+    
     Like Manus AI:
     - User makes request → Task created immediately
     - Task executes in background
     - User gets notification when complete
     - Can retry on failure
+    - Persists across restarts
     """
     
     def __init__(self, mind: 'Mind'):
@@ -84,9 +90,12 @@ class BackgroundTaskExecutor:
             mind: Mind instance
         """
         self.mind = mind
-        self.active_tasks: Dict[str, BackgroundTask] = {}
-        self.completed_tasks: List[BackgroundTask] = []
+        self.active_tasks: Dict[str, BackgroundTask] = {}  # In-memory cache
+        self.completed_tasks: List[BackgroundTask] = []  # In-memory cache
         self.max_completed_history = 100
+        
+        # Load pending/running tasks from SQLite (for crash recovery)
+        self._load_active_tasks()
     
     async def execute_task(
         self,
@@ -172,6 +181,7 @@ class BackgroundTaskExecutor:
                 task.status = TaskStatus.RUNNING
                 task.started_at = datetime.now()
                 task.progress = 0.1
+                self._save_task(task)  # Persist state change
                 
                 self.mind.logger.action(
                     "background_task",
@@ -222,6 +232,9 @@ class BackgroundTaskExecutor:
                 task.completed_at = datetime.now()
                 task.progress = 1.0
                 task.result = result
+                
+                # Save final state to SQLite
+                self._save_task(task)
                 
                 # Move to completed
                 self.active_tasks.pop(task.task_id, None)
@@ -278,16 +291,27 @@ class BackgroundTaskExecutor:
                     print(f"[DEBUG BG_EXEC] Sending WebSocket notification...")
                     
                     # Send via WebSocket for immediate delivery
-                    websocket_sent = await self.mind.notification_manager.send_to_websocket(
-                        user_email=user_email,
-                        message_type="task_complete",
-                        data={
-                            "task_id": task.task_id,
-                            "user_request": user_request,
-                            "status": "completed",
-                            "message": result_message,
-                            "artifacts": result.get("artifacts", []) if isinstance(result, dict) else [],
-                            "result": result if isinstance(result, dict) else {"success": True},
+                # Convert any Path objects to strings for JSON serialization
+                artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
+                serializable_artifacts = []
+                for artifact in artifacts:
+                    if isinstance(artifact, dict):
+                        serializable_artifact = artifact.copy()
+                        if "path" in serializable_artifact:
+                            serializable_artifact["path"] = str(serializable_artifact["path"])
+                        serializable_artifacts.append(serializable_artifact)
+                    else:
+                        serializable_artifacts.append(artifact)
+                
+                websocket_sent = await self.mind.notification_manager.send_to_websocket(
+                    user_email=user_email,
+                    message_type="task_complete",
+                    data={
+                        "task_id": task.task_id,
+                        "user_request": user_request,
+                        "status": "completed",
+                        "message": result_message,
+                        "artifacts": serializable_artifacts,
                             "timestamp": task.completed_at.isoformat()
                         }
                     )
@@ -303,6 +327,18 @@ class BackgroundTaskExecutor:
                         
                         # Fallback: Queue persistent notification for when user reconnects
                         result_summary = self._format_result_summary(result)
+                        # Convert any Path objects to strings for JSON serialization
+                        artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
+                        serializable_artifacts = []
+                        for artifact in artifacts:
+                            if isinstance(artifact, dict):
+                                serializable_artifact = artifact.copy()
+                                if "path" in serializable_artifact:
+                                    serializable_artifact["path"] = str(serializable_artifact["path"])
+                                serializable_artifacts.append(serializable_artifact)
+                            else:
+                                serializable_artifacts.append(artifact)
+                        
                         await self.mind.notification_manager.send_notification(
                             recipient=user_email,
                             title="Task Completed ✓",
@@ -311,7 +347,7 @@ class BackgroundTaskExecutor:
                             channel="web",
                             metadata={
                                 "task_id": task.task_id,
-                                "artifacts": result.get("artifacts", []) if isinstance(result, dict) else []
+                                "artifacts": serializable_artifacts
                             }
                         )
                 
@@ -337,6 +373,7 @@ class BackgroundTaskExecutor:
                 if task.retry_count <= task.max_retries:
                     task.status = TaskStatus.RETRYING
                     task.progress = 0.0
+                    self._save_task(task)  # Persist retry state
                     
                     # Wait before retry (exponential backoff)
                     wait_time = 2 ** task.retry_count
@@ -346,6 +383,7 @@ class BackgroundTaskExecutor:
                     # Max retries exceeded
                     task.status = TaskStatus.FAILED
                     task.completed_at = datetime.now()
+                    self._save_task(task)  # Persist failure
                     
                     # Move to completed (as failed)
                     self.active_tasks.pop(task.task_id, None)
@@ -508,3 +546,97 @@ class BackgroundTaskExecutor:
                 f"**Request:** {task.user_request}\n\n"
                 f"_Task ID: {task.task_id}_"
             )
+    
+    def _save_task(self, task: BackgroundTask):
+        """
+        Save task to SQLite for persistence.
+        
+        ARCHITECTURE CHANGE:
+        - Tasks saved to SQLite immediately on create/update
+        - Enables crash recovery and daemon restarts
+        """
+        from genesis.database.base import get_session
+        from genesis.database.models import BackgroundTaskRecord
+        
+        try:
+            with get_session() as session:
+                # Check if task exists
+                existing = session.query(BackgroundTaskRecord).filter(
+                    BackgroundTaskRecord.task_id == task.task_id
+                ).first()
+                
+                if existing:
+                    # Update existing task
+                    existing.status = task.status.value
+                    existing.progress = task.progress
+                    existing.started_at = task.started_at
+                    existing.completed_at = task.completed_at
+                    existing.result = task.result
+                    existing.error = task.error
+                    existing.retry_count = task.retry_count
+                else:
+                    # Create new task record
+                    record = BackgroundTaskRecord(
+                        task_id=task.task_id,
+                        mind_gmid=self.mind.identity.gmid,
+                        user_email=task.user_email,
+                        user_request=task.user_request,
+                        status=task.status.value,
+                        progress=task.progress,
+                        created_at=task.created_at,
+                        started_at=task.started_at,
+                        completed_at=task.completed_at,
+                        result=task.result,
+                        error=task.error,
+                        retry_count=task.retry_count,
+                        max_retries=task.max_retries
+                    )
+                    session.add(record)
+                
+                session.commit()
+                logger.debug(f"[BACKGROUND] Saved task {task.task_id} to SQLite")
+        except Exception as e:
+            logger.error(f"[BACKGROUND] Error saving task to SQLite: {e}")
+    
+    def _load_active_tasks(self):
+        """
+        Load pending/running tasks from SQLite for crash recovery.
+        
+        ARCHITECTURE CHANGE:
+        - On daemon start, resume any incomplete tasks
+        - Prevents task loss from crashes/restarts
+        """
+        from genesis.database.base import get_session
+        from genesis.database.models import BackgroundTaskRecord
+        
+        try:
+            with get_session() as session:
+                # Load pending and running tasks
+                active_records = session.query(BackgroundTaskRecord).filter(
+                    BackgroundTaskRecord.mind_gmid == self.mind.identity.gmid,
+                    BackgroundTaskRecord.status.in_(['pending', 'running', 'retrying'])
+                ).all()
+                
+                for record in active_records:
+                    task = BackgroundTask(
+                        task_id=record.task_id,
+                        user_request=record.user_request,
+                        user_email=record.user_email,
+                        status=TaskStatus(record.status),
+                        created_at=record.created_at,
+                        started_at=record.started_at,
+                        completed_at=record.completed_at,
+                        progress=record.progress,
+                        result=record.result,
+                        error=record.error,
+                        retry_count=record.retry_count,
+                        max_retries=record.max_retries
+                    )
+                    self.active_tasks[task.task_id] = task
+                
+                if active_records:
+                    logger.info(f"[BACKGROUND] Loaded {len(active_records)} pending tasks for recovery")
+        except Exception as e:
+            logger.error(f"[BACKGROUND] Error loading tasks from SQLite: {e}")
+            # Not fatal - start with empty task list
+

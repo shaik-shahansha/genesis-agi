@@ -2338,6 +2338,50 @@ async def get_pending_followups(
                     resolved=ctx.resolved,
                     resolved_at=ctx.resolved_at.isoformat() if ctx.resolved_at else None,
                     importance=ctx.importance,
+
+
+@minds_router.get("/{mind_id}/concerns")
+async def get_concerns(
+    mind_id: str,
+    user_email: Optional[str] = Query(None, description="Filter by user email"),
+    include_resolved: bool = Query(False, description="Include resolved concerns"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get tracked concerns for proactive follow-up."""
+    mind = await _get_cached_mind(mind_id)
+    
+    if not hasattr(mind, 'proactive_consciousness') or not mind.proactive_consciousness:
+        return {
+            "active_concerns": [],
+            "resolved_concerns": [],
+            "message": "Proactive consciousness not enabled for this mind"
+        }
+    
+    try:
+        all_concerns = mind.proactive_consciousness.get_all_concerns()
+        
+        # Filter by user if specified
+        active = all_concerns["active"]
+        resolved = all_concerns["resolved"]
+        
+        if user_email:
+            active = [c for c in active if c.get("user_email") == user_email]
+            resolved = [c for c in resolved if c.get("user_email") == user_email]
+        
+        result = {
+            "active_concerns": active,
+            "count": len(active)
+        }
+        
+        if include_resolved:
+            result["resolved_concerns"] = resolved
+            result["resolved_count"] = len(resolved)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting concerns: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
                     urgency=ctx.urgency,
                     created_at=ctx.created_at.isoformat(),
                     last_updated=ctx.last_updated.isoformat()

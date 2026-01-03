@@ -1,4 +1,5 @@
 import './globals.css';
+import '../styles/chat-enhancements.css';
 import Link from 'next/link';
 import AuthButton from '@/components/AuthButton';
 import NotificationBell from '@/components/NotificationBell';

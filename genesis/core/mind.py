@@ -181,7 +181,8 @@ class Mind:
             self.living_mind = None
 
         # CORE: Conversation & dreams
-        self.conversation_history: list[dict[str, str]] = []
+        from genesis.storage.conversation import ConversationManager
+        self.conversation = ConversationManager(self.identity.gmid)  # SQLite-backed
         self.dreams: list[dict[str, Any]] = []
         self._alive = True
 
@@ -218,6 +219,7 @@ class Mind:
             from genesis.core.notification_manager import NotificationManager
             from genesis.core.proactive_consciousness import ProactiveConsciousnessModule
             from genesis.core.proactive_conversation import ProactiveConversationManager
+            from genesis.core.spontaneous_conversation import SpontaneousConversationEngine
             
             self.notification_manager = NotificationManager(
                 mind_id=self.identity.gmid,
@@ -233,6 +235,9 @@ class Mind:
             # Initialize proactive conversation system (WhatsApp-like care)
             self.proactive_conversation = ProactiveConversationManager(self)
             
+            # Initialize spontaneous conversation engine (real-time interjections)
+            self.spontaneous_conversation = SpontaneousConversationEngine(self)
+            
             if self.logger:
                 self.logger.log(
                     LogLevel.INFO,
@@ -240,7 +245,8 @@ class Mind:
                     metadata={
                         "notification_manager": True,
                         "proactive_consciousness": True,
-                        "proactive_conversation": True
+                        "proactive_conversation": True,
+                        "spontaneous_conversation": True
                     }
                 )
         except Exception as e:
@@ -249,6 +255,7 @@ class Mind:
             self.notification_manager = None
             self.proactive_consciousness = None
             self.proactive_conversation = None
+            self.spontaneous_conversation = None
             if self.logger:
                 self.logger.log(
                     LogLevel.WARNING,
@@ -514,7 +521,7 @@ class Mind:
             # Classify intent with comprehensive extraction
             classification = await self.intent_classifier.classify(
                 user_message=prompt,
-                conversation_history=self.conversation_history[-5:],
+                conversation_history=self.conversation.get_conversation_context(max_messages=5, user_email=user_email),
                 user_email=user_email
             )
             
@@ -561,8 +568,8 @@ class Mind:
                 response += f"\nI'm working on this in the background and will notify you when complete!"
                 
                 # Store in history
-                self.conversation_history.append({"role": "user", "content": prompt})
-                self.conversation_history.append({"role": "assistant", "content": response})
+                self.conversation.add_message(role="user", content=prompt, user_email=user_email)
+                self.conversation.add_message(role="assistant", content=response)
                 
                 # Create memory with rich metadata
                 self.memory.add_memory(
@@ -614,8 +621,8 @@ class Mind:
                 )
                 
                 # Store in history
-                self.conversation_history.append({"role": "user", "content": prompt})
-                self.conversation_history.append({"role": "assistant", "content": response})
+                self.conversation.add_message(role="user", content=prompt, user_email=user_email)
+                self.conversation.add_message(role="assistant", content=response)
                 
                 # Create memory
                 self.memory.add_memory(
@@ -701,7 +708,7 @@ class Mind:
         messages.append({"role": "system", "content": system_msg})
 
         # Add recent conversation history
-        messages.extend(self.conversation_history[-10:])
+        messages.extend(self.conversation.get_conversation_context(max_messages=10))
 
         # Add current prompt
         messages.append({"role": "user", "content": prompt})
@@ -910,9 +917,9 @@ class Mind:
         self.state.last_interaction = datetime.now()
         self.state.status = "idle"
 
-        # Store in conversation history
-        self.conversation_history.append({"role": "user", "content": prompt})
-        self.conversation_history.append({"role": "assistant", "content": response.content})
+        # Store in conversation history (SQLite)
+        self.conversation.add_message(role="user", content=prompt, user_email=user_email)
+        self.conversation.add_message(role="assistant", content=response.content)
 
         # Add action context if actions were taken
         memory_content = f"User said: {prompt}\nI responded: {response.content}"
@@ -931,6 +938,65 @@ class Mind:
                     level=LogLevel.WARNING,
                     message=f"Error processing proactive response: {e}"
                 )
+            
+            # IMMEDIATE CONCERN DETECTION: Analyze user message for concerns right away
+            try:
+                from genesis.core.concern_analyzer import LLMConcernAnalyzer
+                concern_analyzer = LLMConcernAnalyzer(self)
+                
+                print(f"[DEBUG CONCERN] Analyzing user message for immediate concerns: {prompt[:80]}...")
+                analysis = await concern_analyzer.analyze_conversation(
+                    conversation_text=prompt,
+                    user_email=user_email
+                )
+                
+                # If concern detected with sufficient confidence, create it immediately
+                if analysis.has_concern and analysis.confidence >= 0.7 and analysis.requires_followup:
+                    print(f"[DEBUG CONCERN] ✅ {analysis.concern_type.upper()} concern detected!")
+                    print(f"[DEBUG CONCERN]    Confidence: {analysis.confidence:.2f}")
+                    print(f"[DEBUG CONCERN]    Severity: {analysis.severity}")
+                    print(f"[DEBUG CONCERN]    Will follow up in {analysis.suggested_followup_hours}h")
+                    
+                    # Parse deadline if present
+                    deadline = None
+                    if analysis.has_deadline and analysis.deadline_datetime:
+                        try:
+                            from datetime import datetime
+                            deadline = datetime.fromisoformat(analysis.deadline_datetime)
+                        except:
+                            pass
+                    
+                    # Map severity to numeric value
+                    severity_map = {'low': 0.4, 'moderate': 0.6, 'high': 0.8, 'critical': 0.95}
+                    severity = severity_map.get(analysis.severity, 0.6)
+                    
+                    # Create concern immediately (don't wait for next scan)
+                    await self.proactive_consciousness._create_concern(
+                        concern_type=analysis.concern_type,
+                        user_email=user_email,
+                        description=analysis.description,
+                        severity=severity,
+                        follow_up_hours=analysis.suggested_followup_hours,
+                        memory_id=None,  # Will be set after memory is created
+                        memory_content=prompt,
+                        deadline=deadline,
+                        urgency=analysis.urgency,
+                        llm_followup_message=analysis.followup_message
+                    )
+                    
+                    # Add tag to memory
+                    memory_content += f"\n[Concern detected: {analysis.concern_type} - will follow up]"
+                    
+                    print(f"[DEBUG CONCERN] Concern created and will be tracked!")
+                else:
+                    print(f"[DEBUG CONCERN] No significant concern detected (has_concern={analysis.has_concern}, confidence={analysis.confidence:.2f})")
+                    
+            except Exception as e:
+                print(f"[DEBUG CONCERN] Error analyzing concern: {e}")
+                self.logger.log(
+                    level=LogLevel.WARNING,
+                    message=f"Error analyzing concern: {e}"
+                )
         
         # Create episodic memory of this interaction
         self.memory.add_memory(
@@ -938,6 +1004,40 @@ class Mind:
             memory_type=MemoryType.EPISODIC,
             emotion=self.emotional_state.get_emotion_value(),
             emotion_intensity=self.emotional_state.intensity,
+            user_email=user_email or "system",
+            metadata={"context": environment_context} if environment_context else None
+        )
+        
+        # SPONTANEOUS CONVERSATION: Analyze for real-time interjections
+        # This happens AFTER the main response to see if there's anything additional to say
+        if hasattr(self, 'spontaneous_conversation') and self.spontaneous_conversation and user_email:
+            try:
+                # Get recent conversation history for context
+                recent_history = self.conversation.get_messages(limit=10)
+                conversation_history = [
+                    {"role": msg.role, "content": msg.content}
+                    for msg in recent_history
+                ]
+                
+                # Fire and forget - don't block the response
+                asyncio.create_task(
+                    self.spontaneous_conversation.process_conversation_turn(
+                        user_message=prompt,
+                        user_email=user_email,
+                        assistant_response=response.content,
+                        conversation_history=conversation_history
+                    )
+                )
+                
+                print(f"[SPONTANEOUS] Analyzing conversation for interjection opportunities...")
+                
+            except Exception as e:
+                self.logger.log(
+                    level=LogLevel.WARNING,
+                    message=f"Error in spontaneous conversation: {e}"
+                )
+        
+        # Return the response
             importance=0.7 if action_results else 0.6,  # Higher importance if actions were taken
             tags=["conversation"] + (["action_taken"] if action_results else []),
             metadata={"user_input": prompt, "my_response": response.content, "actions": action_results},
@@ -1015,10 +1115,10 @@ class Mind:
             for part in response_parts:
                 yield part
             
-            # Store acknowledgment in history
+            # Store acknowledgment in history (SQLite)
             full_response = "".join(response_parts)
-            self.conversation_history.append({"role": "user", "content": prompt})
-            self.conversation_history.append({"role": "assistant", "content": full_response})
+            self.conversation.add_message(role="user", content=prompt, user_email=user_email)
+            self.conversation.add_message(role="assistant", content=full_response)
             
             self.memory.add_memory(
                 content=f"User requested task: {prompt}\nI started background task {task.task_id}",
@@ -1041,7 +1141,7 @@ class Mind:
         messages = []
         system_msg = self._build_system_message(relevant_memories)
         messages.append({"role": "system", "content": system_msg})
-        messages.extend(self.conversation_history[-10:])
+        messages.extend(self.conversation.get_conversation_context(max_messages=10))
         messages.append({"role": "user", "content": prompt})
 
         full_response = ""
@@ -1055,8 +1155,8 @@ class Mind:
             yield chunk
 
         # Update history and create memory
-        self.conversation_history.append({"role": "user", "content": prompt})
-        self.conversation_history.append({"role": "assistant", "content": full_response})
+        self.conversation.add_message(role="user", content=prompt, user_email=user_email)
+        self.conversation.add_message(role="assistant", content=full_response)
 
         self.memory.add_memory(
             content=f"User said: {prompt}\nI responded: {full_response}",
@@ -1452,8 +1552,8 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
             "autonomy": json.loads(self.autonomy.model_dump_json()),
             "state": json.loads(self.state.model_dump_json()),
             "emotional_state": json.loads(self.emotional_state.model_dump_json()),
-            "conversation_history": self.conversation_history,
-            "memory": self.memory.to_dict(),
+            # conversation_history no longer serialized - stored in SQLite for scalability
+            "memory": self.memory.to_dict(),  # Only metadata, not full memories
             "dreams": self.dreams,
             "consciousness": {
                 "thought_stream": self.consciousness.thought_stream,
@@ -1538,7 +1638,7 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
         mind.identity = MindIdentity(**data["identity"])
         mind.state = MindState(**data["state"])
         mind.emotional_state = EmotionalState(**data["emotional_state"])
-        mind.conversation_history = data.get("conversation_history", [])
+        # conversation_history no longer restored from JSON - loaded from SQLite on-demand
         mind.dreams = data.get("dreams", [])
 
         # Restore CORE memory

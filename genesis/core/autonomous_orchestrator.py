@@ -510,20 +510,24 @@ class AutonomousOrchestrator:
                         try:
                             file_data = json.loads(match.group(1))
                             for file_path in file_data.get("generated_files", []):
+                                # Ensure paths are strings (convert Path objects if present)
+                                file_path_str = str(file_path)
                                 artifacts.append({
                                     "type": "file",
-                                    "path": file_path,
-                                    "name": Path(file_path).name
+                                    "path": file_path_str,
+                                    "name": Path(file_path_str).name
                                 })
                         except:
                             pass
                 
                 # Check for file paths in results
                 if "file_path" in result:
+                    # Ensure paths are strings (convert Path objects if present)
+                    file_path_str = str(result["file_path"])
                     artifacts.append({
                         "type": "file",
-                        "path": result["file_path"],
-                        "name": Path(result["file_path"]).name
+                        "path": file_path_str,
+                        "name": Path(file_path_str).name
                     })
                 
                 # Check for generated images
