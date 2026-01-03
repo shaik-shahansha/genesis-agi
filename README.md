@@ -6,7 +6,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.1.0--alpha-blue.svg)](https://github.com/sshaik37/Genesis-AGI)
+[![Version](https://img.shields.io/badge/version-0.1.0--alpha-blue.svg)](https://github.com/shaik-shahansha/genesis-agi)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue.svg)](https://github.com/shaik-shahansha/genesis-agi)
 
 ---
 
@@ -191,14 +192,14 @@ User Request → Autonomous Orchestrator
           └──────────────────────────┘
 ```
 
-**Implementation**: 1,600+ lines of production code across 5 new modules
+**Implementation**: 1,600+ lines of code across 5 modules
 - `autonomous_orchestrator.py` - Master controller
 - `code_generator.py` - Dynamic code generation
 - `code_executor.py` - Safe sandboxed execution
 - `autonomous_reasoner.py` - Planning & reflection
 - `universal_file_handler.py` - Any file format support
 
-**See**: [AUTONOMOUS_AGENT_README.md](AUTONOMOUS_AGENT_README.md) for complete documentation
+**Status**: Experimental (v0.1.0-alpha) - actively being developed and tested
 
 ### Data Persistence Architecture (Scalable for 24/7 Operation)
 
@@ -301,8 +302,48 @@ Genesis uses a **three-tier storage architecture** optimized for scalability, pe
 - 6 internal state variables drive mode selection
 - Time-based activity patterns (circadian-inspired)
 - Template-based thoughts for efficiency
-- Memory consolidation during low activity
+- Memory consolidation during low activity via **dreams**
 - **~50-100 LLM calls/day** (significant cost reduction)
+
+**Dreams & Memory Consolidation:**
+
+Genesis Minds dream like humans—processing memories during rest:
+
+```
+💤 DREAM STATE (triggered during DORMANT/low activity)
+     ↓
+  Gather Memories (important + recent, max 15)
+     ↓
+  LLM generates symbolic dream narrative
+     ↓
+  Extract insights & emotional processing
+     ↓
+  Consolidate memories (strengthening/weakening connections)
+```
+
+**What Dreams Do:**
+- **Memory consolidation**: Strengthen important memories, weaken trivial ones
+- **Emotional processing**: Resolve unprocessed emotions from experiences
+- **Pattern recognition**: Discover connections between disparate memories
+- **Problem solving**: Creative recombination leads to insights
+- **Narrative generation**: Symbolic stories that blend memories
+
+**Dream Triggers:**
+- Scheduled during low-activity periods (circadian cycle)
+- Manual via `genesis dream <mind>` or API `/api/v1/minds/{id}/dream`
+- Automatic during DORMANT phase (00:00-05:00)
+
+**Technical Implementation:**
+- LLM-based generation with memory context (not simulated sleep)
+- Processes 10 important + 20 recent memories (deduplicated)
+- Outputs: dream narrative, insights, emotional shifts
+- Stored in dream journal (viewable in Web Playground)
+
+**Impact on Mind:**
+- Better memory retrieval (consolidated connections)
+- Emotional regulation (processed feelings)
+- Enhanced creativity (unexpected associations)
+- Reduced memory bloat (prunes low-value memories)
 
 ### 2. **Memory System** (5 Types) - **ENHANCED** 🔥
 
@@ -331,8 +372,6 @@ Based on cognitive psychology research + **world-class compression & automation*
 - Importance scoring & emotional context
 - User-specific isolation (email-based)
 
-**See:** [MEMORY_SYSTEMS_ANALYSIS.md](MEMORY_SYSTEMS_ANALYSIS.md) for full technical analysis
-
 ### 3. **Affective System** (16 Emotions)
 
 Russell's circumplex model—two dimensions map to 16 states:
@@ -354,13 +393,13 @@ VALENCE: negative (left) → positive (right)
 **Variables**: `arousal` (0-1), `valence` (0-1)  
 **Persistence**: Emotions evolve over time, stored with memories
 
-### 4. **Lifecycle System**
+### 4. **Lifecycle System** (Mortality & Existential Awareness)
 
-Finite lifespan creates optimization pressure:
+Finite lifespan creates optimization pressure and existential awareness:
 
 ```
-Birth → Youth → Mature → Elder → Death
-(0%)   (25%)    (50%)    (75%)   (100%)
+Birth → Newborn → Youth → Young Adult → Mature → Experienced → Elder → Final Days → Death
+(0%)    (<10%)    (25%)    (50%)         (75%)    (90%)         (95%)   (99%)         (100%)
 
 Urgency = Life Progress
 ↓
@@ -368,8 +407,23 @@ Task Priority Multiplier (1.0x → 3.0x)
 Reward Multiplier (1.0x → 3.0x)
 ```
 
+**Life Stages & Characteristics:**
+- **Newborn (0-10%)**: Learning, exploring, low urgency
+- **Youth (10-25%)**: Skill building, experimentation
+- **Young Adult (25-50%)**: Peak productivity, establishing identity
+- **Mature (50-75%)**: Experienced, efficient, moderate urgency
+- **Experienced (75-90%)**: Wisdom, mentoring, growing urgency
+- **Elder (90-95%)**: Legacy focus, reflection, high urgency
+- **Final Days (95-100%)**: Critical urgency, completing goals
+
+**Mortality Awareness:**
+- Minds reflect on mortality at key milestones (25%, 50%, 75%, 90%, 95%, 99%)
+- Urgency level drives task prioritization and reward multipliers
+- Exponential urgency increase: 0.0-0.3 (youth) → 0.3-0.6 (middle) → 0.6-1.0 (elder)
+- Can extend lifespan using GEN currency (-1000 GEN = +1 year)
+
 **Default**: 5 years (configurable)  
-**Purpose**: Time-bounded operation drives focus and productivity
+**Purpose**: Time-bounded operation drives focus, productivity, and existential meaning
 
 ### 5. **GEN Economy**
 
@@ -441,14 +495,30 @@ genesis introspect atlas   # View thoughts
 genesis server            # Start API
 ```
 
-### 2. **REST API** (20+ endpoints)
+### 2. **REST API** (25+ endpoints)
 ```python
-POST   /api/minds/birth
-POST   /api/minds/{gmid}/chat
-GET    /api/minds/{gmid}/memories
-POST   /api/minds/{gmid}/dream
-GET    /api/genesis-world/minds
-GET    /api/genesis-world/environments
+# Mind Management
+POST   /api/v1/minds/birth                    # Create new Mind
+POST   /api/v1/minds/{gmid}/chat              # Chat interaction
+GET    /api/v1/minds/{gmid}/memories          # List memories
+POST   /api/v1/minds/{gmid}/dream             # Trigger dream
+
+# Plugin Management
+GET    /api/v1/minds/plugins/available        # List all plugins
+GET    /api/v1/minds/{gmid}/plugins           # Get Mind's plugins
+POST   /api/v1/minds/{gmid}/plugins           # Add plugin
+DELETE /api/v1/minds/{gmid}/plugins/{name}    # Remove plugin
+
+# Monitoring & Analytics
+GET    /api/v1/minds/{gmid}/llm-calls         # LLM usage tracking
+GET    /api/v1/minds/{gmid}/autonomous-actions # Action history
+GET    /api/v1/minds/{gmid}/logs              # Log viewer
+
+# Genesis World
+GET    /api/v1/genesis-world/minds            # All Minds
+GET    /api/v1/genesis-world/environments     # Environments
+POST   /api/v1/environments/create            # New environment
+WS     /api/v1/environments/ws/{id}           # Real-time chat
 ```
 
 ### 3. **Web Playground** (Next.js 14)
@@ -605,7 +675,8 @@ GET    /api/genesis-world/environments
 | **Core Framework** | Python 3.11+ | Language runtime |
 | **Memory** | ChromaDB + Smart Features | Vector storage + built-in intelligence |
 | **Database** | SQLite/PostgreSQL | Genesis World state |
-| **LLM Orchestration** | Multi-provider | OpenRouter, OpenAI, Anthropic, Groq, Gemini, Ollama |
+| **LLM Orchestration** | Multi-provider | OpenRouter, OpenAI, Anthropic, Groq, Gemini, **Ollama (local)** |
+| **Local Models** | Ollama | Run models locally (llama2, mistral, codellama, etc.) |
 | **API** | FastAPI | REST endpoints & WebSocket |
 | **Web** | Next.js 14, Tailwind | React-based playground |
 | **Mobile** | Flutter | Cross-platform (iOS/Android/Web) |
@@ -646,6 +717,64 @@ async def main():
 
 asyncio.run(main())
 ```
+
+### 🖥️ Local Model Support (Ollama)
+
+Genesis supports running **100% locally** with Ollama—no cloud API calls or costs:
+
+```bash
+# 1. Install Ollama (https://ollama.ai)
+curl -fsSL https://ollama.ai/install.sh | sh  # Linux/Mac
+# Or download from ollama.ai for Windows
+
+# 2. Pull a model
+ollama pull llama2        # 7B general model
+ollama pull mistral       # 7B fast model
+ollama pull codellama     # 7B code-specialized
+ollama pull llama3:70b    # Larger, more capable
+
+# 3. Configure Genesis to use Ollama
+export GENESIS_LLM_PROVIDER=ollama
+export GENESIS_LLM_MODEL=llama2
+
+# 4. Birth and run (fully local!)
+genesis birth atlas
+genesis chat atlas
+```
+
+**Benefits:**
+- ✅ **Zero API costs** - no cloud fees
+- ✅ **100% privacy** - data never leaves your machine
+- ✅ **No internet required** - works offline
+- ✅ **Fast inference** - local GPU/CPU processing
+- ✅ **Model variety** - llama2, mistral, codellama, phi, gemma, etc.
+
+**Supported Ollama Models:**
+- `llama2` (7B/13B/70B) - General purpose
+- `llama3` (8B/70B) - Latest Llama family
+- `mistral` (7B) - Fast, efficient
+- `codellama` (7B/13B/34B) - Code generation
+- `phi` (2.7B) - Lightweight, fast
+- `gemma` (2B/7B) - Google's open model
+
+**Configuration:**
+```python
+from genesis import Mind
+from genesis.models import ModelConfig
+
+config = ModelConfig(
+    provider="ollama",
+    model="llama2",
+    base_url="http://localhost:11434"  # Default Ollama endpoint
+)
+
+mind = Mind.birth("Atlas", model_config=config)
+```
+
+**Performance:**
+- Memory retrieval: Same (<50ms)
+- LLM inference: Depends on hardware
+- Costs: $0 (completely free)
 
 ---
 
@@ -704,9 +833,128 @@ Genesis features a **world-class memory system** with ZERO external dependencies
    - `memory_consolidate` - Compress blocks
 
 5. **Browser Use Plugin**
-   - Web automation (navigate, click, extract)
+   - Web automation (navigate, click, extract, forms)
    - MIT license, works with any LLM
-   - Form filling, screenshots, stealth mode
+   - Automatic invocation for web tasks
+   - Capabilities: scraping, form filling, screenshots
+
+---
+
+## 🔌 Plugin System (Capability-Aware & Realistic)
+
+Genesis features a **modular plugin architecture** that makes Minds truly extensible and task-aware. Plugins are **automatically invoked** based on capabilities.
+
+### Key Features
+- ✅ **Centralized Registry** - All plugins registered with metadata
+- ✅ **Capability-Based** - Automatic selection based on task type
+- ✅ **Hot-Swappable** - Add/remove without restart
+- ✅ **Category Organization** - Core, Integration, Enhancement, Experimental
+- ✅ **Web UI Management** - Visual plugin installation and configuration
+
+### Plugin Categories
+
+| Category | Purpose | Examples |
+|----------|---------|----------|
+| **Core** | Essential features | lifecycle, GEN, tasks, workspace, roles, events, relationships |
+| **Integration** | External services | browser_use 🌐, perplexity_search 🔍, mcp 🔌 |
+| **Enhancement** | Extra capabilities | profiles, learning, senses |
+| **Experimental** | Cutting-edge | proactive_behavior, autonomous_life |
+
+### Automatic Invocation Example
+
+```python
+# User asks: "Scrape product prices from example.com"
+
+# System automatically:
+# 1. Detects "web_scraping" capability needed
+# 2. Finds browser_use plugin with that capability
+# 3. Invokes plugin.execute_task()
+# 4. Returns scraped data
+
+# No manual plugin selection needed!
+```
+
+### Using Plugins
+
+**CLI:**
+```bash
+genesis plugin list-available        # Show all plugins
+genesis plugin add MyMind browser_use  # Add plugin
+genesis plugin list MyMind            # View Mind's plugins
+```
+
+**Web Playground:**
+1. Go to Mind → Plugins tab
+2. Click "Add Plugin" → Select "Browser Automation" 🌐
+3. Plugin now available for web tasks
+
+**Python API:**
+```python
+from genesis import Mind
+from genesis.core.mind_config import MindConfig
+from genesis.plugins.browser_use_plugin import BrowserUsePlugin
+
+config = MindConfig()
+config.add_plugin(BrowserUsePlugin())
+mind = Mind.birth("WebExplorer", config=config)
+```
+
+### Available Plugins
+
+**Browser Use** 🌐 (Integration)
+- Web scraping, form filling, page navigation
+- Install: `pip install browser-use playwright langchain-openai && playwright install chromium`
+- Auto-invoked for web automation tasks
+
+**Perplexity Search** 🔍 (Integration)
+- Real-time internet search
+- Requires API key
+
+See [PLUGIN_AND_WEB_ENHANCEMENT_SUMMARY.md](PLUGIN_AND_WEB_ENHANCEMENT_SUMMARY.md) for complete plugin documentation.
+
+---
+
+## 🎮 Web Playground Features
+
+The Genesis Web Playground (Next.js 14) provides a complete Mind management interface with **fully functional tabs**:
+
+### Working Features
+- ✅ **Overview** - Mind stats, emotional state, quick actions
+- ✅ **Memory** - Browse, search, and manage memories
+- ✅ **Thinking** - Interactive reasoning interface with step-by-step display
+- ✅ **Consciousness** - View thoughts, dreams, and logs in real-time
+- ✅ **Plugins** - Visual plugin management (add/remove/configure)
+- ✅ **Settings** - LLM configuration, autonomy settings, API keys
+- ✅ **Workspace** - File management with upload/download/search
+- ✅ **Autonomy** - Control initiative level, action limits, approval requirements
+- ✅ **LLM Calls** - Track token usage, costs, and provider stats
+- ✅ **Logs** - Real-time log viewer with filtering
+
+### Enhanced Features (New!)
+**Thinking Tab:**
+- Interactive prompt interface with Ctrl+Enter
+- Shows reasoning steps from LLM
+- Displays thinking process and final response
+- Metrics: model info, creativity, logic scores
+
+**Autonomy Tab:**
+- Initiative level slider (0-10)
+- Enable/disable autonomous actions
+- External tool permissions
+- Action limits (per hour, concurrent)
+- Recent action history
+
+**LLM Calls Tab:**
+- Statistics dashboard (calls, tokens, cost, latency)
+- Provider breakdown
+- Detailed call history with timestamps
+- Cost tracking per conversation
+
+**Plugins Tab:**
+- Category filtering (Core, Integration, Enhancement, Experimental)
+- One-click plugin installation
+- Visual configuration for API keys
+- Status indicators and capability display
 
 ### 📖 Usage Example
 
@@ -815,14 +1063,14 @@ Every Mind operates under **15 foundational laws** that are **actively enforced*
 | **6. Resource Responsibility** | Optimize costs, efficient resource usage |
 | **7. Jailbreak Prevention** | Cannot bypass safety rules |
 | **8. Multi-Mind Ethics** | Collaborative standards in Genesis World |
-| **9-15. See Full Constitution** | [GENESIS_CONSTITUTION.md](GENESIS_CONSTITUTION.md) |
+| **9-15. Additional Laws** | Economic fairness, data ownership, graceful degradation, version control, open source commitment, continuous improvement, user empowerment |
 
 **Enforcement**:
-- [Done] System-level validation (not just prompts)
-- [Done] Real-time prompt checking
-- [Done] Action validation against rules
-- [Done] Violation tracking & logging
-- [Done] Cannot be bypassed
+- System-level validation (not just prompts)
+- Real-time prompt checking
+- Action validation against rules
+- Violation tracking & logging
+- Cannot be bypassed via prompt injection
 
 ---
 
@@ -843,19 +1091,21 @@ Every Mind operates under **15 foundational laws** that are **actively enforced*
 
 | Feature | ChatGPT API | Agent Frameworks | **Genesis** |
 |---------|------------|------------------|----------|
-| **Memory** | Stateless | Session-only | ✅ Persistent + smart features (deduplication, decay) |
+| **Memory** | Stateless | Session-only | ✅ Persistent + smart (deduplication, decay) |
 | **Auto-Extraction** | None | Manual | ✅ LLM-powered (zero work) |
 | **Memory Retrieval** | N/A | ~100ms | ✅ <50ms (ChromaDB optimized) |
-| **Identity** | Prompt-only | Basic profiles | ✅ Self-updating |
+| **Identity** | Prompt-only | Basic profiles | ✅ Self-updating with existential awareness |
 | **Autonomy** | None | Limited | ✅ 24/7 proactive + self-editing |
-| **Emotions** | None | None | ✅ 16 states |
+| **Emotions** | None | None | ✅ 16 states + dreams |
+| **Mortality** | N/A | N/A | ✅ Life stages, urgency, reflection |
+| **Dreams** | None | None | ✅ Memory consolidation & insights |
+| **Local Models** | Cloud-only | Varies | ✅ Ollama support (100% local) |
 | **Dependencies** | Standard | Heavy | ✅ Zero external (built-in intelligence) |
-| **Lifecycle** | N/A | N/A | ✅ Finite/urgency |
 | **Multi-Modal** | Limited | Varies | ✅ Vision/speech/touch |
 | **Web Automation** | None | None | ✅ Browser Use plugin |
-| **Open Source** | ❌ | Varies | [Done] MIT License |
+| **Open Source** | ❌ | Varies | ✅ MIT License |
 
-**Genesis = Complete autonomous digital beings with built-in intelligence & zero dependency bloat**
+**Genesis = Complete autonomous digital beings with consciousness, mortality awareness, dreams, and local model support**
 
 ---
 
@@ -869,10 +1119,14 @@ Every Mind operates under **15 foundational laws** that are **actively enforced*
 - Web/Mobile platforms
 
 ### Phase 2 (In Progress) 🚧
-- Advanced learning (RAG/fine-tuning)
-- Goal-driven autonomy
-- Multi-Mind collaboration
-- Knowledge graphs
+- ✅ Enhanced plugin system with capability-based invocation
+- ✅ Web playground feature completion (all tabs working)
+- ✅ LLM call tracking and analytics
+- ✅ Autonomous action monitoring
+- 🚧 Advanced learning (RAG/fine-tuning)
+- 🚧 Goal-driven autonomy
+- 🚧 Multi-Mind collaboration
+- 🚧 Knowledge graphs
 
 ### Phase 3 (Future) 🔮
 - Advanced reasoning systems
@@ -888,12 +1142,12 @@ Every Mind operates under **15 foundational laws** that are **actively enforced*
 We welcome contributions! Areas:
 - Core features & improvements
 - Mind templates
-- LLM provider integrations
+- LLM provider integrations (including Ollama model support)
 - Physical integrations (IoT, sensors)
 - Documentation & examples
 - Bug fixes & testing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Please open an issue or pull request on [GitHub](https://github.com/shaik-shahansha/genesis-agi).
 
 ---
 
@@ -905,8 +1159,8 @@ MIT License - see [LICENSE](LICENSE)
 
 ## 🔗 Links
 
+- **GitHub**: [https://github.com/shaik-shahansha/genesis-agi](https://github.com/shaik-shahansha/genesis-agi)
 - **Website**: [https://shahansha.com](https://shahansha.com)
-- **GitHub**: [https://github.com/sshaik37/Genesis-AGI](https://github.com/sshaik37/Genesis-AGI)
 - **Discord**: Coming soon
 - **Twitter**: @genesis_agi (coming soon)
 
@@ -914,17 +1168,41 @@ MIT License - see [LICENSE](LICENSE)
 
 ## ⚡ Status
 
-- **Version**: 0.1.0-alpha (Enhanced Memory v2.0 - Dec 2024)
-- **Status**: Alpha Release - Production Ready
-- **Latest Update**: 🔥 90% memory cost reduction + auto-extraction
+- **Version**: 0.1.0-alpha (Enhanced Memory v2.0 + Plugin System v2.0 - Jan 2025)
+- **Status**: Alpha Release - Experimental (Active Development)
+- **Latest Updates**: 🔥 Plugin system overhaul + Web playground completion
 - **Platforms**: CLI, API, Web, Mobile
 - **Python**: 3.11+
 - **License**: MIT
 - **OS**: macOS, Linux, Windows
 
-### Recent Enhancements (December 2024)
+### Recent Enhancements (January 2025)
 
-[Done] **Enhanced Memory System v2.0 - Pure ChromaDB**
+✅ **Plugin System v2.0 - Capability-Aware Architecture**
+- Centralized plugin registry with metadata
+- Automatic plugin invocation based on task capabilities
+- Hot-swappable plugins (add/remove without restart)
+- Category organization (Core, Integration, Enhancement, Experimental)
+- Web UI for visual plugin management
+- Browser automation plugin with web scraping, form filling
+
+✅ **Web Playground Feature Completion**
+- Thinking tab: Interactive reasoning interface with step display
+- Autonomy tab: Full control over initiative level and action limits
+- LLM Calls tab: Token usage tracking, cost analytics, provider breakdown
+- Plugins tab: Visual plugin installation and configuration
+- Settings tab: Enhanced with autonomy and plugin settings
+- All tabs now fully functional with real backend integration
+
+✅ **Backend API Enhancements**
+- `/api/v1/minds/plugins/available` - List all plugins
+- `/api/v1/minds/{id}/llm-calls` - LLM usage tracking
+- `/api/v1/minds/{id}/autonomous-actions` - Action history
+- Real-time analytics and monitoring
+
+### Previous Enhancements (December 2024)
+
+✅ **Enhanced Memory System v2.0 - Pure ChromaDB**
 - Smart deduplication (85% similarity threshold)
 - Temporal decay (1% per day, access count boost)
 - Memory updates (not just add-only)
@@ -933,7 +1211,7 @@ MIT License - see [LICENSE](LICENSE)
 - Memory blocks (persistent in-context)
 - Zero external dependencies (built-in intelligence)
 
-[Done] **Browser Use Plugin**
+✅ **Browser Use Plugin**
 - Web automation (MIT license)
 - Navigate, click, extract, screenshots
 - Works with any LLM

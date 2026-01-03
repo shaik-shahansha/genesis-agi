@@ -98,6 +98,15 @@ const availablePlugins = [
     configFields: [{ name: 'api_key', label: 'API Key', type: 'password', required: true }],
   },
   { 
+    id: 'browser_use', 
+    name: 'Browser Automation', 
+    category: 'Integration',
+    description: 'Web scraping, form filling, and browser automation',
+    emoji: '🌐',
+    requiresConfig: false,
+    capabilities: ['web_scraping', 'form_filling', 'automation'],
+  },
+  { 
     id: 'mcp', 
     name: 'MCP', 
     category: 'Integration',

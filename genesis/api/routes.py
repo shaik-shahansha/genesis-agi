@@ -1609,6 +1609,49 @@ class PluginResponse(BaseModel):
     config: Optional[Dict[str, Any]] = None
 
 
+class AvailablePluginResponse(BaseModel):
+    """Available plugin metadata."""
+    name: str
+    version: str
+    description: str
+    category: str
+    requires_config: bool
+    config_fields: List[Dict[str, Any]] = []
+
+
+@minds_router.get("/plugins/available")
+async def list_available_plugins():
+    """List all available plugins from the registry."""
+    try:
+        from genesis.plugins.registry import PluginRegistry
+        plugins_list = PluginRegistry.list_all()
+        
+        return {
+            "plugins": [
+                AvailablePluginResponse(
+                    name=p["name"],
+                    version=p["version"],
+                    description=p["description"],
+                    category=p.get("category", "extension"),
+                    requires_config=p.get("requires_config", "false") == "true",
+                    config_fields=p.get("config_fields", [])
+                )
+                for p in plugins_list
+            ]
+        }
+    except Exception as e:
+        # Fallback if registry not available
+        return {
+            "plugins": [
+                {"name": "lifecycle", "version": "1.0.0", "description": "Mortality awareness", "category": "core", "requires_config": False, "config_fields": []},
+                {"name": "gen", "version": "1.0.0", "description": "Economy system", "category": "core", "requires_config": False, "config_fields": []},
+                {"name": "tasks", "version": "1.0.0", "description": "Task management", "category": "core", "requires_config": False, "config_fields": []},
+                {"name": "workspace", "version": "1.0.0", "description": "File workspace", "category": "core", "requires_config": False, "config_fields": []},
+                {"name": "browser_use", "version": "1.0.0", "description": "Browser automation", "category": "integration", "requires_config": False, "config_fields": []},
+            ]
+        }
+
+
 @minds_router.get("/{mind_id}/plugins")
 async def get_plugins(mind_id: str):
     """Get all plugins for a Mind (optimized - reads from config in JSON)."""
@@ -2938,3 +2981,177 @@ async def test_gemini_connection(
             status_code=400,
             detail=f"Connection failed: {str(e)}"
         )
+
+
+# =============================================================================
+# LLM CALL TRACKING & AUTONOMOUS ACTIONS ENDPOINTS
+# =============================================================================
+
+
+@minds_router.get("/{mind_id}/llm-calls")
+async def get_llm_calls(
+    mind_id: str,
+    limit: int = 50,
+):
+    """
+    Get LLM call history for a Mind.
+    
+    Extracts LLM call logs from the Mind's log history.
+    """
+    try:
+        # Find mind path
+        mind_path = _find_mind_path(mind_id)
+        mind = Mind.load(mind_path)
+        
+        # Get logs
+        logs = mind.logger.get_logs(limit=limit * 2)  # Get more to filter
+        
+        # Filter for LLM calls
+        llm_calls = []
+        for log in logs:
+            if log.get("level") == "llm_call" or "LLM call" in log.get("message", ""):
+                metadata = log.get("metadata", {})
+                
+                # Calculate approximate cost (rough estimates)
+                model = metadata.get("model", "unknown")
+                prompt_tokens = metadata.get("prompt_length", 0)
+                completion_tokens = metadata.get("response_length", 0)
+                total_tokens = prompt_tokens + completion_tokens
+                
+                # Rough cost estimation (in USD per 1M tokens)
+                cost_per_token = 0.0
+                if "gpt-4" in model.lower():
+                    cost_per_token = 0.00003  # $30 per 1M tokens (input)
+                elif "gpt-3.5" in model.lower():
+                    cost_per_token = 0.000001  # $1 per 1M tokens
+                elif "deepseek" in model.lower():
+                    cost_per_token = 0.0000001  # Very cheap
+                elif "claude" in model.lower():
+                    cost_per_token = 0.000015  # $15 per 1M tokens
+                else:
+                    cost_per_token = 0.000001  # Default low cost
+                
+                cost = total_tokens * cost_per_token
+                
+                # Extract provider from model name
+                provider = "unknown"
+                if "openrouter" in model.lower():
+                    provider = "OpenRouter"
+                elif "gpt" in model.lower() or "openai" in model.lower():
+                    provider = "OpenAI"
+                elif "claude" in model.lower() or "anthropic" in model.lower():
+                    provider = "Anthropic"
+                elif "deepseek" in model.lower():
+                    provider = "DeepSeek"
+                elif "groq" in model.lower():
+                    provider = "Groq"
+                elif "gemini" in model.lower():
+                    provider = "Google"
+                
+                # Estimate latency (mock data for now - could be tracked in future)
+                latency = 1000 + (total_tokens // 10)  # Rough estimate based on tokens
+                
+                llm_calls.append({
+                    "id": log.get("timestamp", ""),
+                    "timestamp": log.get("timestamp", ""),
+                    "provider": provider,
+                    "model": model,
+                    "purpose": metadata.get("purpose", "chat"),
+                    "promptTokens": prompt_tokens,
+                    "completionTokens": completion_tokens,
+                    "totalTokens": total_tokens,
+                    "cost": cost,
+                    "latency": latency,
+                    "success": True,  # Assume success if logged
+                })
+        
+        # Sort by timestamp and limit
+        llm_calls.sort(key=lambda x: x["timestamp"], reverse=True)
+        llm_calls = llm_calls[:limit]
+        
+        return {"calls": llm_calls}
+        
+    except Exception as e:
+        # Return empty list if tracking not available
+        return {"calls": []}
+
+
+@minds_router.get("/{mind_id}/autonomous-actions")
+async def get_autonomous_actions(
+    mind_id: str,
+    limit: int = 20,
+):
+    """
+    Get autonomous action history for a Mind.
+    
+    Extracts autonomous actions from the Mind's log history.
+    """
+    try:
+        # Find mind path
+        mind_path = _find_mind_path(mind_id)
+        mind = Mind.load(mind_path)
+        
+        # Get logs
+        logs = mind.logger.get_logs(limit=limit * 3)  # Get more to filter
+        
+        # Filter for autonomous actions
+        actions = []
+        for log in logs:
+            message = log.get("message", "")
+            metadata = log.get("metadata", {})
+            level = log.get("level", "")
+            
+            # Identify autonomous actions
+            is_action = (
+                level == "action" or
+                "autonomous" in message.lower() or
+                "executing action" in message.lower() or
+                "proactive" in message.lower() or
+                metadata.get("action_type") is not None
+            )
+            
+            if is_action:
+                action_type = metadata.get("action_type", "unknown")
+                
+                # Infer action type from message if not in metadata
+                if action_type == "unknown":
+                    if "thought" in message.lower():
+                        action_type = "thought_generation"
+                    elif "memory" in message.lower():
+                        action_type = "memory_update"
+                    elif "search" in message.lower():
+                        action_type = "information_search"
+                    elif "task" in message.lower():
+                        action_type = "task_execution"
+                    elif "conversation" in message.lower():
+                        action_type = "proactive_conversation"
+                    else:
+                        action_type = "general_action"
+                
+                # Determine status
+                status = "completed"
+                if "failed" in message.lower() or "error" in message.lower():
+                    status = "failed"
+                elif "pending" in message.lower() or "started" in message.lower():
+                    status = "in_progress"
+                
+                actions.append({
+                    "action_id": f"{log.get('timestamp', '')}_{action_type}",
+                    "action_type": action_type,
+                    "description": message,
+                    "status": status,
+                    "created_at": log.get("timestamp", ""),
+                    "completed_at": log.get("timestamp", "") if status == "completed" else None,
+                    "result": metadata.get("result", None),
+                })
+        
+        # Sort by timestamp and limit
+        actions.sort(key=lambda x: x["created_at"], reverse=True)
+        actions = actions[:limit]
+        
+        return {"actions": actions}
+        
+    except Exception as e:
+        # Return empty list if tracking not available
+        return {"actions": []}
+

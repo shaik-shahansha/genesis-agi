@@ -29,13 +29,30 @@ class BrowserUsePlugin(BasePlugin):
     - Take screenshots
     - Multi-tab support
     - Stealth mode (CAPTCHA bypass)
+    
+    Capability-Based: Auto-invoked when user asks for web scraping,
+    form filling, or browser automation tasks.
     """
 
-    def __init__(self):
+    def __init__(self, **config):
         """Initialize browser use plugin."""
-        super().__init__()
+        super().__init__(**config)
         self.browser_agent = None
         self.browser_instance = None
+        
+    def get_capabilities(self) -> List[str]:
+        """
+        Return list of capabilities this plugin provides.
+        Used for automatic plugin invocation based on task type.
+        """
+        return [
+            "web_scraping",
+            "form_filling",
+            "web_automation",
+            "page_navigation",
+            "element_interaction",
+            "data_extraction"
+        ]
 
     def get_name(self) -> str:
         """Get plugin name."""
@@ -51,11 +68,23 @@ class BrowserUsePlugin(BasePlugin):
             from browser_use import Agent as BrowserAgent
             from langchain_openai import ChatOpenAI
             
+            # Try to get OpenAI API key from various sources
+            api_key = (
+                mind.intelligence.api_keys.get("openai") or
+                self.config.get("openai_api_key") or
+                None
+            )
+            
+            if not api_key:
+                print(f"⚠️ Browser Use plugin needs OpenAI API key - will use Mind's model instead")
+                self.browser_agent = None
+                return
+            
             # Initialize LLM for browser agent (uses same model as Mind)
             # browser-use requires LangChain wrapper
             llm = ChatOpenAI(
                 model=mind.intelligence.reasoning_model,
-                api_key=mind.intelligence.api_keys.get("openai"),
+                api_key=api_key,
                 temperature=0.3,  # Lower temperature for precise web actions
             )
             
@@ -66,15 +95,21 @@ class BrowserUsePlugin(BasePlugin):
                 use_vision=True,  # Enable vision for screenshot understanding
             )
             
-            print(f"[Done] Browser Use plugin initialized for {mind.identity.name}")
+            print(f"✅ Browser Use plugin initialized for {mind.identity.name}")
+            print(f"   Capabilities: web scraping, form filling, automation")
             
         except ImportError as e:
             print(f"⚠️ Browser Use plugin requires: pip install browser-use playwright langchain-openai")
             print(f"   Error: {e}")
+            print(f"   Run: playwright install chromium")
             self.browser_agent = None
         except Exception as e:
             print(f"⚠️ Failed to initialize Browser Use: {e}")
             self.browser_agent = None
+    
+    def is_initialized(self) -> bool:
+        """Check if plugin is properly initialized."""
+        return self.browser_agent is not None
 
     def register_actions(self, action_executor) -> None:
         """Register browser actions with the action executor."""
