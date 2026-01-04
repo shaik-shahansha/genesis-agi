@@ -22,9 +22,7 @@ export default function ThinkingTab({ mindId }: ThinkingTabProps) {
     
     try {
       // Use the chat endpoint to get a response with thinking
-      const result = await api.chat(mindId, input, {
-        include_thinking: true
-      });
+      const result = await api.chat(mindId, input);
       
       setResponse(result.response || result.message || 'No response');
       

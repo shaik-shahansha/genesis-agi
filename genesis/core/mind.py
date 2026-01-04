@@ -926,6 +926,19 @@ class Mind:
         if action_results:
             memory_content += f"\nActions taken: {json.dumps(action_results)}"
 
+        # Get environment context for memory metadata
+        environment_context = None
+        try:
+            current_env = self.environments.get_current_environment()
+            if current_env:
+                environment_context = {
+                    "environment_id": current_env.id,
+                    "environment_name": current_env.name,
+                    "environment_type": current_env.type.value
+                }
+        except Exception:
+            pass  # Environment context is optional
+
         # PROACTIVE: Check if user is responding to a concern (e.g., "I'm fine now")
         if hasattr(self, 'proactive_consciousness') and self.proactive_consciousness and user_email:
             try:
@@ -1036,14 +1049,6 @@ class Mind:
                     level=LogLevel.WARNING,
                     message=f"Error in spontaneous conversation: {e}"
                 )
-        
-        # Return the response
-            importance=0.7 if action_results else 0.6,  # Higher importance if actions were taken
-            tags=["conversation"] + (["action_taken"] if action_results else []),
-            metadata={"user_input": prompt, "my_response": response.content, "actions": action_results},
-            user_email=user_email,
-            relationship_context="personal" if user_email else "generic",
-        )
         
         # Log memory creation
         self.logger.memory_action(

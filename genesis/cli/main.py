@@ -120,34 +120,34 @@ def _interactive_model_selection() -> Intelligence:
 
             # Recommend best free models
             console.print("\n[bold]Select a free model:[/bold]")
-            console.print("  [cyan]1.[/cyan] DeepSeek Chat (FREE, best for general tasks)")
-            console.print("  [cyan]2.[/cyan] Xiaomi MiMo V2 Flash (FREE, fast)")
-            console.print("  [cyan]3.[/cyan] Mistral Devstral 2 (FREE, best for coding)")
-            console.print("  [cyan]4.[/cyan] DeepSeek V3.1 Nex N1 (FREE, agent tasks)")
-            console.print("  [cyan]5.[/cyan] Llama 3.3 70B (FREE)\n")
+            console.print("  [cyan]1.[/cyan] Llama 3.3 70B (FREE, RECOMMENDED - best for general tasks)")
+            console.print("  [cyan]2.[/cyan] DeepSeek Chat (FREE, excellent quality)")
+            console.print("  [cyan]3.[/cyan] Xiaomi MiMo V2 Flash (FREE, fast)")
+            console.print("  [cyan]4.[/cyan] Mistral Devstral 2 (FREE, best for coding)")
+            console.print("  [cyan]5.[/cyan] DeepSeek V3.1 Nex N1 (FREE, agent tasks)\n")
             
             model_choice = typer.prompt("Select model", type=int, default=1)
             
             if model_choice == 1:
-                intelligence.reasoning_model = "openrouter/deepseek/deepseek-r1-0528:free"
-                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
-                console.print("\n[green][SUCCESS] Using DeepSeek Chat (FREE, excellent quality)[/green]\n")
+                intelligence.reasoning_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
+                intelligence.fast_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
+                console.print("\n[green][SUCCESS] Using Llama 3.3 70B (FREE, RECOMMENDED)[/green]\n")
             elif model_choice == 2:
                 intelligence.reasoning_model = "openrouter/deepseek/deepseek-r1-0528:free"
                 intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
-                console.print("\n[green][SUCCESS] Using Xiaomi MiMo V2 Flash (FREE, ultra-fast)[/green]\n")
+                console.print("\n[green][SUCCESS] Using DeepSeek Chat (FREE, excellent quality)[/green]\n")
             elif model_choice == 3:
-                intelligence.reasoning_model = "openrouter/mistralai/devstral-2512:free"
+                intelligence.reasoning_model = "openrouter/deepseek/deepseek-r1-0528:free"
                 intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
-                console.print("\n[green][SUCCESS] Using Mistral Devstral 2 (FREE, best for coding)[/green]\n")
+                console.print("\n[green][SUCCESS] Using Xiaomi MiMo V2 Flash (FREE, ultra-fast)[/green]\n")
             elif model_choice == 4:
-                intelligence.reasoning_model = "openrouter/nex-agi/deepseek-v3.1-nex-n1:free"
-                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
-                console.print("\n[green][SUCCESS] Using DeepSeek V3.1 Nex N1 (FREE, agent optimized)[/green]\n")
+                intelligence.reasoning_model = "openrouter/mistralai/devstral-2512:free"
+                intelligence.fast_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
+                console.print("\n[green][SUCCESS] Using Mistral Devstral 2 (FREE, best for coding)[/green]\n")
             else:
-                intelligence.reasoning_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
-                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
-                console.print("\n[green][SUCCESS] Using Llama 3.3 70B (FREE)[/green]\n")
+                intelligence.reasoning_model = "openrouter/nex-agi/deepseek-v3.1-nex-n1:free"
+                intelligence.fast_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
+                console.print("\n[green][SUCCESS] Using DeepSeek V3.1 Nex N1 (FREE, agent optimized)[/green]\n")
 
         elif provider_choice == 2:
             # Groq

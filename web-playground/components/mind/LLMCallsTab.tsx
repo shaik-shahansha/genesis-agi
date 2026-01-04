@@ -210,34 +210,3 @@ export default function LLMCallsTab({ mindId }: LLMCallsTabProps) {
     </div>
   );
 }
-
-                  </td>
-                </tr>
-              ) : (
-                calls.map((call) => (
-                  <tr key={call.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="p-3 text-gray-900">
-                      {new Date(call.timestamp).toLocaleTimeString()}
-                    </td>
-                    <td className="p-3 text-gray-900">{call.provider}</td>
-                    <td className="p-3 text-gray-900 font-mono text-xs">{call.model}</td>
-                    <td className="p-3 text-right text-gray-900">{call.totalTokens}</td>
-                    <td className="p-3 text-right text-gray-900">${call.cost.toFixed(4)}</td>
-                    <td className="p-3 text-right text-gray-900">{call.latency}ms</td>
-                    <td className="p-3 text-center">
-                      {call.success ? (
-                        <span className="text-green-600">✓</span>
-                      ) : (
-                        <span className="text-red-600">✗</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}

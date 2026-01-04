@@ -16,8 +16,8 @@ export default function CreateMindPage() {
     name: '',
     creator_email: '',
     template: 'base/curious_explorer',
-    reasoning_model: 'openrouter/deepseek/deepseek-r1-0528:free',
-    fast_model: 'openrouter/deepseek/deepseek-r1-0528:free',
+    reasoning_model: 'openrouter/meta-llama/llama-3.3-70b-instruct:free',
+    fast_model: 'openrouter/meta-llama/llama-3.3-70b-instruct:free',
     autonomy_level: 'medium',
     enable_daemon: false,
     enable_cache: true,
@@ -145,9 +145,16 @@ export default function CreateMindPage() {
   const models = [
     // OpenRouter Free Models (Recommended at the top)
     { 
+      value: 'openrouter/meta-llama/llama-3.3-70b-instruct:free', 
+      label: '🌟 OpenRouter: Llama 3.3 70B',
+      description: 'FREE • RECOMMENDED • Large model • Strong reasoning • Best for general tasks',
+      cost: 'Free',
+      speed: 'Fast'
+    },
+    { 
       value: 'openrouter/deepseek/deepseek-r1-0528:free', 
       label: '🌟 OpenRouter: DeepSeek Chat',
-      description: 'FREE • RECOMMENDED • Excellent quality • Best for general tasks',
+      description: 'FREE • Excellent quality • Great alternative',
       cost: 'Free',
       speed: 'Fast'
     },
@@ -169,13 +176,6 @@ export default function CreateMindPage() {
       value: 'openrouter/nex-agi/deepseek-v3.1-nex-n1:free', 
       label: '🌟 OpenRouter: DeepSeek V3.1 Nex N1',
       description: 'FREE • Optimized for agents & tools',
-      cost: 'Free',
-      speed: 'Fast'
-    },
-    { 
-      value: 'openrouter/meta-llama/llama-3.3-70b-instruct:free', 
-      label: '🌟 OpenRouter: Llama 3.3 70B',
-      description: 'FREE • Large model • Strong reasoning',
       cost: 'Free',
       speed: 'Fast'
     },
@@ -366,9 +366,16 @@ export default function CreateMindPage() {
                           : ''
                       }`}
                     >
-                      <div className="text-4xl mb-3">{template.emoji}</div>
-                      <h3 className="text-lg font-bold text-white mb-2">{template.label}</h3>
-                      <p className="text-sm text-gray-300">{template.description}</p>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="text-4xl mb-3">{template.emoji}</div>
+                          <h3 className="text-lg font-bold text-white mb-2">{template.label}</h3>
+                          <p className="text-sm text-gray-300">{template.description}</p>
+                        </div>
+                        {formData.template === template.value && (
+                          <div className="text-2xl text-purple-400">✓</div>
+                        )}
+                      </div>
                     </Card>
                   ))}
                 </div>
@@ -722,15 +729,76 @@ export default function CreateMindPage() {
                 </div>
               </div>
 
-              {/* Info Banner */}
+              {/* Info Banner - Dynamic Cost Estimation */}
               <Card className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 border-purple-500/30">
                 <div className="text-sm text-gray-300">
                   <p className="font-semibold text-purple-300 mb-2">🚀 Estimated Costs:</p>
                   <ul className="space-y-1">
-                    <li>• With Groq (Free): $0/month unlimited</li>
-                    <li>• With caching enabled: 90% cost reduction</li>
-                    <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
-                    <li>• Total estimated: <strong className="text-green-400">Nearly Free!</strong></li>
+                    {(() => {
+                      const model = formData.reasoning_model;
+                      const isFree = model.includes(':free') || model.includes('groq/');
+                      const isOpenRouter = model.includes('openrouter/');
+                      const isGroq = model.includes('groq/');
+                      const isOllama = model.includes('ollama/');
+                      const isOpenAI = model.includes('openai/');
+                      const isAnthropic = model.includes('anthropic/');
+                      
+                      if (isOllama) {
+                        return (
+                          <>
+                            <li>• Local (Ollama): $0/month (100% private, no limits)</li>
+                            <li>• Hardware: Runs on your computer (4-16GB RAM)</li>
+                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
+                            <li>• Total cost: <strong className="text-green-400">Free Forever!</strong></li>
+                          </>
+                        );
+                      } else if (isFree && isOpenRouter) {
+                        return (
+                          <>
+                            <li>• OpenRouter (Free tier): $0/month with usage limits</li>
+                            <li>• {formData.enable_cache ? 'With caching: 90% cost reduction' : 'Enable caching for 90% savings'}</li>
+                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
+                            <li>• Total cost: <strong className="text-green-400">Free (with limits)!</strong></li>
+                          </>
+                        );
+                      } else if (isGroq) {
+                        return (
+                          <>
+                            <li>• Groq (Free tier): $0/month with rate limits</li>
+                            <li>• Speed: Ultra-fast inference (350+ tokens/sec)</li>
+                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
+                            <li>• Total cost: <strong className="text-green-400">Free (with limits)!</strong></li>
+                          </>
+                        );
+                      } else if (isOpenAI) {
+                        return (
+                          <>
+                            <li>• OpenAI (Paid): ~$1-5/day depending on usage</li>
+                            <li>• {formData.enable_cache ? 'With caching: 90% cost reduction' : 'Enable caching for 90% savings'}</li>
+                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
+                            <li>• Total estimated: <strong className="text-yellow-400">$10-50/month</strong></li>
+                          </>
+                        );
+                      } else if (isAnthropic) {
+                        return (
+                          <>
+                            <li>• Anthropic (Paid): ~$2-8/day depending on usage</li>
+                            <li>• {formData.enable_cache ? 'With caching: 90% cost reduction' : 'Enable caching for 90% savings'}</li>
+                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
+                            <li>• Total estimated: <strong className="text-yellow-400">$20-80/month</strong></li>
+                          </>
+                        );
+                      } else {
+                        return (
+                          <>
+                            <li>• Selected model: Check provider pricing</li>
+                            <li>• {formData.enable_cache ? 'With caching: 90% cost reduction' : 'Enable caching for 90% savings'}</li>
+                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
+                            <li>• Total: <strong className="text-blue-400">Varies by provider</strong></li>
+                          </>
+                        );
+                      }
+                    })()}
                   </ul>
                 </div>
               </Card>

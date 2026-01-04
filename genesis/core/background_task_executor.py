@@ -312,44 +312,44 @@ class BackgroundTaskExecutor:
                         "status": "completed",
                         "message": result_message,
                         "artifacts": serializable_artifacts,
-                            "timestamp": task.completed_at.isoformat()
+                        "timestamp": task.completed_at.isoformat()
+                    }
+                )
+                
+                print(f"[DEBUG BG_EXEC] WebSocket sent status: {websocket_sent}")
+                
+                if websocket_sent:
+                    logger.info(f"[TASK {task.task_id[:8]}] ✓ Sent completion via WebSocket")
+                    print(f"[DEBUG BG_EXEC] ✓ Notification delivered via WebSocket!")
+                else:
+                    logger.info(f"[TASK {task.task_id[:8]}] WebSocket not available, queuing persistent notification")
+                    print(f"[DEBUG BG_EXEC] WebSocket not connected, using fallback notification")
+                    
+                    # Fallback: Queue persistent notification for when user reconnects
+                    result_summary = self._format_result_summary(result)
+                    # Convert any Path objects to strings for JSON serialization
+                    artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
+                    serializable_artifacts = []
+                    for artifact in artifacts:
+                        if isinstance(artifact, dict):
+                            serializable_artifact = artifact.copy()
+                            if "path" in serializable_artifact:
+                                serializable_artifact["path"] = str(serializable_artifact["path"])
+                            serializable_artifacts.append(serializable_artifact)
+                        else:
+                            serializable_artifacts.append(artifact)
+                    
+                    await self.mind.notification_manager.send_notification(
+                        recipient=user_email,
+                        title="Task Completed ✓",
+                        message=f"I've completed: {user_request}\n\n{result_summary}",
+                        priority="normal",
+                        channel="web",
+                        metadata={
+                            "task_id": task.task_id,
+                            "artifacts": serializable_artifacts
                         }
                     )
-                    
-                    print(f"[DEBUG BG_EXEC] WebSocket sent status: {websocket_sent}")
-                    
-                    if websocket_sent:
-                        logger.info(f"[TASK {task.task_id[:8]}] ✓ Sent completion via WebSocket")
-                        print(f"[DEBUG BG_EXEC] ✓ Notification delivered via WebSocket!")
-                    else:
-                        logger.info(f"[TASK {task.task_id[:8]}] WebSocket not available, queuing persistent notification")
-                        print(f"[DEBUG BG_EXEC] WebSocket not connected, using fallback notification")
-                        
-                        # Fallback: Queue persistent notification for when user reconnects
-                        result_summary = self._format_result_summary(result)
-                        # Convert any Path objects to strings for JSON serialization
-                        artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
-                        serializable_artifacts = []
-                        for artifact in artifacts:
-                            if isinstance(artifact, dict):
-                                serializable_artifact = artifact.copy()
-                                if "path" in serializable_artifact:
-                                    serializable_artifact["path"] = str(serializable_artifact["path"])
-                                serializable_artifacts.append(serializable_artifact)
-                            else:
-                                serializable_artifacts.append(artifact)
-                        
-                        await self.mind.notification_manager.send_notification(
-                            recipient=user_email,
-                            title="Task Completed ✓",
-                            message=f"I've completed: {user_request}\n\n{result_summary}",
-                            priority="normal",
-                            channel="web",
-                            metadata={
-                                "task_id": task.task_id,
-                                "artifacts": serializable_artifacts
-                            }
-                        )
                 
                 break  # Success, exit retry loop
                 

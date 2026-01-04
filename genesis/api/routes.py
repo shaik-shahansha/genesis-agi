@@ -2381,6 +2381,17 @@ async def get_pending_followups(
                     resolved=ctx.resolved,
                     resolved_at=ctx.resolved_at.isoformat() if ctx.resolved_at else None,
                     importance=ctx.importance,
+                    urgency=ctx.urgency,
+                    created_at=ctx.created_at.isoformat(),
+                    last_updated=ctx.last_updated.isoformat()
+                )
+                for ctx in pending
+            ],
+            "count": len(pending)
+        }
+    except Exception as e:
+        logger.error(f"Error getting pending follow-ups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @minds_router.get("/{mind_id}/concerns")
@@ -2424,17 +2435,6 @@ async def get_concerns(
         
     except Exception as e:
         logger.error(f"Error getting concerns: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-                    urgency=ctx.urgency,
-                    created_at=ctx.created_at.isoformat(),
-                    last_updated=ctx.last_updated.isoformat()
-                )
-                for ctx in pending
-            ],
-            "count": len(pending)
-        }
-    except Exception as e:
-        logger.error(f"Error getting pending follow-ups: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

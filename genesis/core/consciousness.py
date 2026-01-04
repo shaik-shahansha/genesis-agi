@@ -130,42 +130,16 @@ class ConsciousnessEngine:
                     
                     print(f"[{self.mind_name}] [BRAIN] Generating autonomous thought #{self.thought_count + 1}...")
                     
-                    # Send notification to web playground
-                    if self.notification_manager:
-                        await self.notification_manager.send_notification(
-                            recipient="web_user@genesis.local",  # Default web playground user
-                            title=f"[THINKING] {self.mind_name} is thinking...",
-                            message=f"Generating autonomous thought #{self.thought_count + 1}",
-                            priority="low",
-                            metadata={"type": "consciousness_activity", "activity": "thought_generation"}
-                        )
+                    # Note: Removed routine thought generation notifications - not important for users
                     
                     thought = await self._generate_autonomous_thought(orchestrator, emotional_state, memory_manager)
                     
                     if thought:
                         print(f"[{self.mind_name}] [THOUGHT] Thought: {thought[:100]}...")
-                        
-                        # Send thought content to web playground
-                        if self.notification_manager:
-                            await self.notification_manager.send_notification(
-                                recipient="web_user@genesis.local",
-                                title=f"[THOUGHT] {self.mind_name}'s thought",
-                                message=thought[:200] + ("..." if len(thought) > 200 else ""),
-                                priority="low",
-                                metadata={"type": "consciousness_thought", "thought_content": thought}
-                            )
+                        # Note: Removed routine thought notifications - clutters user notifications
                     else:
                         print(f"[{self.mind_name}] [WARN] No thought generated")
-                        
-                        # Send warning to web playground
-                        if self.notification_manager:
-                            await self.notification_manager.send_notification(
-                                recipient="web_user@genesis.local",
-                                title=f"[WARNING] {self.mind_name} thought generation issue",
-                                message="Failed to generate autonomous thought",
-                                priority="low",
-                                metadata={"type": "consciousness_warning", "issue": "thought_generation_failed"}
-                            )
+                        # Note: Removed routine warnings - not actionable by users
                     
                     # Simulate emotional fluctuations
                     if random.random() < 0.2:  # 20% chance of emotion change
@@ -183,28 +157,12 @@ class ConsciousnessEngine:
                     if self.thought_count % 5 == 0 and self.logger:  # More frequent - every 5 thoughts
                         print(f"\n[{self.mind_name}] [CONSOLIDATING] MEMORY CONSOLIDATION STARTING...")
                         
-                        # Send notification to web playground
-                        if self.notification_manager:
-                            await self.notification_manager.send_notification(
-                                recipient="web_user@genesis.local",
-                                title=f"[MEMORY] {self.mind_name} consolidating memories",
-                                message="Processing and organizing stored memories for better recall",
-                                priority="low",
-                                metadata={"type": "consciousness_activity", "activity": "memory_consolidation"}
-                            )
+                        # Note: Removed routine memory consolidation notifications - not important for users
                         
                         await self._revise_memories(memory_manager)
                         print(f"[{self.mind_name}] [Done] Memory consolidation complete")
                         
-                        # Send completion notification
-                        if self.notification_manager:
-                            await self.notification_manager.send_notification(
-                                recipient="web_user@genesis.local",
-                                title=f"[Done] {self.mind_name} memory consolidation complete",
-                                message="Memory organization and optimization finished",
-                                priority="low",
-                                metadata={"type": "consciousness_activity", "activity": "memory_consolidation_complete"}
-                            )
+                        # Note: Removed routine completion notifications
                     
                     # Occasionally simulate curiosity/search
                     if self.thought_count % 7 == 0 and self.logger and thought:  # More frequent
@@ -271,15 +229,7 @@ class ConsciousnessEngine:
                             print(f"[{self.mind_name}]   Importance: {importance:.2f}")
                             print(f"[{self.mind_name}]   Content: \"{thought[:60]}...\"")
                             
-                            # Send notification to web playground
-                            if self.notification_manager:
-                                await self.notification_manager.send_notification(
-                                    recipient="web_user@genesis.local",
-                                    title=f"💾 {self.mind_name} stored a memory",
-                                    message=f"Remembered: {thought[:100]}{'...' if len(thought) > 100 else ''}",
-                                    priority="low",
-                                    metadata={"type": "memory_storage", "importance": importance, "content": thought}
-                                )
+                            # Note: Removed routine memory storage notifications - not important for users
 
                 # Wait before next awareness tick with some randomization
                 from genesis.config import get_settings
