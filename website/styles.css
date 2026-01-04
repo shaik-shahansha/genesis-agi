@@ -324,7 +324,7 @@ img {
 }
 
 .hero-title {
-    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-size: clamp(2.5rem, 6vw, 2.5rem);
     font-weight: 900;
     line-height: 1.1;
     margin-bottom: 1.5rem;
@@ -334,7 +334,7 @@ img {
 .hero-subtitle {
     font-size: clamp(1.1rem, 2vw, 1.4rem);
     color: var(--text-muted);
-    margin-bottom: 3rem;
+    margin-bottom: 1rem;
     line-height: 1.7;
     animation: fadeInUp 0.8s ease-out 0.4s both;
 }
@@ -342,7 +342,7 @@ img {
 .hero-label {
     font-size: clamp(1rem, 2vw, 1rem);
     color: var(--text-muted);
-    margin-bottom: 3rem;
+    margin-bottom: 1rem;
     line-height: 1.7;
     animation: fadeInUp 0.8s ease-out 0.4s both;
 }
@@ -485,6 +485,85 @@ section {
     color: var(--text-muted);
     max-width: 600px;
     margin: 1.5rem auto 0;
+}
+
+/* ============= WEB PLAYGROUND SECTION ============= */
+.web-playground-section {
+    background: var(--background);
+    padding: 6rem 0;
+    border-top: 1px solid var(--border);
+}
+
+.playground-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: start;
+    margin-top: 3rem;
+}
+
+.playground-description {
+    background: var(--background-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+}
+
+.playground-description h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.playground-description ul li {
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+.playground-setup {
+    background: var(--background-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+}
+
+.setup-step {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.setup-step:last-of-type {
+    margin-bottom: 0;
+}
+
+.setup-step-number {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: var(--gradient-primary);
+    color: var(--background);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.setup-step-content {
+    flex: 1;
+}
+
+.setup-step-content h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: var(--text);
+}
+
+.setup-step-content .code-block {
+    margin-top: 0;
 }
 
 /* ============= FEATURES SECTION ============= */
@@ -2066,6 +2145,16 @@ section {
     }
     
     .requirements-box {
+        padding: 1.5rem;
+    }
+    
+    .playground-content {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .playground-description,
+    .playground-setup {
         padding: 1.5rem;
     }
     
