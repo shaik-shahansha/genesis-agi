@@ -527,11 +527,11 @@ class GoalManager:
         return {
             "mind_gmid": self.mind_gmid,
             "goals": {
-                goal_id: goal.model_dump()
+                goal_id: goal.model_dump(mode='json')
                 for goal_id, goal in self.goals.items()
             },
             "plans": {
-                plan_id: plan.model_dump()
+                plan_id: plan.model_dump(mode='json')
                 for plan_id, plan in self.plans.items()
             },
             "goals_completed": self.goals_completed,

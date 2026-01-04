@@ -398,7 +398,6 @@ class AutonomousLifeEngine:
             "reflect_on_day": self._reflect_on_day,
             "consolidate_memories": self._consolidate_memories,
             "evaluate_progress": self._evaluate_progress,
-            "dream_processing": self._dream_processing,
         }
 
         method = activity_map.get(activity)
@@ -586,17 +585,6 @@ class AutonomousLifeEngine:
     async def _evaluate_progress(self, use_llm: bool):
         """Evaluate progress on goals."""
         logger.info("📊 Evaluating progress...")
-
-    async def _dream_processing(self, use_llm: bool):
-        """Process dreams during sleep."""
-        logger.info("[DREAM] Dream processing...")
-        if use_llm and hasattr(self.mind, 'consciousness'):
-            await self.mind.consciousness.dream(
-                self.mind.orchestrator,
-                self.mind.emotional_state,
-                self.mind.memory
-            )
-            self._record_llm_call()
 
     async def _evaluate_goal_progress(self, goal: Goal):
         """Evaluate goal progress with LLM."""

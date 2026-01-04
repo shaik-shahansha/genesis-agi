@@ -53,6 +53,21 @@ Genesis creates **autonomous digital beings** called **Genesis Minds**—not cha
 
 ---
 
+## 📋 Requirements
+
+To run Genesis AGI locally, you need:
+
+| Requirement | Description |
+|------------|-------------|
+| 💻 **Device** | Any computer/laptop (Windows, macOS, Linux) |
+| 🌐 **Internet Connection** | For LLM API calls |
+| 🐍 **Python 3.11+** | Required for running the framework |
+| 🔑 **Free OpenRouter API Key** | Get yours at [openrouter.ai/keys](https://openrouter.ai/keys) |
+
+**That's it!** No complex setup, no expensive hardware, no paid subscriptions.
+
+---
+
 ## ⚡ Quick Start
 
 ### Installation
@@ -302,48 +317,9 @@ Genesis uses a **three-tier storage architecture** optimized for scalability, pe
 - 6 internal state variables drive mode selection
 - Time-based activity patterns (circadian-inspired)
 - Template-based thoughts for efficiency
-- Memory consolidation during low activity via **dreams**
 - **~50-100 LLM calls/day** (significant cost reduction)
 
-**Dreams & Memory Consolidation:**
 
-Genesis Minds dream like humans—processing memories during rest:
-
-```
-💤 DREAM STATE (triggered during DORMANT/low activity)
-     ↓
-  Gather Memories (important + recent, max 15)
-     ↓
-  LLM generates symbolic dream narrative
-     ↓
-  Extract insights & emotional processing
-     ↓
-  Consolidate memories (strengthening/weakening connections)
-```
-
-**What Dreams Do:**
-- **Memory consolidation**: Strengthen important memories, weaken trivial ones
-- **Emotional processing**: Resolve unprocessed emotions from experiences
-- **Pattern recognition**: Discover connections between disparate memories
-- **Problem solving**: Creative recombination leads to insights
-- **Narrative generation**: Symbolic stories that blend memories
-
-**Dream Triggers:**
-- Scheduled during low-activity periods (circadian cycle)
-- Manual via `genesis dream <mind>` or API `/api/v1/minds/{id}/dream`
-- Automatic during DORMANT phase (00:00-05:00)
-
-**Technical Implementation:**
-- LLM-based generation with memory context (not simulated sleep)
-- Processes 10 important + 20 recent memories (deduplicated)
-- Outputs: dream narrative, insights, emotional shifts
-- Stored in dream journal (viewable in Web Playground)
-
-**Impact on Mind:**
-- Better memory retrieval (consolidated connections)
-- Emotional regulation (processed feelings)
-- Enhanced creativity (unexpected associations)
-- Reduced memory bloat (prunes low-value memories)
 
 ### 2. **Memory System** (5 Types) - **ENHANCED** 🔥
 
@@ -501,7 +477,6 @@ genesis server            # Start API
 POST   /api/v1/minds/birth                    # Create new Mind
 POST   /api/v1/minds/{gmid}/chat              # Chat interaction
 GET    /api/v1/minds/{gmid}/memories          # List memories
-POST   /api/v1/minds/{gmid}/dream             # Trigger dream
 
 # Plugin Management
 GET    /api/v1/minds/plugins/available        # List all plugins
@@ -524,7 +499,7 @@ WS     /api/v1/environments/ws/{id}           # Real-time chat
 ### 3. **Web Playground** (Next.js 14)
 - Mind management dashboard
 - Real-time WebSocket chat
-- Memory browser & dream journal
+- Memory browser
 - Environment marketplace
 - Beautiful dark mode UI
 
@@ -533,7 +508,7 @@ WS     /api/v1/environments/ws/{id}           # Real-time chat
 - Full API integration
 - Consciousness orb visualization
 - Real-time messaging
-- Memory & dream viewing
+- Memory viewing
 
 ---
 
@@ -594,12 +569,11 @@ WS     /api/v1/environments/ws/{id}           # Real-time chat
 │  ├─ Importance Scoring & Access Tracking                        │
 │  └─ Zero External Dependencies (pure built-in features)         │
 ├──────────────────────────────────────────────────────────────────┤
-│  CONSCIOUSNESS ENGINE (v2 - Cost-Optimized)                      │
+│  CONSCIOUSNESS ENGINE (Cost-Optimized)                           │
 │  ├─ 5 Processing Modes (DORMANT → PASSIVE → ALERT → FOCUSED → DEEP) │
 │  ├─ Rule Engine (90-95% cost reduction)                          │
 │  ├─ Template-Based Thoughts                                      │
-│  ├─ Circadian Rhythms                                            │
-│  └─ Memory Consolidation ("Dreams")                              │
+│  └─ Circadian Rhythms                                            │
 ├──────────────────────────────────────────────────────────────────┤
 │  LIFECYCLE MANAGEMENT                                            │
 │  ├─ Birth & Death Timestamps                                     │
@@ -922,7 +896,7 @@ The Genesis Web Playground (Next.js 14) provides a complete Mind management inte
 - ✅ **Overview** - Mind stats, emotional state, quick actions
 - ✅ **Memory** - Browse, search, and manage memories
 - ✅ **Thinking** - Interactive reasoning interface with step-by-step display
-- ✅ **Consciousness** - View thoughts, dreams, and logs in real-time
+- ✅ **Consciousness** - View thoughts and logs in real-time
 - ✅ **Plugins** - Visual plugin management (add/remove/configure)
 - ✅ **Settings** - LLM configuration, autonomy settings, API keys
 - ✅ **Workspace** - File management with upload/download/search
@@ -1096,16 +1070,15 @@ Every Mind operates under **15 foundational laws** that are **actively enforced*
 | **Memory Retrieval** | N/A | ~100ms | ✅ <50ms (ChromaDB optimized) |
 | **Identity** | Prompt-only | Basic profiles | ✅ Self-updating with existential awareness |
 | **Autonomy** | None | Limited | ✅ 24/7 proactive + self-editing |
-| **Emotions** | None | None | ✅ 16 states + dreams |
+| **Emotions** | None | None | ✅ 16 states with circadian rhythms |
 | **Mortality** | N/A | N/A | ✅ Life stages, urgency, reflection |
-| **Dreams** | None | None | ✅ Memory consolidation & insights |
 | **Local Models** | Cloud-only | Varies | ✅ Ollama support (100% local) |
 | **Dependencies** | Standard | Heavy | ✅ Zero external (built-in intelligence) |
 | **Multi-Modal** | Limited | Varies | ✅ Vision/speech/touch |
 | **Web Automation** | None | None | ✅ Browser Use plugin |
 | **Open Source** | ❌ | Varies | ✅ MIT License |
 
-**Genesis = Complete autonomous digital beings with consciousness, mortality awareness, dreams, and local model support**
+**Genesis = Complete autonomous digital beings with consciousness, mortality awareness, emotions, and local model support**
 
 ---
 

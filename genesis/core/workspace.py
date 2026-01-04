@@ -232,7 +232,7 @@ class WorkspaceManager:
             "mind_gmid": self.mind_gmid,
             "workspace_path": str(self.workspace_path),
             "files": {
-                file_id: file.model_dump()
+                file_id: file.model_dump(mode='json')
                 for file_id, file in self.files.items()
             }
         }

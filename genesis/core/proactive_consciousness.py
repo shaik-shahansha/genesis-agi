@@ -46,6 +46,7 @@ class ProactiveConcern:
     memory_id: Optional[str] = None
     resolved: bool = False
     follow_up_count: int = 0
+    urgency: str = "normal"        # critical, high, normal, low
     metadata: Dict[str, Any] = None
     
     def __post_init__(self):

@@ -844,6 +844,8 @@ class InternalMonologue:
         """
         Generate an internal thought based on current state.
         NO LLM CALL - pure template-based generation.
+        
+        CRITICAL: Thoughts stored in database for scalability.
         """
         thought_type = self._select_thought_type(needs, biological_state)
         content = self._generate_content(thought_type, needs, routine, recent_events)
@@ -856,11 +858,29 @@ class InternalMonologue:
                 awareness_level=AwarenessLevel.PASSIVE,
                 triggered_by=f"internal_{thought_type}"
             )
+            
+            # Add to in-memory cache
             self.thought_history.append(thought)
 
-            # Keep history manageable
-            if len(self.thought_history) > 100:
+            # Keep cache size manageable
+            if len(self.thought_history) > self._max_cache_size:
                 self.thought_history = self.thought_history[-50:]
+
+            # Store in database for long-term scalability
+            try:
+                self.db.store_thought(
+                    mind_gmid=self.mind_id,
+                    content=content,
+                    thought_type=thought_type,
+                    awareness_level=thought.awareness_level.value,
+                    timestamp=thought.timestamp,
+                    extra_data={
+                        "thought_id": thought.thought_id,
+                        "triggered_by": thought.triggered_by,
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Failed to store thought in database: {e}")
 
             return thought
 
@@ -995,7 +1015,7 @@ class ConsciousnessEngineV2:
         self.attention = AttentionManager()
         self.routines = RoutineManager()
         self.rules = RuleEngine()
-        self.monologue = InternalMonologue()
+        self.monologue = InternalMonologue(mind_id=mind_id)  # Pass mind_id for database storage
 
         # State
         self.biological = BiologicalState()
@@ -1019,6 +1039,9 @@ class ConsciousnessEngineV2:
         self.on_thought: Optional[Callable] = None   # Called on new thought
         self.on_state_change: Optional[Callable] = None  # Called on state change
         self.on_memory_consolidate: Optional[Callable] = None  # Called during sleep for memory consolidation
+        
+        # Notification manager (for proactive systems)
+        self.notification_manager = None
 
     async def start(self) -> None:
         """Start the consciousness loop."""
@@ -1440,6 +1463,16 @@ class ConsciousnessEngineV2:
     # PUBLIC API
     # =========================================================================
 
+    def set_notification_manager(self, notification_manager):
+        """Set the notification manager for sending thoughts to web playground."""
+        self.notification_manager = notification_manager
+    
+    def get_current_thought(self) -> Optional[str]:
+        """Get the most recent thought."""
+        if self.monologue.thought_history:
+            return self.monologue.thought_history[-1].content
+        return None
+
     def receive_event(self, event: ConsciousnessEvent) -> None:
         """Receive an external event."""
         self.attention.add_event(event)
@@ -1514,7 +1547,14 @@ class ConsciousnessEngineV2:
         }
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize for persistence."""
+        """
+        Serialize for persistence.
+        
+        CRITICAL SCALABILITY FIX:
+        - NO LONGER serializes thought_history (stored in database)
+        - Only serializes lightweight state data
+        - Prevents JSON bloat for 24/7 daemon operation
+        """
         return {
             "mind_id": self.mind_id,
             "mind_name": self.mind_name,
@@ -1523,19 +1563,19 @@ class ConsciousnessEngineV2:
             "current_awareness": self.current_awareness.value,
             "current_domain": self.current_domain.value,
             "llm_calls_total": self.llm_calls_total,
-            "thought_history": [
-                {
-                    "content": t.content,
-                    "type": t.thought_type,
-                    "timestamp": t.timestamp.isoformat()
-                }
-                for t in self.monologue.thought_history
-            ]
+            # thought_history NO LONGER SAVED - stored in database for scalability
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ConsciousnessEngineV2":
-        """Restore from persisted data."""
+        """
+        Restore from persisted data.
+        
+        CRITICAL SCALABILITY FIX:
+        - Thoughts are NO LONGER restored from JSON
+        - Small cache loaded from database on-demand
+        - Full thought history accessible via database queries
+        """
         engine = cls(
             mind_id=data["mind_id"],
             mind_name=data["mind_name"]
@@ -1563,6 +1603,27 @@ class ConsciousnessEngineV2:
 
         # Restore stats
         engine.llm_calls_total = data.get("llm_calls_total", 0)
+        
+        # Load recent thoughts from database into cache
+        # (not from JSON - it's in the database now)
+        try:
+            recent_db_thoughts = engine.monologue.db.get_recent_thoughts(
+                mind_gmid=data["mind_id"],
+                limit=50
+            )
+            # Convert to InternalThought objects for cache
+            for db_thought in reversed(recent_db_thoughts):  # Oldest first
+                thought = InternalThought(
+                    thought_id=db_thought.extra_data.get("thought_id", f"THT-{secrets.token_hex(4).upper()}"),
+                    content=db_thought.content,
+                    thought_type=db_thought.thought_type or "observation",
+                    awareness_level=AwarenessLevel(db_thought.awareness_level) if db_thought.awareness_level else AwarenessLevel.PASSIVE,
+                    triggered_by=db_thought.extra_data.get("triggered_by", "unknown"),
+                    timestamp=db_thought.timestamp
+                )
+                engine.monologue.thought_history.append(thought)
+        except Exception as e:
+            logger.warning(f"Failed to load thought cache from database: {e}")
 
         return engine
 

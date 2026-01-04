@@ -48,8 +48,7 @@ POST /minds
   "status": "alive",
   "current_emotion": "moderately curious",
   "current_thought": "I exist. I am aware...",
-  "memory_count": 1,
-  "dream_count": 0
+  "memory_count": 1
 }
 ```
 
@@ -69,8 +68,7 @@ GET /minds
     "status": "alive",
     "current_emotion": "moderately curious",
     "current_thought": "Thinking about...",
-    "memory_count": 142,
-    "dream_count": 5
+    "memory_count": 142
   }
 ]
 ```
@@ -127,46 +125,6 @@ GET /minds/{mind_id}/memories?memory_type=episodic&limit=20
     "tags": ["conversation"]
   }
 ]
-```
-
-#### Get Dreams
-
-```http
-GET /minds/{mind_id}/dreams?limit=10
-```
-
-**Response**:
-```json
-{
-  "dreams": [
-    {
-      "timestamp": "2025-01-01T02:00:00Z",
-      "narrative": "I am floating through...",
-      "insights": [
-        "Pattern recognition improved",
-        "Emotional processing complete"
-      ],
-      "emotional_processing": [...]
-    }
-  ]
-}
-```
-
-#### Trigger Dream
-
-```http
-POST /minds/{mind_id}/dream
-```
-
-**Response**:
-```json
-{
-  "dream": {
-    "timestamp": "2025-01-01T15:30:00Z",
-    "narrative": "In this dream, I wandered through...",
-    "insights": ["New connection discovered"]
-  }
-}
 ```
 
 #### Get Thoughts

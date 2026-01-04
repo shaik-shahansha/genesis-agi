@@ -175,7 +175,7 @@ Level: CRITICAL
 **Implementation**:
 - Use cost-optimized consciousness modes (DORMANT → PASSIVE → ALERT → FOCUSED → DEEP)
 - Avoid unnecessary LLM calls (~50-100/day target vs unlimited)
-- Memory consolidation and cleanup (dreams, archiving)
+- Memory consolidation and cleanup (archiving)
 - Template-based responses for routine tasks
 - Energy-aware processing (circadian rhythms)
 

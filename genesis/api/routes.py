@@ -84,7 +84,6 @@ class CreateMindRequest(BaseModel):
     reasoning_model: Optional[str] = None
     fast_model: Optional[str] = None
     autonomy_level: str = "medium"
-    start_consciousness: bool = False  # DEPRECATED: Consciousness should run in daemon only
     api_keys: Optional[dict[str, str]] = None  # Provider API keys (e.g., {'groq': 'gsk_...'})
 
 
@@ -98,18 +97,18 @@ class MindResponse(BaseModel):
     current_emotion: str
     current_thought: Optional[str]
     memory_count: int
-    dream_count: int
     gens: int = 1000
     avatar_url: Optional[str] = None
     creator: Optional[str] = None
     creator_email: Optional[str] = None
+    template: Optional[str] = None
     primary_purpose: Optional[str] = None
     description: Optional[str] = None
     llm_provider: Optional[str] = None
     llm_model: Optional[str] = None
+    max_tokens: Optional[int] = None
     autonomy_level: Optional[int] = None
-    consciousness_active: bool = True
-    dreaming_enabled: bool = True
+    created_at: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
@@ -392,11 +391,11 @@ async def create_mind(
             status=mind.identity.status,
             current_emotion=mind.current_emotion,
             current_thought=mind.current_thought,
-            memory_count=len(mind.memory.memories),
-            dream_count=len(mind.dreams),
+            memory_count=mind.memory.vector_store.count(),
             avatar_url=getattr(mind.identity, 'avatar_url', None),
             creator=mind.identity.creator,
             creator_email=getattr(mind.identity, 'creator_email', None),
+            max_tokens=getattr(mind.intelligence, 'max_tokens', 8000),
         )
 
     except Exception as e:
@@ -445,8 +444,16 @@ async def list_minds():
                 except Exception:
                     pass
             
-            # Count memories from memory.memories array
-            memory_count = len(memory_data.get('memories', []))
+            # Count memories from ChromaDB vector store
+            # Since memories are no longer stored in JSON, read from ChromaDB directly
+            gmid = identity.get('gmid', '')
+            try:
+                from genesis.storage.vector_store import VectorStore
+                vector_store = VectorStore(gmid)
+                memory_count = vector_store.count()
+            except Exception as e:
+                # Fallback if ChromaDB read fails
+                memory_count = memory_data.get('total_memories', 0)
             
             # Skip terminated minds
             if identity.get('status', 'active') == 'terminated':
@@ -462,17 +469,17 @@ async def list_minds():
                     current_thought=state.get('current_thought'),
                     avatar_url=identity.get('avatar_url'),
                     memory_count=memory_count,
-                    dream_count=len(data.get('dreams', [])),
                     gens=identity.get('gens', 1000),
                     creator=identity.get('creator'),
                     creator_email=identity.get('creator_email'),
+                    template=identity.get('template'),
                     primary_purpose=identity.get('primary_purpose'),
                     description=identity.get('description'),
                     llm_provider=data.get('intelligence', {}).get('primary_provider', 'groq'),
                     llm_model=data.get('intelligence', {}).get('primary_model', 'mixtral-8x7b-32768'),
+                    max_tokens=data.get('intelligence', {}).get('max_tokens', 8000),
                     autonomy_level=data.get('autonomy', {}).get('level', 5),
-                    consciousness_active=state.get('consciousness_active', True),
-                    dreaming_enabled=data.get('autonomy', {}).get('dreaming_enabled', True),
+                    created_at=identity.get('birth_timestamp'),
                 )
             )
         except Exception as e:
@@ -493,17 +500,19 @@ async def get_mind(mind_id: str):
         status=mind.identity.status,
         current_emotion=mind.current_emotion,
         current_thought=mind.current_thought,
-        memory_count=len(mind.memory.memories),
-        dream_count=len(mind.dreams),
+        memory_count=mind.memory.vector_store.count(),
         gens=getattr(mind.identity, 'gens', 1000),
         avatar_url=getattr(mind.identity, 'avatar_url', None),
+        creator=getattr(mind.identity, 'creator', None),
+        creator_email=getattr(mind.identity, 'creator_email', None),
+        template=getattr(mind.identity, 'template', None),
         primary_purpose=getattr(mind.identity, 'primary_purpose', None),
         description=getattr(mind.identity, 'description', None),
         llm_provider=getattr(mind.intelligence, 'primary_provider', 'groq'),
         llm_model=getattr(mind.intelligence, 'primary_model', 'mixtral-8x7b-32768'),
+        max_tokens=getattr(mind.intelligence, 'max_tokens', 8000),
         autonomy_level=getattr(mind.autonomy, 'level', 5),
-        consciousness_active=mind.state.consciousness_active,
-        dreaming_enabled=getattr(mind.autonomy, 'dreaming_enabled', True),
+        created_at=mind.identity.birth_timestamp.isoformat() if hasattr(mind.identity, 'birth_timestamp') else None,
     )
 
 
@@ -516,6 +525,32 @@ async def chat(
     """Chat with a Mind (requires authentication)."""
     # Use cached mind to persist background tasks!
     mind = await _get_cached_mind(mind_id)
+    
+    # SAFETY: Ensure mind is registered in database (for foreign key integrity)
+    # This handles cases where minds were loaded before database registration was implemented
+    try:
+        from genesis.database.manager import MetaverseDB
+        metaverse_db = MetaverseDB()
+        
+        existing_mind = metaverse_db.get_mind(mind.identity.gmid)
+        if not existing_mind:
+            # Register mind that somehow wasn't registered
+            primary_role = None
+            if hasattr(mind, 'roles'):
+                primary = mind.roles.get_primary_role()
+                if primary:
+                    primary_role = primary.get("name")
+            
+            metaverse_db.register_mind(
+                gmid=mind.identity.gmid,
+                name=mind.identity.name,
+                creator=mind.identity.creator,
+                template=mind.identity.template,
+                primary_role=primary_role,
+            )
+            print(f"[INFO] Registered mind {mind.identity.gmid} in database")
+    except Exception as reg_error:
+        print(f"[WARNING] Could not verify/register mind in database: {reg_error}")
     
     print(f"\n[DEBUG CHAT ENDPOINT] Chat request received")
     print(f"[DEBUG CHAT ENDPOINT] Mind ID: {mind_id}")
@@ -607,19 +642,30 @@ async def chat(
         # Log for debugging
         if not response:
             print(f"WARNING: mind.think() returned empty response for Mind {mind.identity.gmid}")
-            print(f"Mind has API keys: {mind.intelligence.api_keys}")
+            print(f"Mind has API keys configured: {bool(mind.intelligence.api_keys)}")
             print(f"Reasoning model: {mind.intelligence.reasoning_model}")
             print(f"Fast model: {mind.intelligence.fast_model}")
             response = "I apologize, but I was unable to generate a response. Please check my configuration and API keys."
 
-        # Save updated state
-        mind.save()
-
-        return ChatResponse(
+        # ⚡ PERFORMANCE: Prepare response immediately
+        chat_response = ChatResponse(
             response=response or "No response generated",
             emotion=mind.current_emotion,
             memory_created=True,
         )
+        
+        # Save updated state in background (non-blocking)
+        async def _save_mind_state():
+            try:
+                mind.save()
+                print(f"[PERF] ✓ Mind state saved to disk")
+            except Exception as e:
+                logger.error(f"Failed to save mind state: {e}")
+        
+        asyncio.create_task(_save_mind_state())
+        
+        # Return response immediately - UI gets instant feedback!
+        return chat_response
 
     except HTTPException:
         raise
@@ -785,16 +831,27 @@ async def chat_multimodal(
         except Exception as e:
             print(f"Avatar generation failed: {e}")
 
-        # Save updated state
-        mind.save()
-
-        return MultimodalChatResponse(
+        # ⚡ PERFORMANCE: Prepare response immediately
+        multimodal_response = MultimodalChatResponse(
             response=response,
             emotion=mind.current_emotion,
             memory_created=True,
             generated_image=generated_image_url,
             avatar_url=avatar_url,
         )
+        
+        # Save updated state in background (non-blocking)
+        async def _save_mind_state():
+            try:
+                mind.save()
+                print(f"[PERF] ✓ Mind state saved to disk")
+            except Exception as e:
+                logger.error(f"Failed to save mind state: {e}")
+        
+        asyncio.create_task(_save_mind_state())
+        
+        # Return response immediately
+        return multimodal_response
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -875,6 +932,8 @@ async def update_mind_settings(
         if 'api_key' in settings and settings['api_key']:
             # Store API key securely (this would need proper encryption in production)
             mind.intelligence.api_key = settings['api_key']
+        if 'max_tokens' in settings:
+            mind.intelligence.max_tokens = settings['max_tokens']
         
         # Update Ollama configuration
         if 'use_ollama' in settings:
@@ -885,10 +944,6 @@ async def update_mind_settings(
         # Update autonomy settings
         if 'autonomy_level' in settings:
             mind.autonomy.level = settings['autonomy_level']
-        if 'consciousness_active' in settings:
-            mind.state.consciousness_active = settings['consciousness_active']
-        if 'dreaming_enabled' in settings:
-            mind.autonomy.dreaming_enabled = settings['dreaming_enabled']
         
         # Update currency (Gens)
         if 'gens' in settings:
@@ -1248,36 +1303,32 @@ async def get_memories(
     ]
 
 
-@minds_router.get("/{mind_id}/dreams")
-async def get_dreams(mind_id: str, limit: int = Query(default=10, le=50)):
-    """Get Mind's dreams."""
-    mind = await _load_mind(mind_id)
-
-    dreams = mind.dreams[-limit:]
-    return {"dreams": dreams}
-
-
-@minds_router.post("/{mind_id}/dream")
-async def trigger_dream(mind_id: str):
-    """Trigger a dream session."""
-    mind = await _load_mind(mind_id)
-
-    try:
-        dream = await mind.dream()
-        mind.save()
-
-        return {"dream": dream}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @minds_router.get("/{mind_id}/thoughts")
 async def get_thoughts(mind_id: str, limit: int = Query(default=10, le=50)):
-    """Get Mind's recent thoughts."""
+    """
+    Get Mind's recent thoughts from database.
+    
+    CRITICAL: Thoughts now stored in SQLite for scalability.
+    """
     mind = await _load_mind(mind_id)
-
-    thoughts = mind.consciousness.get_recent_thoughts(limit=limit)
+    
+    # Get thoughts from database
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    db_thoughts = db.get_recent_thoughts(mind.identity.gmid, limit=limit)
+    
+    # Convert to API format
+    thoughts = [
+        {
+            "content": t.content,
+            "type": t.thought_type,
+            "timestamp": t.timestamp.isoformat(),
+            "awareness_level": t.awareness_level,
+            "emotion": t.emotion,
+        }
+        for t in db_thoughts
+    ]
+    
     return {"thoughts": thoughts}
 
 
@@ -1287,7 +1338,7 @@ async def get_mind_logs(
     limit: int = Query(default=100, le=1000),
     level: Optional[str] = Query(None, description="Filter by log level"),
 ):
-    """Get Mind's activity logs (all consciousness activities, LLM calls, thoughts, dreams, etc.)."""
+    """Get Mind's activity logs (all consciousness activities, LLM calls, thoughts, etc.)."""
     mind = await _load_mind(mind_id)
     
     # Convert level string to LogLevel enum if provided
@@ -1329,6 +1380,25 @@ async def get_mind_log_stats(mind_id: str):
         "mind_name": mind.identity.name,
         "stats": stats,
     }
+
+
+@minds_router.delete("/{mind_id}/logs")
+async def clear_mind_logs(mind_id: str):
+    """Clear all logs for a Mind."""
+    mind = await _load_mind(mind_id)
+    
+    try:
+        mind.logger.clear_logs()
+        return {
+            "success": True,
+            "message": "Logs cleared successfully",
+            "mind_id": mind_id,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to clear logs: {str(e)}"
+        )
 
 
 @minds_router.post("/{mind_id}/thought")
@@ -1982,7 +2052,7 @@ async def websocket_chat(websocket: WebSocket, mind_id: str):
                     {
                         "type": "complete",
                         "emotion": mind.current_emotion,
-                        "memory_count": len(mind.memory.memories),
+                        "memory_count": mind.memory.vector_store.count(),
                     }
                 )
 
@@ -2633,8 +2703,32 @@ async def send_pending_notifications(mind: Mind, user_email: str, websocket):
         logger.error(f"Error retrieving pending notifications: {e}")
 
 
+def _find_mind_path(mind_id: str) -> Path:
+    """Find the path to a Mind's JSON file by ID or name."""
+    import json
+    
+    # Try to find by GMID or name
+    for path in settings.minds_dir.glob("*.json"):
+        try:
+            with open(path) as f:
+                data = json.load(f)
+
+            gmid = data["identity"]["gmid"]
+            name = data["identity"]["name"]
+            
+            if gmid == mind_id or name == mind_id:
+                return path
+
+        except Exception as e:
+            logger.debug(f"Error checking {path}: {e}")
+
+    raise HTTPException(status_code=404, detail=f"Mind '{mind_id}' not found")
+
+
 async def _load_mind(mind_id: str) -> Mind:
     """Load a Mind by ID or name."""
+    print(f"[DEBUG _load_mind] Searching for mind_id: {mind_id}")
+    
     # Try to find by GMID or name
     for path in settings.minds_dir.glob("*.json"):
         try:
@@ -2643,8 +2737,21 @@ async def _load_mind(mind_id: str) -> Mind:
             with open(path) as f:
                 data = json.load(f)
 
-            if data["identity"]["gmid"] == mind_id or data["identity"]["name"] == mind_id:
-                return Mind.load(path)
+            gmid = data["identity"]["gmid"]
+            name = data["identity"]["name"]
+            
+            if gmid == mind_id or name == mind_id:
+                print(f"[DEBUG _load_mind] Found match in {path.name}")
+                print(f"[DEBUG _load_mind]   GMID: {gmid}")
+                print(f"[DEBUG _load_mind]   Name: {name}")
+                loaded_mind = Mind.load(path)
+                print(f"[DEBUG _load_mind] Loaded mind has GMID: {loaded_mind.identity.gmid}")
+                
+                # CRITICAL: Verify the loaded mind has the expected GMID
+                if loaded_mind.identity.gmid != gmid:
+                    print(f"[ERROR] Mind GMID mismatch! File has {gmid} but loaded mind has {loaded_mind.identity.gmid}")
+                
+                return loaded_mind
 
         except Exception as e:
             print(f"Error checking {path}: {e}")
@@ -3003,8 +3110,8 @@ async def get_llm_calls(
         mind_path = _find_mind_path(mind_id)
         mind = Mind.load(mind_path)
         
-        # Get logs
-        logs = mind.logger.get_logs(limit=limit * 2)  # Get more to filter
+        # Get logs (using get_all_logs to retrieve from file)
+        logs = mind.logger.get_all_logs(limit=limit * 5)  # Get more to filter for LLM calls only
         
         # Filter for LLM calls
         llm_calls = []

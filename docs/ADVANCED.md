@@ -69,7 +69,7 @@ Modular system for composable Mind capabilities.
 
 **Always Included (Core)**:
 - Identity (GMID, birth, creator)
-- Consciousness (thoughts, dreams)
+- Consciousness (thoughts, awareness)
 - Memory (vector storage)
 - Emotions (affective states)
 

@@ -465,11 +465,11 @@ class LearningSystem:
         return {
             "mind_gmid": self.mind_gmid,
             "skills": {
-                skill_id: skill.model_dump()
+                skill_id: skill.model_dump(mode='json')
                 for skill_id, skill in self.skills.items()
             },
             "learning_paths": {
-                path_id: path.model_dump()
+                path_id: path.model_dump(mode='json')
                 for path_id, path in self.learning_paths.items()
             },
             "total_learning_time": self.total_learning_time,

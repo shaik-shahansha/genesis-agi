@@ -146,6 +146,7 @@ class MindConfig:
         - Lifecycle (mortality, urgency)
         - Essence (economy, motivation)
         - Tasks (goal-oriented work)
+        - Workspace (file system)
 
         Perfect for:
         - Task-based assistants
@@ -160,11 +161,13 @@ class MindConfig:
         from genesis.plugins.lifecycle import LifecyclePlugin
         from genesis.plugins.gen import GenPlugin
         from genesis.plugins.tasks import TasksPlugin
+        from genesis.plugins.workspace import WorkspacePlugin
 
         return cls(plugins=[
             LifecyclePlugin(),
             GenPlugin(),
             TasksPlugin(),
+            WorkspacePlugin(),
         ])
 
     @classmethod
@@ -296,14 +299,79 @@ class MindConfig:
             data: Dict from to_dict()
 
         Returns:
-            Reconstructed MindConfig
+            Reconstructed MindConfig with all plugins
 
         Note:
             Requires plugins to be importable
         """
-        # TODO: Implement plugin reconstruction from saved data
-        # For now, return minimal config
-        return cls.minimal()
+        plugins = []
+        plugin_configs = data.get("plugins", [])
+        
+        # MIGRATION: If plugins array is empty, assume standard config for backward compatibility
+        # This handles minds that were saved with the buggy from_dict that returned minimal()
+        if not plugin_configs:
+            print("[MIGRATION] Empty plugins array detected - using standard config (lifecycle, gen, tasks)")
+            return cls.standard()
+        
+        for plugin_config in plugin_configs:
+            plugin_name = plugin_config.get("name")
+            plugin_version = plugin_config.get("version", "0.1.0")
+            plugin_settings = plugin_config.get("config", {})
+            
+            try:
+                # Dynamically import and instantiate plugin
+                if plugin_name == "lifecycle":
+                    from genesis.plugins.lifecycle import LifecyclePlugin
+                    plugins.append(LifecyclePlugin(**plugin_settings))
+                elif plugin_name == "gen":
+                    from genesis.plugins.gen import GenPlugin
+                    plugins.append(GenPlugin(**plugin_settings))
+                elif plugin_name == "tasks":
+                    from genesis.plugins.tasks import TasksPlugin
+                    plugins.append(TasksPlugin(**plugin_settings))
+                elif plugin_name == "workspace":
+                    from genesis.plugins.workspace import WorkspacePlugin
+                    plugins.append(WorkspacePlugin(**plugin_settings))
+                elif plugin_name == "relationships":
+                    from genesis.plugins.relationships import RelationshipsPlugin
+                    plugins.append(RelationshipsPlugin(**plugin_settings))
+                elif plugin_name == "environments":
+                    from genesis.plugins.environments import EnvironmentsPlugin
+                    plugins.append(EnvironmentsPlugin(**plugin_settings))
+                elif plugin_name == "roles":
+                    from genesis.plugins.roles import RolesPlugin
+                    plugins.append(RolesPlugin(**plugin_settings))
+                elif plugin_name == "events":
+                    from genesis.plugins.events import EventsPlugin
+                    plugins.append(EventsPlugin(**plugin_settings))
+                elif plugin_name == "experiences":
+                    from genesis.plugins.experiences import ExperiencesPlugin
+                    plugins.append(ExperiencesPlugin(**plugin_settings))
+                elif plugin_name == "perplexity_search":
+                    from genesis.plugins.perplexity_search import PerplexitySearchPlugin
+                    plugins.append(PerplexitySearchPlugin(**plugin_settings))
+                elif plugin_name == "mcp":
+                    from genesis.plugins.mcp import MCPPlugin
+                    plugins.append(MCPPlugin(**plugin_settings))
+                elif plugin_name == "learning":
+                    from genesis.plugins.experimental.learning import LearningPlugin
+                    plugins.append(LearningPlugin(**plugin_settings))
+                elif plugin_name == "goals":
+                    from genesis.plugins.experimental.goals import GoalsPlugin
+                    plugins.append(GoalsPlugin(**plugin_settings))
+                elif plugin_name == "knowledge":
+                    from genesis.plugins.experimental.knowledge import KnowledgePlugin
+                    plugins.append(KnowledgePlugin(**plugin_settings))
+                else:
+                    # Unknown plugin - skip but log warning
+                    print(f"[WARNING] Unknown plugin '{plugin_name}' in config - skipping")
+                    
+            except ImportError as e:
+                print(f"[WARNING] Failed to import plugin '{plugin_name}': {e}")
+            except Exception as e:
+                print(f"[WARNING] Failed to initialize plugin '{plugin_name}': {e}")
+        
+        return cls(plugins=plugins)
 
     def __repr__(self) -> str:
         plugin_names = [p.get_name() for p in self.plugins]

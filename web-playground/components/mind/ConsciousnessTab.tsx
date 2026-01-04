@@ -9,7 +9,6 @@ interface ConsciousnessTabProps {
 
 export default function ConsciousnessTab({ mindId }: ConsciousnessTabProps) {
   const [thoughts, setThoughts] = useState<any[]>([]);
-  const [dreams, setDreams] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -33,13 +32,11 @@ export default function ConsciousnessTab({ mindId }: ConsciousnessTabProps) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [thoughtsData, dreamsData, logsData] = await Promise.all([
+      const [thoughtsData, logsData] = await Promise.all([
         api.getMindThoughts(mindId, 20),
-        api.getMindDreams(mindId, 10),
         api.getMindLogs(mindId, 50),
       ]);
       setThoughts(thoughtsData.thoughts || []);
-      setDreams(dreamsData.dreams || []);
       setLogs(logsData.logs || []);
     } catch (error) {
       console.error('Error loading consciousness data:', error);
@@ -69,31 +66,6 @@ export default function ConsciousnessTab({ mindId }: ConsciousnessTabProps) {
     } catch (error: any) {
       console.error('Error generating thought:', error);
       alert(`Failed to generate thought: ${error.message}`);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const triggerDream = async () => {
-    if (generating) return;
-    
-    setGenerating(true);
-    try {
-      const result = await api.triggerDream(mindId);
-      console.log('Triggered dream:', result);
-      
-      // Wait a moment for the dream to be saved
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Reload the data
-      await loadData();
-      
-      if (result.dream) {
-        console.log('Dream triggered successfully');
-      }
-    } catch (error: any) {
-      console.error('Error triggering dream:', error);
-      alert(`Failed to trigger dream: ${error.message}`);
     } finally {
       setGenerating(false);
     }
@@ -129,13 +101,6 @@ export default function ConsciousnessTab({ mindId }: ConsciousnessTabProps) {
               disabled={generating}
             >
               {generating ? '⏳ Generating...' : '💭 Generate Thought'}
-            </button>
-            <button 
-              onClick={triggerDream} 
-              className="btn-primary"
-              disabled={generating}
-            >
-              {generating ? '⏳ Processing...' : '💤 Trigger Dream'}
             </button>
             <button 
               onClick={loadData} 
@@ -195,30 +160,6 @@ export default function ConsciousnessTab({ mindId }: ConsciousnessTabProps) {
                   </span>
                 </div>
                 <p className="text-gray-900">{typeof thought === 'string' ? thought : thought.content || JSON.stringify(thought)}</p>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Dreams */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dreams ({dreams.length})</h3>
-        <div className="space-y-4">
-          {dreams.length === 0 ? (
-            <p className="text-gray-600 text-center py-4">No dreams yet</p>
-          ) : (
-            dreams.map((dream, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 bg-purple-50">
-                <div className="flex items-start justify-between mb-2">
-                  <span className="text-xs text-purple-700">Dream {dreams.length - index}</span>
-                  <span className="text-xs text-gray-500">
-                    {dream.timestamp ? new Date(dream.timestamp).toLocaleString() : 'Unknown time'}
-                  </span>
-                </div>
-                <p className="text-gray-900 whitespace-pre-wrap">
-                  {typeof dream === 'string' ? dream : dream.content || JSON.stringify(dream)}
-                </p>
               </div>
             ))
           )}

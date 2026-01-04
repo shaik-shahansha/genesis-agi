@@ -43,6 +43,7 @@ class Intelligence(BaseModel):
     # Generation parameters
     default_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     default_max_tokens: int = Field(default=2000, ge=1)  # Increased for DeepSeek R1 reasoning models
+    max_tokens: int = Field(default=8000, ge=1, description="Maximum tokens for generation (default: 8000)")
 
     # Capabilities
     multimodal_enabled: bool = Field(default=False, description="Enable vision/audio")

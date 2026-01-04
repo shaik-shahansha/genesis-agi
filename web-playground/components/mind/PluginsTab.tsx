@@ -155,16 +155,8 @@ export default function PluginsTab({ mindId }: PluginsTabProps) {
 
   const loadPlugins = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/minds/${mindId}/plugins`);
-      if (response.ok) {
-        const data = await response.json();
-        setPlugins(data.plugins || []);
-      } else if (response.status === 404) {
-        // Mind doesn't exist or no plugins
-        setPlugins([]);
-      } else {
-        console.error('Error loading plugins:', response.statusText);
-      }
+      const data = await api.getPlugins(mindId);
+      setPlugins(data.plugins || []);
     } catch (error) {
       console.error('Error loading plugins:', error);
       // Continue with empty plugins instead of crashing
@@ -177,33 +169,14 @@ export default function PluginsTab({ mindId }: PluginsTabProps) {
   const handleAddPlugin = async (pluginId: string) => {
     setActionLoading(pluginId);
     try {
-      const payload: any = { plugin_name: pluginId };
-      
-      // Add config if required
-      if (pluginConfig[pluginId]) {
-        payload.config = pluginConfig[pluginId];
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/minds/${mindId}/plugins`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (response.ok) {
-        await loadPlugins();
-        setShowAddModal(false);
-        setSelectedPlugin(null);
-        setPluginConfig({});
-      } else {
-        const error = await response.json();
-        alert(`Failed to add plugin: ${error.detail || 'Unknown error'}`);
-      }
+      const config = pluginConfig[pluginId] || undefined;
+      await api.addPlugin(mindId, pluginId, config);
+      await loadPlugins();
+      setShowAddModal(false);
+      setSelectedPlugin(null);
+      setPluginConfig({});
     } catch (error: any) {
-      alert(`Error adding plugin: ${error.message}`);
+      alert(`Failed to add plugin: ${error.message}`);
     } finally {
       setActionLoading(null);
     }
@@ -216,19 +189,10 @@ export default function PluginsTab({ mindId }: PluginsTabProps) {
 
     setActionLoading(pluginName);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/minds/${mindId}/plugins/${pluginName}`,
-        { method: 'DELETE' }
-      );
-
-      if (response.ok) {
-        await loadPlugins();
-      } else {
-        const error = await response.json();
-        alert(`Failed to remove plugin: ${error.detail || 'Unknown error'}`);
-      }
+      await api.removePlugin(mindId, pluginName);
+      await loadPlugins();
     } catch (error: any) {
-      alert(`Error removing plugin: ${error.message}`);
+      alert(`Failed to remove plugin: ${error.message}`);
     } finally {
       setActionLoading(null);
     }
@@ -237,20 +201,14 @@ export default function PluginsTab({ mindId }: PluginsTabProps) {
   const handleTogglePlugin = async (pluginName: string, currentlyEnabled: boolean) => {
     setActionLoading(pluginName);
     try {
-      const action = currentlyEnabled ? 'disable' : 'enable';
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/minds/${mindId}/plugins/${pluginName}/${action}`,
-        { method: 'POST' }
-      );
-
-      if (response.ok) {
-        await loadPlugins();
+      if (currentlyEnabled) {
+        await api.disablePlugin(mindId, pluginName);
       } else {
-        const error = await response.json();
-        alert(`Failed to ${action} plugin: ${error.detail || 'Unknown error'}`);
+        await api.enablePlugin(mindId, pluginName);
       }
+      await loadPlugins();
     } catch (error: any) {
-      alert(`Error toggling plugin: ${error.message}`);
+      alert(`Failed to toggle plugin: ${error.message}`);
     } finally {
       setActionLoading(null);
     }

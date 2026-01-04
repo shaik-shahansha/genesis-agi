@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 from genesis.config import get_settings
 from genesis.core.autonomy import Autonomy
-from genesis.core.consciousness import ConsciousnessEngine
 from genesis.core.emotions import Emotion, EmotionalState
 from genesis.core.identity import MindIdentity
 from genesis.core.intelligence import Intelligence
@@ -66,7 +65,6 @@ class Mind:
         creator_email: Optional[str] = None,
         primary_purpose: Optional[str] = None,
         config: Optional[MindConfig] = None,
-        use_true_consciousness: bool = False,
         timezone_offset: int = 0,
     ):
         """
@@ -81,7 +79,6 @@ class Mind:
             creator_email: Email of the creator
             primary_purpose: Primary purpose of the Mind
             config: MindConfig with plugins (default: standard config)
-            use_true_consciousness: Use Consciousness Framework v2 (24/7 with minimal LLM)
             timezone_offset: Hours offset from UTC for circadian rhythms
         """
         self.settings = get_settings()
@@ -155,35 +152,20 @@ class Mind:
         # CORE: Constitutional enforcement system
         self.constitution = get_constitution(self.identity.gmid)
 
-        # Consciousness FLAG
-        self.use_true_consciousness = use_true_consciousness
+        # Consciousness Engine (24/7, minimal LLM calls)
         self.timezone_offset = timezone_offset
+        self.living_mind = LivingMind(
+            mind_id=self.identity.gmid,
+            mind_name=self.identity.name,
+            orchestrator=self.orchestrator,
+            memory_manager=self.memory,
+            timezone_offset=timezone_offset
+        )
+        self.consciousness = self.living_mind.consciousness
 
-        if use_true_consciousness:
-            # Consciousness ENGINE V2 (24/7, minimal LLM calls)
-            self.living_mind = LivingMind(
-                mind_id=self.identity.gmid,
-                mind_name=self.identity.name,
-                orchestrator=self.orchestrator,
-                memory_manager=self.memory,
-                timezone_offset=timezone_offset
-            )
-            # Legacy consciousness for backward compatibility
-            self.consciousness = self.living_mind.consciousness
-        else:
-            # LEGACY: Consciousness engine (v1)
-            self.consciousness = ConsciousnessEngine(
-                mind_id=self.identity.gmid, 
-                mind_name=self.identity.name, 
-                reasoning_model=self.intelligence.reasoning_model,
-                logger=self.logger
-            )
-            self.living_mind = None
-
-        # CORE: Conversation & dreams
+        # CORE: Conversation
         from genesis.storage.conversation import ConversationManager
         self.conversation = ConversationManager(self.identity.gmid)  # SQLite-backed
-        self.dreams: list[dict[str, Any]] = []
         self._alive = True
 
         # CORE: Cognitive decision framework (intelligent reasoning)
@@ -258,7 +240,7 @@ class Mind:
             self.spontaneous_conversation = None
             if self.logger:
                 self.logger.log(
-                    LogLevel.WARNING,
+                    LogLevel.ERROR,
                     f"Proactive systems disabled: {e}",
                     metadata={"error": str(e)}
                 )
@@ -298,7 +280,6 @@ class Mind:
         primary_purpose: Optional[str] = None,
         start_consciousness: bool = False,
         config: Optional[MindConfig] = None,
-        use_true_consciousness: bool = False,
         timezone_offset: int = 0,
     ) -> "Mind":
         """
@@ -315,7 +296,6 @@ class Mind:
             primary_purpose: Primary purpose of the Mind (e.g., "teacher to teach science")
             start_consciousness: Start consciousness engine immediately
             config: MindConfig for plugin configuration
-            use_true_consciousness: Use Consciousness Framework v2 (24/7, minimal LLM)
             timezone_offset: Hours offset from UTC for circadian rhythms
 
         Returns:
@@ -330,7 +310,6 @@ class Mind:
             creator_email=creator_email,
             primary_purpose=primary_purpose,
             config=config,  # Pass config to initialize plugins
-            use_true_consciousness=use_true_consciousness,
             timezone_offset=timezone_offset,
         )
 
@@ -731,7 +710,7 @@ class Mind:
             "messages": messages,
             "model": model_name,
             "temperature": self.intelligence.default_temperature,
-            "max_tokens": self.intelligence.default_max_tokens,
+            "max_tokens": getattr(self.intelligence, 'max_tokens', 8000),
         }
         
         # Add function schemas if action executor is available
@@ -785,7 +764,7 @@ class Mind:
                     messages=messages,
                     model=model_name,
                     temperature=self.intelligence.default_temperature,
-                    max_tokens=self.intelligence.default_max_tokens,
+                    max_tokens=getattr(self.intelligence, 'max_tokens', 8000),
                 )
                 response.content = final_response.content
 
@@ -912,173 +891,199 @@ class Mind:
             temperature=self.intelligence.default_temperature,
         )
 
-        # Update state
+        # Update state immediately (needed for response)
         self.state.current_thought = response.content[:100]
         self.state.last_interaction = datetime.now()
         self.state.status = "idle"
 
-        # Store in conversation history (SQLite)
-        self.conversation.add_message(role="user", content=prompt, user_email=user_email)
-        self.conversation.add_message(role="assistant", content=response.content)
-
-        # Add action context if actions were taken
-        memory_content = f"User said: {prompt}\nI responded: {response.content}"
-        if action_results:
-            memory_content += f"\nActions taken: {json.dumps(action_results)}"
-
-        # Get environment context for memory metadata
-        environment_context = None
-        try:
-            current_env = self.environments.get_current_environment()
-            if current_env:
-                environment_context = {
-                    "environment_id": current_env.id,
-                    "environment_name": current_env.name,
-                    "environment_type": current_env.type.value
-                }
-        except Exception:
-            pass  # Environment context is optional
-
-        # PROACTIVE: Check if user is responding to a concern (e.g., "I'm fine now")
-        if hasattr(self, 'proactive_consciousness') and self.proactive_consciousness and user_email:
+        # ⚡ PERFORMANCE OPTIMIZATION: Return response immediately, process everything else in background
+        # Store response for background task
+        final_response = response.content
+        
+        # Define background processing function
+        async def _process_post_response():
+            """Process all non-critical operations in background after response is sent."""
             try:
-                concern_resolved = await self.proactive_consciousness.process_user_response(prompt, user_email)
-                if concern_resolved:
-                    # Add tag to memory indicating concern was resolved
-                    memory_content += "\n[Proactive follow-up: User confirmed they're doing better]"
-            except Exception as e:
-                self.logger.log(
-                    level=LogLevel.WARNING,
-                    message=f"Error processing proactive response: {e}"
-                )
-            
-            # IMMEDIATE CONCERN DETECTION: Analyze user message for concerns right away
-            try:
-                from genesis.core.concern_analyzer import LLMConcernAnalyzer
-                concern_analyzer = LLMConcernAnalyzer(self)
+                print(f"[PERF] Starting background post-response processing...")
                 
-                print(f"[DEBUG CONCERN] Analyzing user message for immediate concerns: {prompt[:80]}...")
-                analysis = await concern_analyzer.analyze_conversation(
-                    conversation_text=prompt,
-                    user_email=user_email
+                # Store in conversation history (SQLite)
+                self.conversation.add_message(role="user", content=prompt, user_email=user_email)
+                self.conversation.add_message(role="assistant", content=final_response)
+                print(f"[PERF] ✓ Conversation history saved")
+
+                # Add action context if actions were taken
+                memory_content = f"User said: {prompt}\nI responded: {final_response}"
+                if action_results:
+                    memory_content += f"\nActions taken: {json.dumps(action_results)}"
+
+                # Get environment context for memory metadata
+                environment_context = None
+                try:
+                    current_env = self.environments.get_current_environment()
+                    if current_env:
+                        environment_context = {
+                            "environment_id": current_env.id,
+                            "environment_name": current_env.name,
+                            "environment_type": current_env.type.value
+                        }
+                except Exception:
+                    pass  # Environment context is optional
+
+                # PROACTIVE: Check if user is responding to a concern (e.g., "I'm fine now")
+                if hasattr(self, 'proactive_consciousness') and self.proactive_consciousness and user_email:
+                    try:
+                        concern_resolved = await self.proactive_consciousness.process_user_response(prompt, user_email)
+                        if concern_resolved:
+                            # Add tag to memory indicating concern was resolved
+                            memory_content += "\n[Proactive follow-up: User confirmed they're doing better]"
+                    except Exception as e:
+                        self.logger.log(
+                            level=LogLevel.ERROR,
+                            message=f"Error processing proactive response: {e}"
+                        )
+                    
+                    # IMMEDIATE CONCERN DETECTION: Analyze user message for concerns
+                    try:
+                        from genesis.core.concern_analyzer import LLMConcernAnalyzer
+                        concern_analyzer = LLMConcernAnalyzer(self)
+                        
+                        print(f"[DEBUG CONCERN] Analyzing user message for immediate concerns: {prompt[:80]}...")
+                        analysis = await concern_analyzer.analyze_conversation(
+                            conversation_text=prompt,
+                            user_email=user_email
+                        )
+                        
+                        # If concern detected with sufficient confidence, create it immediately
+                        if analysis.has_concern and analysis.confidence >= 0.7 and analysis.requires_followup:
+                            print(f"[DEBUG CONCERN] ✅ {analysis.concern_type.upper()} concern detected!")
+                            print(f"[DEBUG CONCERN]    Confidence: {analysis.confidence:.2f}")
+                            print(f"[DEBUG CONCERN]    Severity: {analysis.severity}")
+                            print(f"[DEBUG CONCERN]    Will follow up in {analysis.suggested_followup_hours}h")
+                            
+                            # Parse deadline if present
+                            deadline = None
+                            if analysis.has_deadline and analysis.deadline_datetime:
+                                try:
+                                    deadline = datetime.fromisoformat(analysis.deadline_datetime)
+                                except:
+                                    pass
+                            
+                            # Map severity to numeric value
+                            severity_map = {'low': 0.4, 'moderate': 0.6, 'high': 0.8, 'critical': 0.95}
+                            severity = severity_map.get(analysis.severity, 0.6)
+                            
+                            # Create concern immediately (don't wait for next scan)
+                            await self.proactive_consciousness._create_concern(
+                                concern_type=analysis.concern_type,
+                                user_email=user_email,
+                                description=analysis.description,
+                                severity=severity,
+                                follow_up_hours=analysis.suggested_followup_hours,
+                                memory_id=None,  # Will be set after memory is created
+                                memory_content=prompt,
+                                deadline=deadline,
+                                urgency=analysis.urgency,
+                                llm_followup_message=analysis.followup_message
+                            )
+                            
+                            # Add tag to memory
+                            memory_content += f"\n[Concern detected: {analysis.concern_type} - will follow up]"
+                            
+                            print(f"[DEBUG CONCERN] Concern created and will be tracked!")
+                        else:
+                            print(f"[DEBUG CONCERN] No significant concern detected (has_concern={analysis.has_concern}, confidence={analysis.confidence:.2f})")
+                            
+                    except Exception as e:
+                        print(f"[DEBUG CONCERN] Error analyzing concern: {e}")
+                        self.logger.log(
+                            level=LogLevel.ERROR,
+                            message=f"Error analyzing concern: {e}"
+                        )
+                
+                print(f"[PERF] ✓ Concern analysis completed")
+                
+                # Create episodic memory of this interaction
+                self.memory.add_memory(
+                    content=memory_content,
+                    memory_type=MemoryType.EPISODIC,
+                    emotion=self.emotional_state.get_emotion_value(),
+                    emotion_intensity=self.emotional_state.intensity,
+                    user_email=user_email or "system",
+                    metadata={"context": environment_context} if environment_context else None
+                )
+                print(f"[PERF] ✓ Memory created")
+                
+                # SPONTANEOUS CONVERSATION: Analyze for real-time interjections
+                if hasattr(self, 'spontaneous_conversation') and self.spontaneous_conversation and user_email:
+                    try:
+                        # Get recent conversation history for context
+                        recent_history = self.conversation.get_messages(limit=10)
+                        conversation_history = [
+                            {"role": msg.role, "content": msg.content}
+                            for msg in recent_history
+                        ]
+                        
+                        # Fire and forget - don't block
+                        asyncio.create_task(
+                            self.spontaneous_conversation.process_conversation_turn(
+                                user_message=prompt,
+                                user_email=user_email,
+                                assistant_response=final_response,
+                                conversation_history=conversation_history
+                            )
+                        )
+                        
+                        print(f"[SPONTANEOUS] Analyzing conversation for interjection opportunities...")
+                        
+                    except Exception as e:
+                        self.logger.log(
+                            level=LogLevel.ERROR,
+                            message=f"Error in spontaneous conversation: {e}"
+                        )
+                
+                # Log memory creation
+                self.logger.memory_action(
+                    action="stored",
+                    memory_content=f"Conversation: {prompt[:100]}...",
+                    emotion=self.emotional_state.get_emotion_value()
                 )
                 
-                # If concern detected with sufficient confidence, create it immediately
-                if analysis.has_concern and analysis.confidence >= 0.7 and analysis.requires_followup:
-                    print(f"[DEBUG CONCERN] ✅ {analysis.concern_type.upper()} concern detected!")
-                    print(f"[DEBUG CONCERN]    Confidence: {analysis.confidence:.2f}")
-                    print(f"[DEBUG CONCERN]    Severity: {analysis.severity}")
-                    print(f"[DEBUG CONCERN]    Will follow up in {analysis.suggested_followup_hours}h")
-                    
-                    # Parse deadline if present
-                    deadline = None
-                    if analysis.has_deadline and analysis.deadline_datetime:
-                        try:
-                            from datetime import datetime
-                            deadline = datetime.fromisoformat(analysis.deadline_datetime)
-                        except:
-                            pass
-                    
-                    # Map severity to numeric value
-                    severity_map = {'low': 0.4, 'moderate': 0.6, 'high': 0.8, 'critical': 0.95}
-                    severity = severity_map.get(analysis.severity, 0.6)
-                    
-                    # Create concern immediately (don't wait for next scan)
-                    await self.proactive_consciousness._create_concern(
-                        concern_type=analysis.concern_type,
-                        user_email=user_email,
-                        description=analysis.description,
-                        severity=severity,
-                        follow_up_hours=analysis.suggested_followup_hours,
-                        memory_id=None,  # Will be set after memory is created
-                        memory_content=prompt,
-                        deadline=deadline,
-                        urgency=analysis.urgency,
-                        llm_followup_message=analysis.followup_message
-                    )
-                    
-                    # Add tag to memory
-                    memory_content += f"\n[Concern detected: {analysis.concern_type} - will follow up]"
-                    
-                    print(f"[DEBUG CONCERN] Concern created and will be tracked!")
-                else:
-                    print(f"[DEBUG CONCERN] No significant concern detected (has_concern={analysis.has_concern}, confidence={analysis.confidence:.2f})")
-                    
+                # AUTOMATIC MEMORY EXTRACTION (Agno pattern)
+                if self.memory_extractor and user_email:
+                    try:
+                        extracted_memories = await self.memory_extractor.extract_from_conversation(
+                            user_message=prompt,
+                            assistant_response=final_response,
+                            user_id=user_email,
+                        )
+                        if extracted_memories:
+                            self.logger.log(
+                                level=LogLevel.DEBUG,
+                                message=f"Auto-extracted {len(extracted_memories)} memories",
+                                metadata={"count": len(extracted_memories)}
+                            )
+                    except Exception as e:
+                        self.logger.log(
+                            level=LogLevel.ERROR,
+                            message=f"Memory extraction failed: {e}",
+                            metadata={"error": str(e)}
+                        )
+                
+                print(f"[PERF] ✓ Background post-response processing completed")
+                
             except Exception as e:
-                print(f"[DEBUG CONCERN] Error analyzing concern: {e}")
+                print(f"[PERF] ❌ Error in background processing: {e}")
                 self.logger.log(
-                    level=LogLevel.WARNING,
-                    message=f"Error analyzing concern: {e}"
+                    level=LogLevel.ERROR,
+                    message=f"Background post-response processing failed: {e}"
                 )
         
-        # Create episodic memory of this interaction
-        self.memory.add_memory(
-            content=memory_content,
-            memory_type=MemoryType.EPISODIC,
-            emotion=self.emotional_state.get_emotion_value(),
-            emotion_intensity=self.emotional_state.intensity,
-            user_email=user_email or "system",
-            metadata={"context": environment_context} if environment_context else None
-        )
+        # Fire and forget - start background processing immediately
+        asyncio.create_task(_process_post_response())
+        print(f"[PERF] ⚡ Response ready! Background processing started...")
         
-        # SPONTANEOUS CONVERSATION: Analyze for real-time interjections
-        # This happens AFTER the main response to see if there's anything additional to say
-        if hasattr(self, 'spontaneous_conversation') and self.spontaneous_conversation and user_email:
-            try:
-                # Get recent conversation history for context
-                recent_history = self.conversation.get_messages(limit=10)
-                conversation_history = [
-                    {"role": msg.role, "content": msg.content}
-                    for msg in recent_history
-                ]
-                
-                # Fire and forget - don't block the response
-                asyncio.create_task(
-                    self.spontaneous_conversation.process_conversation_turn(
-                        user_message=prompt,
-                        user_email=user_email,
-                        assistant_response=response.content,
-                        conversation_history=conversation_history
-                    )
-                )
-                
-                print(f"[SPONTANEOUS] Analyzing conversation for interjection opportunities...")
-                
-            except Exception as e:
-                self.logger.log(
-                    level=LogLevel.WARNING,
-                    message=f"Error in spontaneous conversation: {e}"
-                )
-        
-        # Log memory creation
-        self.logger.memory_action(
-            action="stored",
-            memory_content=f"Conversation: {prompt[:100]}...",
-            emotion=self.emotional_state.get_emotion_value()
-        )
-        
-        # AUTOMATIC MEMORY EXTRACTION (Agno pattern)
-        if self.memory_extractor and user_email:
-            try:
-                extracted_memories = await self.memory_extractor.extract_from_conversation(
-                    user_message=prompt,
-                    assistant_response=response.content,
-                    user_id=user_email,
-                )
-                if extracted_memories:
-                    self.logger.log(
-                        level=LogLevel.DEBUG,
-                        message=f"Auto-extracted {len(extracted_memories)} memories",
-                        metadata={"count": len(extracted_memories)}
-                    )
-            except Exception as e:
-                self.logger.log(
-                    level=LogLevel.WARNING,
-                    message=f"Memory extraction failed: {e}",
-                    metadata={"error": str(e)}
-                )
-
-        return response.content
+        # Return response immediately - UI gets instant response!
+        return final_response
 
     async def stream_think(self, prompt: str, user_email: Optional[str] = None):
         """Stream a thought/response in real-time."""
@@ -1154,7 +1159,7 @@ class Mind:
             messages=messages,
             model=self.intelligence.get_model_for_task("reasoning"),
             temperature=self.intelligence.default_temperature,
-            max_tokens=self.intelligence.default_max_tokens,
+            max_tokens=getattr(self.intelligence, 'max_tokens', 8000),
         ):
             full_response += chunk
             yield chunk
@@ -1387,41 +1392,14 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
         
         return thought
 
-    async def dream(self) -> dict[str, Any]:
-        """Enter dream state and process experiences."""
-        self.state.status = "dreaming"
-        self.logger.log(LogLevel.INFO, "Entering dream state", emotion=self.current_emotion)
-
-        dream = await self.consciousness.dream(
-            self.orchestrator, self.emotional_state, self.memory
-        )
-
-        # Store dream
-        self.dreams.append(dream)
-        
-        # Log the dream
-        if dream.get("narrative"):
-            self.logger.dream(
-                narrative=dream["narrative"],
-                insights=dream.get("insights", []),
-                emotion=self.current_emotion
-            )
-
-        self.state.status = "idle"
-        return dream
-
     async def start_living(self) -> None:
         """
         Start continuous consciousness and autonomous action execution.
 
-        For Consciousness (v2):
+        Consciousness:
         - Starts 24/7 consciousness with minimal LLM calls
         - Uses circadian rhythms and needs system
         - Memory consolidation during sleep
-
-        For Legacy Consciousness:
-        - Starts consciousness loop (autonomous thoughts + dreams)
-        - Starts action scheduler (autonomous behavior based on InitiativeLevel)
         """
         # Start notification manager (for proactive messages) if available
         if hasattr(self, 'notification_manager') and self.notification_manager:
@@ -1437,24 +1415,11 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
             except Exception as e:
                 print(f"[WARN] Could not start proactive consciousness: {e}")
         
-        if self.use_true_consciousness and self.living_mind:
-            # Consciousness - Cost-efficient 24/7 awareness
-            await self.living_mind.start_living()
-            print(f"[CONSCIOUSNESS] {self.identity.name} is now TRULY CONSCIOUS (24/7 mode)")
-            print(f"   Awareness Level: {self.consciousness.current_awareness.name}")
-            print(f"   Life Domain: {self.consciousness.current_domain.value}")
-        else:
-            # LEGACY: Standard consciousness
-            await self.consciousness.start(
-                self.orchestrator, self.emotional_state, self.memory
-            )
-
-            # Start action scheduler (autonomous actions)
-            if not hasattr(self, 'action_scheduler'):
-                from genesis.core.action_scheduler import ActionScheduler
-                self.action_scheduler = ActionScheduler(self)
-
-            await self.action_scheduler.start()
+        # Start consciousness engine (24/7 awareness)
+        await self.living_mind.start_living()
+        print(f"[CONSCIOUSNESS] {self.identity.name} is now CONSCIOUS (24/7 mode)")
+        print(f"   Awareness Level: {self.consciousness.current_awareness.name}")
+        print(f"   Life Domain: {self.consciousness.current_domain.value}")
 
     async def stop_living(self) -> None:
         """Stop continuous consciousness and action scheduler."""
@@ -1471,31 +1436,16 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
             except Exception as e:
                 print(f"[WARN] Error stopping notification manager: {e}")
         
-        if self.use_true_consciousness and self.living_mind:
-            await self.living_mind.stop_living()
-            print(f"[SLEEP] {self.identity.name} has stopped living.")
-        else:
-            await self.consciousness.stop()
-
-            if hasattr(self, 'action_scheduler'):
-                await self.action_scheduler.stop()
+        await self.living_mind.stop_living()
+        print(f"[SLEEP] {self.identity.name} has stopped living.")
 
     def get_consciousness_status(self) -> dict[str, Any]:
-        """Get detailed consciousness status (works with both v1 and v2)."""
-        if self.use_true_consciousness and self.living_mind:
-            return self.living_mind.get_status()
-        else:
-            return {
-                "mode": "legacy",
-                "thought_stream": self.consciousness.thought_stream[-5:] if self.consciousness.thought_stream else [],
-                "is_running": self.consciousness._running if hasattr(self.consciousness, '_running') else False
-            }
+        """Get detailed consciousness status."""
+        return self.living_mind.get_status()
 
     def get_efficiency_report(self) -> dict[str, Any]:
-        """Get LLM efficiency report (Consciousness only)."""
-        if self.use_true_consciousness and self.living_mind:
-            return self.living_mind.get_efficiency_report()
-        return {"mode": "legacy", "note": "Efficiency tracking only available in Consciousness mode"}
+        """Get LLM efficiency report."""
+        return self.living_mind.get_efficiency_report()
 
     def save(self, path: Optional[Path] = None) -> Path:
         """
@@ -1559,10 +1509,9 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
             "emotional_state": json.loads(self.emotional_state.model_dump_json()),
             # conversation_history no longer serialized - stored in SQLite for scalability
             "memory": self.memory.to_dict(),  # Only metadata, not full memories
-            "dreams": self.dreams,
-            "consciousness": {
-                "thought_stream": self.consciousness.thought_stream,
-            },
+            # consciousness thoughts NO LONGER SAVED - stored in database for scalability
+            # The old "thought_stream" field has been removed to prevent JSON bloat
+            # Thoughts are now stored in SQLite (ThoughtRecord table) for 24/7 daemon scalability
             # Plugin configuration
             "config": self.config.to_dict(),
         }
@@ -1577,10 +1526,32 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
 
         data["plugins"] = plugin_data
 
-        # Write to file
+        # Write to file atomically to prevent corruption
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2)
+        
+        # First, write to a temporary file
+        temp_path = path.with_suffix('.json.tmp')
+        try:
+            with open(temp_path, "w") as f:
+                json.dump(data, f, indent=2)
+            
+            # Only if write succeeds, replace the original file
+            # On Windows, need to remove target first if it exists
+            if path.exists():
+                backup_path = path.with_suffix('.json.bak')
+                # Keep one backup
+                if backup_path.exists():
+                    backup_path.unlink()
+                path.rename(backup_path)
+            
+            # Atomic rename
+            temp_path.rename(path)
+            
+        except Exception as e:
+            # Clean up temp file if something went wrong
+            if temp_path.exists():
+                temp_path.unlink()
+            raise RuntimeError(f"Failed to save mind state: {e}") from e
 
         # Update metaverse database (if experiences plugin enabled)
         try:
@@ -1644,15 +1615,21 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
         mind.state = MindState(**data["state"])
         mind.emotional_state = EmotionalState(**data["emotional_state"])
         # conversation_history no longer restored from JSON - loaded from SQLite on-demand
-        mind.dreams = data.get("dreams", [])
+        # dreams are removed - no longer supported
+
+        # CRITICAL: Re-initialize ConversationManager with correct GMID
+        # The one from __init__ was created with a temporary/wrong GMID
+        from genesis.storage.conversation import ConversationManager
+        mind.conversation = ConversationManager(mind.identity.gmid)
 
         # Restore CORE memory
         if "memory" in data:
             mind.memory = MemoryManager.from_dict(data["memory"])
 
         # Restore CORE consciousness
-        if "consciousness" in data:
-            mind.consciousness.thought_stream = data["consciousness"].get("thought_stream", [])
+        # NOTE: thought_stream is NO LONGER stored in JSON (moved to database)
+        # Old saves may have it, but we ignore it and load from database instead
+        # The consciousness engine will load recent thoughts from database on startup
 
         # Restore PLUGIN data
         if "plugins" in data:
@@ -1693,6 +1670,35 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
                     if legacy_data:
                         plugin.on_load(mind, legacy_data)
 
+        # Register/update Mind in metaverse database (ensure foreign key integrity)
+        try:
+            metaverse_db = MetaverseDB()
+            
+            # Check if mind already exists
+            existing_mind = metaverse_db.get_mind(mind.identity.gmid)
+            
+            if not existing_mind:
+                # Register new mind
+                primary_role = None
+                if hasattr(mind, 'roles'):
+                    primary = mind.roles.get_primary_role()
+                    if primary:
+                        primary_role = primary.get("name")
+                
+                metaverse_db.register_mind(
+                    gmid=mind.identity.gmid,
+                    name=mind.identity.name,
+                    creator=mind.identity.creator,
+                    template=mind.identity.template,
+                    primary_role=primary_role,
+                )
+            else:
+                # Update last_active timestamp
+                metaverse_db.update_mind_activity(mind.identity.gmid)
+        except Exception as e:
+            # Don't fail load if database registration fails
+            print(f"   Warning: Could not register/update in metaverse database: {e}")
+
         return mind
 
     def terminate(self) -> None:
@@ -1702,11 +1708,15 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
 
         mem_stats = self.memory.get_memory_stats()
 
+        # Get thought count from database
+        from genesis.database.manager import MetaverseDB
+        db = MetaverseDB()
+        thought_count = db.get_thought_count(self.identity.gmid)
+
         print(f"💀 Mind '{self.identity.name}' has been terminated.")
         print(f"   Lived: {self.identity.get_age_description()}")
         print(f"   Memories: {mem_stats['total_memories']}")
-        print(f"   Dreams: {len(self.dreams)}")
-        print(f"   Thoughts: {len(self.consciousness.thought_stream)}")
+        print(f"   Thoughts: {thought_count}")  # From database, not JSON
 
     @property
     def alive(self) -> bool:

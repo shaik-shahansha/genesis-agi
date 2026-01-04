@@ -546,11 +546,11 @@ def execute(input_data):
         return {
             "mind_gmid": self.mind_gmid,
             "tools": {
-                tool_id: tool.model_dump()
+                tool_id: tool.model_dump(mode='json')
                 for tool_id, tool in self.tools.items()
             },
             "accessible_tools": {
-                tool_id: tool.model_dump()
+                tool_id: tool.model_dump(mode='json')
                 for tool_id, tool in self.accessible_tools.items()
             },
             "tools_created": self.tools_created,

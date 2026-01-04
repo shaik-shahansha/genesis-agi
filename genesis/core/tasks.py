@@ -255,7 +255,7 @@ class TaskManager:
         return {
             "mind_gmid": self.mind_gmid,
             "tasks": {
-                task_id: task.model_dump()
+                task_id: task.model_dump(mode='json')
                 for task_id, task in self.tasks.items()
             }
         }

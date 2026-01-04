@@ -536,11 +536,11 @@ class KnowledgeGraph:
         return {
             "mind_gmid": self.mind_gmid,
             "entities": {
-                eid: entity.model_dump()
+                eid: entity.model_dump(mode='json')
                 for eid, entity in self.entities.items()
             },
             "relationships": {
-                rid: rel.model_dump()
+                rid: rel.model_dump(mode='json')
                 for rid, rel in self.relationships.items()
             },
             "total_inferences": self.total_inferences

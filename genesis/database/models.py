@@ -631,3 +631,42 @@ class BackgroundTaskRecord(Base):
         Index("ix_bg_tasks_status_created", "status", "created_at"),
         Index("ix_bg_tasks_mind_status", "mind_gmid", "status"),
     )
+
+
+class ThoughtRecord(Base):
+    """
+    Consciousness thought storage for scalable 24/7 operation.
+    
+    CRITICAL: Replaces in-JSON thought_stream/thought_history to prevent JSON bloat.
+    For a Mind running 24/7, thoughts accumulate constantly and would make JSON files
+    grow indefinitely. This SQLite table provides scalable, queryable storage.
+    """
+    __tablename__ = "thoughts"
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Mind identification
+    mind_gmid = Column(String(50), ForeignKey("minds.gmid"), nullable=False, index=True)
+    
+    # Thought content
+    content = Column(Text, nullable=False)
+    thought_type = Column(String(50), nullable=True)  # 'observation', 'reflection', 'insight', 'plan', etc.
+    
+    # Context
+    awareness_level = Column(String(20), nullable=True)  # 'conscious', 'subconscious', etc.
+    life_domain = Column(String(50), nullable=True)  # 'work', 'relationships', 'learning', etc.
+    emotion = Column(String(50), nullable=True)  # Associated emotional state
+    
+    # Timestamps
+    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    
+    # Optional metadata
+    extra_data = Column(JSON, default=dict)  # Context, triggers, related memories, etc.
+    
+    # Indexes for efficient queries
+    __table_args__ = (
+        Index("ix_thoughts_mind_time", "mind_gmid", "timestamp"),
+        Index("ix_thoughts_type", "thought_type"),
+        Index("ix_thoughts_awareness", "awareness_level"),
+    )

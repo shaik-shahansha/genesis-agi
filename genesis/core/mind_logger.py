@@ -319,3 +319,20 @@ class MindLogger:
             stats["last_log"] = self.recent_logs[-1]["timestamp"]
         
         return stats
+
+    def clear_logs(self):
+        """Clear all logs for this mind.
+        
+        Clears both in-memory cache and the log file.
+        """
+        # Clear in-memory cache
+        self.recent_logs = []
+        
+        # Clear log file by truncating it
+        try:
+            if self.log_file.exists():
+                self.log_file.unlink()  # Delete the file
+                self.log_file.touch()   # Create empty file
+        except Exception as e:
+            self.logger.error(f"Failed to clear logs: {e}")
+            raise

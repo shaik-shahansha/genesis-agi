@@ -15,7 +15,7 @@
 - **Professional Navigation**: Fixed header with quick access to all features
 
 ### 🧠 **Mind Management Dashboard**
-- **Real-Time Stats**: Live metrics for minds, memories, dreams, and thoughts
+- **Real-Time Stats**: Live metrics for minds, memories, and thoughts
 - **Activity Feed**: See what your minds are doing in real-time
 - **Consciousness Orbs**: Visual representation of emotional states with animations
 - **Quick Actions**: Birth, chat, and manage minds with one click
@@ -39,11 +39,10 @@
 - **Smart Sidebar**: Quick access to mind stats and actions
 
 ### 📊 **Mind Profile Dashboard (Complete Analytics)**
-- **4 Tab Interface**: Overview, Memories, Dreams, Settings
+- **Multiple Tab Interface**: Overview, Memories, Thinking, Consciousness, Plugins, Settings, Workspace, Autonomy, LLM Calls, Logs
 - **Consciousness Visualization**: Large animated consciousness orb
-- **Activity Analytics**: Visual progress bars for memory, dreams, emotions
+- **Activity Analytics**: Visual progress bars for memory and emotions
 - **Memory Browser**: Filter by 5 types with importance ratings
-- **Dream Journal**: View narratives and extracted insights
 - **Settings Panel**: Configure consciousness mode and autonomy
 - **Danger Zone**: Pause, reset, or delete minds safely
 
@@ -217,7 +216,7 @@ ws.disconnect();
 - [Done] Mind status display
 - [Done] Chat interface
 - [Done] Create new Mind
-- [Done] View memories and dreams
+- [Done] View memories
 
 ## 🛠️ Tech Stack
 

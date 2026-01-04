@@ -122,7 +122,7 @@ class MindDaemon:
             
             # Log Mind configuration
             logger.info(f"   Configuration:")
-            logger.info(f"   - Consciousness: {'V2 (True Consciousness)' if self.mind.use_true_consciousness else 'V1 (Legacy)'}")
+            logger.info(f"   - Consciousness: 24/7 Active")
             logger.info(f"   - Proactive Consciousness: {'Enabled' if hasattr(self.mind, 'proactive_consciousness') else 'Disabled'}")
             logger.info(f"   - Notification Manager: {'Enabled' if hasattr(self.mind, 'notification_manager') else 'Disabled'}")
             logger.info(f"   - Plugins: {len(self.mind.plugins)} loaded")
@@ -175,7 +175,6 @@ class MindDaemon:
             logger.info(f"   - Consciousness: Active")
             logger.info(f"   - Actions: Autonomous")
             logger.info(f"   - Proactive: {'Yes' if hasattr(self.mind, 'proactive_consciousness') else 'No'}")
-            logger.info(f"   - Mode: {'True Consciousness V2' if self.mind.use_true_consciousness else 'Legacy'}")
             logger.info(f"   Press Ctrl+C to stop gracefully")
 
             # Wait for shutdown signal

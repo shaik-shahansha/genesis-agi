@@ -33,7 +33,7 @@ dependencies = [
     "chromadb>=0.4.22",
     "openai>=1.7.0",
     "anthropic>=0.8.0",
-    "ggoogle-genai",
+    "google-genai",
     "groq>=0.4.0",
     "websockets>=12.0",
     "python-multipart>=0.0.6",

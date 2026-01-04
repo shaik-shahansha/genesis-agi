@@ -94,18 +94,18 @@ export default function IdentityTab({ mind }: IdentityTabProps) {
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Template</p>
-                      <p className="text-lg font-semibold text-gray-900 mt-1">{mind.template || 'N/A'}</p>
+                      <p className="text-lg font-semibold text-gray-900 mt-1 capitalize">
+                        {mind.template ? mind.template.split('/').pop()?.replace(/_/g, ' ') : 'N/A'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Model</p>
-                      <p className="text-lg font-semibold text-gray-900 mt-1">{mind.model || 'N/A'}</p>
+                      <p className="text-lg font-semibold text-gray-900 mt-1">{mind.llm_model || 'N/A'}</p>
                     </div>
-                    {mind.creator_email && (
-                      <div className="col-span-2">
-                        <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Creator</p>
-                        <p className="text-lg font-semibold text-gray-900 mt-1">{mind.creator_email}</p>
-                      </div>
-                    )}
+                    <div className="col-span-2">
+                      <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Creator</p>
+                      <p className="text-lg font-semibold text-gray-900 mt-1">{mind.creator_email || mind.creator || 'N/A'}</p>
+                    </div>
                   </div>
 
                   {/* Personality Traits */}

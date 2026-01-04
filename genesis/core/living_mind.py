@@ -33,7 +33,7 @@ from typing import Optional, Dict, Any, List, Callable
 from dataclasses import dataclass, field
 import secrets
 
-from genesis.config import settings
+from genesis.config import get_settings
 from genesis.core.consciousness_v2 import (
     ConsciousnessEngineV2,
     AwarenessLevel,
@@ -105,6 +105,7 @@ class LLMGateway:
         self.daily_token_limit = 100000
 
         # Model selection
+        settings = get_settings()
         self.complexity_models = {
             "simple": "groq/llama-3.1-8b-instant",     # Quick responses
             "normal": "groq/openai/gpt-oss-120b",   # Balanced

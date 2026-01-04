@@ -69,7 +69,6 @@ Click **"✨ Birth New Mind"** and follow the wizard:
 Click **"📊 Dashboard"** to see:
 - Overview with stats
 - Memories browser
-- Dream journal
 - Settings
 
 ## 🎨 Interface Overview
@@ -98,7 +97,7 @@ Click **"📊 Dashboard"** to see:
 ```
 ┌────────────────────────────────────┐
 │  Large Consciousness Orb + Stats   │
-│  [Overview | Memories | Dreams]    │
+│  [Overview | Memories | Settings]  │
 │  Detailed Analytics                │
 │  Actions & Settings                │
 └────────────────────────────────────┘
@@ -166,10 +165,9 @@ npm install
 1. **Dashboard Stats** - Real-time metrics
 2. **Consciousness Orbs** - Emotional visualization
 3. **Memory Browser** - Search 5 memory types
-4. **Dream Journal** - View AI dreams
-5. **3-Step Wizard** - Easy mind creation
-6. **Markdown Chat** - Rich formatting
-7. **Profile Analytics** - Detailed insights
+4. **3-Step Wizard** - Easy mind creation
+5. **Markdown Chat** - Rich formatting
+6. **Profile Analytics** - Detailed insights
 
 ### Advanced Features
 
@@ -191,12 +189,6 @@ npm install
 1. Open chat interface
 2. Click "💾 Export" in sidebar
 3. Save `.txt` file
-
-### Trigger a Dream
-1. Go to Mind Profile
-2. Click "Dreams" tab
-3. Click "🌙 Trigger New Dream"
-4. Wait for processing
 
 ### Clear Mind's Memories
 1. Go to Mind Profile

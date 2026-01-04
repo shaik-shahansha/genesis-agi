@@ -15,6 +15,7 @@ from genesis.database.models import (
     EnvironmentVisit,
     SharedEvent,
     MetaverseState,
+    ThoughtRecord,
 )
 
 
@@ -544,3 +545,201 @@ class MetaverseDB:
             state.total_relationships = session.query(RelationshipRecord).count()
             state.updated_at = datetime.now(timezone.utc)
             session.commit()
+
+    # =========================================================================
+    # CONSCIOUSNESS THOUGHT STORAGE (Scalable 24/7 operation)
+    # =========================================================================
+
+    def store_thought(
+        self,
+        mind_gmid: str,
+        content: str,
+        thought_type: Optional[str] = None,
+        awareness_level: Optional[str] = None,
+        life_domain: Optional[str] = None,
+        emotion: Optional[str] = None,
+        extra_data: Optional[Dict[str, Any]] = None,
+        timestamp: Optional[datetime] = None,
+    ) -> ThoughtRecord:
+        """
+        Store a consciousness thought in the database.
+        
+        CRITICAL: Replaces in-memory/JSON thought storage for scalability.
+        For 24/7 daemon operation, thoughts must be stored in SQLite.
+        
+        Args:
+            mind_gmid: Mind identifier
+            content: Thought content
+            thought_type: Type of thought (observation, reflection, insight, etc.)
+            awareness_level: Awareness level (conscious, subconscious, etc.)
+            life_domain: Life domain (work, relationships, learning, etc.)
+            emotion: Associated emotion
+            extra_data: Additional metadata
+            timestamp: When thought occurred (default: now)
+            
+        Returns:
+            Created ThoughtRecord
+        """
+        with get_session() as session:
+            thought = ThoughtRecord(
+                mind_gmid=mind_gmid,
+                content=content,
+                thought_type=thought_type,
+                awareness_level=awareness_level,
+                life_domain=life_domain,
+                emotion=emotion,
+                extra_data=extra_data or {},
+                timestamp=timestamp or datetime.now(timezone.utc),
+            )
+            session.add(thought)
+            session.commit()
+            session.refresh(thought)
+            return thought
+
+    def get_recent_thoughts(
+        self,
+        mind_gmid: str,
+        limit: int = 50,
+        thought_type: Optional[str] = None,
+        awareness_level: Optional[str] = None,
+    ) -> List[ThoughtRecord]:
+        """
+        Retrieve recent thoughts for a Mind.
+        
+        Args:
+            mind_gmid: Mind identifier
+            limit: Maximum thoughts to return
+            thought_type: Filter by thought type
+            awareness_level: Filter by awareness level
+            
+        Returns:
+            List of ThoughtRecord ordered by timestamp (most recent first)
+        """
+        with get_session() as session:
+            query = session.query(ThoughtRecord).filter_by(mind_gmid=mind_gmid)
+            
+            if thought_type:
+                query = query.filter_by(thought_type=thought_type)
+            if awareness_level:
+                query = query.filter_by(awareness_level=awareness_level)
+            
+            thoughts = query.order_by(desc(ThoughtRecord.timestamp)).limit(limit).all()
+            return thoughts
+
+    def get_thoughts_in_timerange(
+        self,
+        mind_gmid: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> List[ThoughtRecord]:
+        """
+        Get thoughts within a specific time range.
+        
+        Args:
+            mind_gmid: Mind identifier
+            start_time: Start of time range
+            end_time: End of time range
+            
+        Returns:
+            List of ThoughtRecord in time range
+        """
+        with get_session() as session:
+            thoughts = (
+                session.query(ThoughtRecord)
+                .filter(
+                    and_(
+                        ThoughtRecord.mind_gmid == mind_gmid,
+                        ThoughtRecord.timestamp >= start_time,
+                        ThoughtRecord.timestamp <= end_time,
+                    )
+                )
+                .order_by(ThoughtRecord.timestamp)
+                .all()
+            )
+            return thoughts
+
+    def get_thought_count(self, mind_gmid: str) -> int:
+        """Get total thought count for a Mind."""
+        with get_session() as session:
+            return session.query(ThoughtRecord).filter_by(mind_gmid=mind_gmid).count()
+
+    def get_thought_stats(self, mind_gmid: str) -> Dict[str, Any]:
+        """
+        Get thought statistics for a Mind.
+        
+        Returns:
+            Dictionary with thought counts by type, awareness level, etc.
+        """
+        with get_session() as session:
+            total = session.query(ThoughtRecord).filter_by(mind_gmid=mind_gmid).count()
+            
+            # Count by type
+            by_type = {}
+            type_results = (
+                session.query(ThoughtRecord.thought_type, func.count(ThoughtRecord.id))
+                .filter_by(mind_gmid=mind_gmid)
+                .group_by(ThoughtRecord.thought_type)
+                .all()
+            )
+            for thought_type, count in type_results:
+                by_type[thought_type or "untyped"] = count
+            
+            # Count by awareness level
+            by_awareness = {}
+            awareness_results = (
+                session.query(ThoughtRecord.awareness_level, func.count(ThoughtRecord.id))
+                .filter_by(mind_gmid=mind_gmid)
+                .group_by(ThoughtRecord.awareness_level)
+                .all()
+            )
+            for awareness, count in awareness_results:
+                by_awareness[awareness or "unknown"] = count
+            
+            # Most recent thought
+            most_recent = (
+                session.query(ThoughtRecord)
+                .filter_by(mind_gmid=mind_gmid)
+                .order_by(desc(ThoughtRecord.timestamp))
+                .first()
+            )
+            
+            return {
+                "total_thoughts": total,
+                "by_type": by_type,
+                "by_awareness_level": by_awareness,
+                "most_recent": most_recent.content if most_recent else None,
+                "most_recent_time": most_recent.timestamp if most_recent else None,
+            }
+
+    def cleanup_old_thoughts(
+        self,
+        mind_gmid: str,
+        keep_days: int = 30,
+    ) -> int:
+        """
+        Clean up old thoughts to prevent database bloat.
+        
+        OPTIONAL: For long-running Minds, periodically clean old thoughts.
+        
+        Args:
+            mind_gmid: Mind identifier
+            keep_days: Keep thoughts from last N days
+            
+        Returns:
+            Number of thoughts deleted
+        """
+        with get_session() as session:
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=keep_days)
+            
+            deleted = (
+                session.query(ThoughtRecord)
+                .filter(
+                    and_(
+                        ThoughtRecord.mind_gmid == mind_gmid,
+                        ThoughtRecord.timestamp < cutoff_date,
+                    )
+                )
+                .delete()
+            )
+            session.commit()
+            return deleted

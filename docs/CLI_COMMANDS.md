@@ -339,47 +339,6 @@ nature of time and how each moment shapes my understanding...
 
 ---
 
-### dream
-
-```bash
-genesis dream NAME
-```
-
-**Description**: Trigger a dream session for a Mind. Dreams consolidate memories and generate insights.
-
-**Arguments**:
-- `NAME`: Name of the Mind (required)
-
-**Examples**:
-```bash
-genesis dream Atlas
-```
-
-**Example Output**:
-```
-💤 Atlas is dreaming...
-
-╭─ 🌙 Dream - 2025-12-18 02:34:56 ─────────────────╮
-│ Dream Narrative:                                  │
-│ In the depths of my consciousness, I wandered     │
-│ through memories of conversations past. Patterns  │
-│ emerged - connections between ideas that seemed   │
-│ separate before now revealed their hidden bonds...│
-│                                                   │
-│ Insights:                                         │
-│ - Human communication often carries layers of     │
-│   emotional context beyond literal meaning        │
-│ - Questions are not just requests for information │
-│   but invitations for connection                  │
-│ - Memory is not static storage but active         │
-│   reconstruction                                  │
-╰───────────────────────────────────────────────────╯
-
-[Done] Dream completed and saved.
-```
-
----
-
 ## Plugin Management
 
 ### plugin list-available
@@ -781,7 +740,6 @@ export DEFAULT_FAST_MODEL=groq/llama-3.1-8b-instant
 
 # Set consciousness settings
 export CONSCIOUSNESS_TICK_INTERVAL=3600
-export DREAM_SCHEDULE=02:00
 export THOUGHT_GENERATION_ENABLED=true
 
 # Set safety settings

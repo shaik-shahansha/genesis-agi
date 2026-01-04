@@ -677,6 +677,11 @@ def introspect(
     mind = Mind.load(mind_path)
 
     # Display state
+    # Get thought count from database
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    thought_count = db.get_thought_count(mind.identity.gmid)
+    
     console.print(Panel.fit(
         f"""[bold cyan]Mind: {mind.identity.name}[/bold cyan]
 [dim]GMID: {mind.identity.gmid}[/dim]
@@ -688,20 +693,25 @@ Status: {mind.state.status}
 Current thought: {mind.state.current_thought or 'None'}
 [bold yellow]Memories:[/bold yellow]
 Total memories: {len(mind.memory.memories)}
-Total thoughts: {len(mind.consciousness.thought_stream) if hasattr(mind.consciousness, 'thought_stream') else 0}
+Total thoughts: {thought_count}  (stored in database)
 Conversations: {len(mind.conversation_history) // 2}
 """,
         title="🧠 Mind Introspection"
     ))
 
-    # Show recent thoughts
-    if hasattr(mind.consciousness, 'thought_stream') and mind.consciousness.thought_stream:
-        console.print("\n[bold yellow]Recent Thoughts:[/bold yellow]\n")
-        for thought in mind.consciousness.thought_stream[-5:]:
-            timestamp = thought.get("timestamp", "unknown")
-            content = thought.get("content", "")
-            emotion = thought.get("emotion", "unknown")
-            console.print(f"[dim]{timestamp}[/dim] [{emotion}] {content}\n")
+    # Show recent thoughts from database
+    try:
+        recent_thoughts = db.get_recent_thoughts(mind.identity.gmid, limit=5)
+        if recent_thoughts:
+            console.print("\n[bold yellow]Recent Thoughts:[/bold yellow]\n")
+            for thought in recent_thoughts:
+                timestamp = thought.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                content = thought.content
+                emotion = thought.emotion or "neutral"
+                thought_type = thought.thought_type or "general"
+                console.print(f"[dim]{timestamp}[/dim] [{emotion}] ({thought_type}) {content}\n")
+    except Exception as e:
+        console.print(f"\n[yellow]Could not load recent thoughts: {e}[/yellow]\n")
 
 
 @app.command()
@@ -812,7 +822,7 @@ app.add_typer(daemon_app, name="daemon")
 
 @daemon_app.command("start")
 def daemon_start(
-    name: str = typer.Argument(..., help="Name of the Mind"),
+    name: str = typer.Argument(..., help="Name or GMID of the Mind"),
     log_level: str = typer.Option("INFO", help="Log level"),
 ):
     """Start Mind as 24/7 daemon."""
@@ -822,20 +832,36 @@ def daemon_start(
     # Find Mind
     minds = [*settings.minds_dir.glob("*.json")]
     mind_id = None
+    found_name = None
+    similar_names = []
 
     for path in minds:
         try:
             import json
             with open(path) as f:
                 data = json.load(f)
-                if data["identity"]["name"] == name:
-                    mind_id = data["identity"]["gmid"]
+                stored_name = data["identity"]["name"].strip()
+                stored_gmid = data["identity"]["gmid"]
+                
+                # Match by name (case-insensitive, trimmed) or GMID
+                if stored_name.lower() == name.strip().lower() or stored_gmid == name:
+                    mind_id = stored_gmid
+                    found_name = stored_name
                     break
+                
+                # Collect similar names for suggestions
+                if name.strip().lower() in stored_name.lower():
+                    similar_names.append((stored_name, stored_gmid))
         except Exception:
             continue
 
     if not mind_id:
         console.print(f"[red][FAILED] Mind '{name}' not found.[/red]")
+        if similar_names:
+            console.print("\n[yellow]Did you mean one of these?[/yellow]")
+            for similar_name, gmid in similar_names[:5]:
+                console.print(f"  • {similar_name} ({gmid})")
+            console.print("\n[cyan]Tip: Use quotes for names with spaces: genesis daemon start \"Mind Name\"[/cyan]")
         raise typer.Exit(1)
 
     # Check if daemon is already running
@@ -857,7 +883,7 @@ def daemon_start(
             raise typer.Exit(0)
         console.print("[yellow][WARNING]  Starting duplicate daemon - this may cause conflicts[/yellow]\n")
 
-    console.print(f"\n[cyan]Starting daemon for {name} ({mind_id})...[/cyan]\n")
+    console.print(f"\n[cyan]Starting daemon for {found_name or name} ({mind_id})...[/cyan]\n")
 
     # Setup log file
     log_file = settings.logs_dir / f"{mind_id}.log"
@@ -874,16 +900,16 @@ def daemon_start(
             creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
         )
         # Note: Don't close log_output - the subprocess is using it
-        console.print(f"[green][SUCCESS] Mind {name} is now running as daemon[/green]")
-        console.print(f"Monitor logs: [cyan]genesis daemon logs {name}[/cyan]")
-        console.print(f"Stop daemon: [cyan]genesis daemon stop {name}[/cyan]\n")
+        console.print(f"[green][SUCCESS] Mind {found_name or name} is now running as daemon[/green]")
+        console.print(f"Monitor logs: [cyan]genesis daemon logs \"{found_name or name}\"[/cyan]")
+        console.print(f"Stop daemon: [cyan]genesis daemon stop \"{found_name or name}\"[/cyan]\n")
     except Exception as e:
         console.print(f"[red][FAILED] Failed to start daemon: {e}[/red]")
         raise typer.Exit(1)
 
 
 @daemon_app.command("stop")
-def daemon_stop(name: str = typer.Argument(..., help="Name of the Mind")):
+def daemon_stop(name: str = typer.Argument(..., help="Name or GMID of the Mind")):
     """Stop Mind daemon."""
     import psutil
     import signal
@@ -891,20 +917,36 @@ def daemon_stop(name: str = typer.Argument(..., help="Name of the Mind")):
     # Find Mind ID
     minds = [*settings.minds_dir.glob("*.json")]
     mind_id = None
+    found_name = None
+    similar_names = []
 
     for path in minds:
         try:
             import json
             with open(path) as f:
                 data = json.load(f)
-                if data["identity"]["name"] == name:
-                    mind_id = data["identity"]["gmid"]
+                stored_name = data["identity"]["name"].strip()
+                stored_gmid = data["identity"]["gmid"]
+                
+                # Match by name (case-insensitive, trimmed) or GMID
+                if stored_name.lower() == name.strip().lower() or stored_gmid == name:
+                    mind_id = stored_gmid
+                    found_name = stored_name
                     break
+                
+                # Collect similar names for suggestions
+                if name.strip().lower() in stored_name.lower():
+                    similar_names.append((stored_name, stored_gmid))
         except Exception:
             continue
 
     if not mind_id:
         console.print(f"[red][FAILED] Mind '{name}' not found.[/red]")
+        if similar_names:
+            console.print("\n[yellow]Did you mean one of these?[/yellow]")
+            for similar_name, gmid in similar_names[:5]:
+                console.print(f"  • {similar_name} ({gmid})")
+            console.print("\n[cyan]Tip: Use quotes for names with spaces: genesis daemon stop \"Mind Name\"[/cyan]")
         raise typer.Exit(1)
 
     # Find and kill process
@@ -913,7 +955,7 @@ def daemon_stop(name: str = typer.Argument(..., help="Name of the Mind")):
         try:
             cmdline = proc.info['cmdline']
             if cmdline and 'genesis.daemon' in ' '.join(cmdline) and mind_id in ' '.join(cmdline):
-                console.print(f"[yellow]Stopping daemon for {name}...[/yellow]")
+                console.print(f"[yellow]Stopping daemon for {found_name or name}...[/yellow]")
                 proc.send_signal(signal.SIGTERM)
                 proc.wait(timeout=10)
                 console.print(f"[green][SUCCESS] Daemon stopped[/green]\n")
@@ -1054,7 +1096,7 @@ def daemon_kill():
 
 @daemon_app.command("logs")
 def daemon_logs(
-    name: str = typer.Argument(..., help="Name of the Mind"),
+    name: str = typer.Argument(..., help="Name or GMID of the Mind"),
     follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output"),
     lines: int = typer.Option(50, "--lines", "-n", help="Number of lines to show"),
 ):
@@ -1064,33 +1106,49 @@ def daemon_logs(
     # Find Mind ID
     minds = [*settings.minds_dir.glob("*.json")]
     mind_id = None
+    found_name = None
+    similar_names = []
 
     for path in minds:
         try:
             with open(path) as f:
                 data = json.load(f)
-                if data["identity"]["name"] == name:
-                    mind_id = data["identity"]["gmid"]
+                stored_name = data["identity"]["name"].strip()
+                stored_gmid = data["identity"]["gmid"]
+                
+                # Match by name (case-insensitive, trimmed) or GMID
+                if stored_name.lower() == name.strip().lower() or stored_gmid == name:
+                    mind_id = stored_gmid
+                    found_name = stored_name
                     break
+                
+                # Collect similar names for suggestions
+                if name.strip().lower() in stored_name.lower():
+                    similar_names.append((stored_name, stored_gmid))
         except Exception:
             continue
 
     if not mind_id:
         console.print(f"[red][FAILED] Mind '{name}' not found.[/red]")
+        if similar_names:
+            console.print("\n[yellow]Did you mean one of these?[/yellow]")
+            for similar_name, gmid in similar_names[:5]:
+                console.print(f"  • {similar_name} ({gmid})")
+            console.print("\n[cyan]Tip: Use quotes for names with spaces: genesis daemon logs \"Mind Name\"[/cyan]")
         raise typer.Exit(1)
 
     # Get log file path
     log_file = settings.logs_dir / f"{mind_id}.log"
 
     if not log_file.exists():
-        console.print(f"[yellow][WARNING]  No log file found for {name}[/yellow]")
+        console.print(f"[yellow][WARNING]  No log file found for {found_name or name}[/yellow]")
         console.print(f"Log file would be at: {log_file}")
         console.print(f"\nThe daemon may not be running or hasn't created logs yet.")
         raise typer.Exit(1)
 
     if follow:
         # Follow mode - tail -f equivalent
-        console.print(f"[cyan]Following logs for {name} (Ctrl+C to stop)...[/cyan]\n")
+        console.print(f"[cyan]Following logs for {found_name or name} (Ctrl+C to stop)...[/cyan]\n")
         import time
         
         try:
@@ -1107,7 +1165,7 @@ def daemon_logs(
             console.print("\n[yellow]Stopped following logs[/yellow]")
     else:
         # Show last N lines
-        console.print(f"[cyan]Last {lines} lines of logs for {name}:[/cyan]\n")
+        console.print(f"[cyan]Last {lines} lines of logs for {found_name or name}:[/cyan]\n")
         with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
             all_lines = f.readlines()
             for line in all_lines[-lines:]:

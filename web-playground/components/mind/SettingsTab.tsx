@@ -23,6 +23,7 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   const [apiKey, setApiKey] = useState('');
   const [useOllama, setUseOllama] = useState(false);
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
+  const [maxTokens, setMaxTokens] = useState(mind.max_tokens || 8000);
   
   // Autonomy Settings
   const [autonomyLevel, setAutonomyLevel] = useState(mind.autonomy_level || 5);
@@ -39,6 +40,7 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
     setDescription(mind.description || '');
     setProvider(mind.llm_provider || 'groq');
     setModel(mind.llm_model || 'mixtral-8x7b-32768');
+    setMaxTokens(mind.max_tokens || 8000);
     setAutonomyLevel(mind.autonomy_level || 5);
     setConsciousnessActive(mind.consciousness_active !== false);
     setDreamingEnabled(mind.dreaming_enabled !== false);
@@ -59,6 +61,7 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
         api_key: apiKey || undefined,
         use_ollama: useOllama,
         ollama_url: useOllama ? ollamaUrl : undefined,
+        max_tokens: maxTokens,
         autonomy_level: autonomyLevel,
         consciousness_active: consciousnessActive,
         dreaming_enabled: dreamingEnabled,
@@ -308,6 +311,26 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
             </div>
           </div>
         )}
+
+        {/* Max Tokens Configuration */}
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Max Tokens
+          </label>
+          <input
+            type="number"
+            min="100"
+            max="100000"
+            step="100"
+            value={maxTokens}
+            onChange={(e) => setMaxTokens(parseInt(e.target.value) || 8000)}
+            className="input w-full"
+            placeholder="8000"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Maximum number of tokens for AI response generation (default: 8000)
+          </p>
+        </div>
       </div>
 
       {/* Autonomy Settings */}

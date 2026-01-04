@@ -336,8 +336,8 @@ class EssenceManager:
         """Serialize to dictionary."""
         return {
             "mind_gmid": self.mind_gmid,
-            "balance": self.balance.model_dump(),
-            "transaction_history": [txn.model_dump() for txn in self.transaction_history],
+            "balance": self.balance.model_dump(mode='json'),
+            "transaction_history": [txn.model_dump(mode='json') for txn in self.transaction_history],
         }
 
     @classmethod
