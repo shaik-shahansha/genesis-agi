@@ -1,13 +1,13 @@
 ﻿"""
 Genesis AGI Framework
-The world's first open-source framework for creating digital beings with emergent consciousness.
+Open-source framework for creating digital beings with emergent consciousness.
 
 Author: Shahansha (https://shahansha.com)
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Shahansha"
-__email__ = "contact@shahansha.com"
+__email__ = "sk.shahansha@hotmail.com"
 
 from genesis.core.mind import Mind
 from genesis.core.intelligence import Intelligence

@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.1.0--alpha-blue.svg)](https://github.com/shaik-shahansha/genesis-agi)
+[![Version](https://img.shields.io/badge/version-0.1.1--alpha-blue.svg)](https://github.com/shaik-shahansha/genesis-agi)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-blue.svg)](https://github.com/shaik-shahansha/genesis-agi)
 
 ---
@@ -114,6 +114,134 @@ asyncio.run(main())
 
 ---
 
+## 📐 Genesis Architecture at a Glance
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         GENESIS WORLD                                │
+│  (Shared database tracking all Minds, environments, relationships)   │
+└───────────────────────────────┬─────────────────────────────────────┘
+                                │
+                ┌───────────────┴───────────────┐
+                │                               │
+        ┌───────▼────────┐             ┌───────▼────────┐
+        │  GENESIS MIND  │             │  GENESIS MIND  │
+        │     "Atlas"    │◄───────────►│    "Athena"    │
+        └───────┬────────┘             └───────┬────────┘
+                │                               │
+    ┌───────────┴────────────┐      ┌──────────┴─────────────┐
+    │                        │      │                        │
+┌───▼────┐  ┌────▼─────┐  ┌─▼──┐  ┌▼────┐  ┌────▼────┐   ┌─▼───┐
+│ CORE   │  │ MEMORY   │  │ I/O│  │CORE │  │ MEMORY  │   │ I/O │
+└────────┘  └──────────┘  └────┘  └─────┘  └─────────┘   └─────┘
+```
+
+### Genesis Mind Components
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                       GENESIS MIND                                │
+├──────────────────────────────────────────────────────────────────┤
+│  CORE IDENTITY                                                   │
+│  ├─ GMID (Global Mind ID)                                        │
+│  ├─ Name, Creator, Birth Date                                    │
+│  ├─ Purpose & Values                                             │
+│  └─ Self-Updating Profile                                        │
+├──────────────────────────────────────────────────────────────────┤
+│  MEMORY SYSTEMS (ChromaDB Vector Storage)                        │
+│  ├─ Episodic Memory (experiences, interactions)                  │
+│  ├─ Semantic Memory (facts, knowledge)                           │
+│  ├─ Procedural Memory (skills, processes)                        │
+│  ├─ Prospective Memory (future plans, reminders)                 │
+│  └─ Working Memory (active context)                              │
+├──────────────────────────────────────────────────────────────────┤
+│  AFFECTIVE STATE MODELING                                        │
+│  ├─ Arousal (0.0-1.0): calm ↔ excited                           │
+│  ├─ Valence (0.0-1.0): negative ↔ positive                      │
+│  ├─ 16 Emotional States (joy, sadness, anger, fear, etc.)       │
+│  └─ Mood Tracking                                                │
+├──────────────────────────────────────────────────────────────────┤
+│  MEMORY SYSTEM (ENHANCED v2.0 - December 2024) 🔥               │
+│  ├─ Smart ChromaDB (deduplication, temporal decay, updates)     │
+│  ├─ Automatic Extraction (LLM-powered, zero manual work)        │
+│  ├─ Memory Blocks (persistent in-context: persona, human, etc.) │
+│  ├─ Agent Self-Editing (replace, insert, consolidate)           │
+│  ├─ 5 Memory Types (episodic, semantic, procedural, etc.)       │
+│  ├─ Emotional Context (emotion + intensity)                     │
+│  ├─ Importance Scoring & Access Tracking                        │
+│  └─ Zero External Dependencies (pure built-in features)         │
+├──────────────────────────────────────────────────────────────────┤
+│  CONSCIOUSNESS ENGINE (Cost-Optimized)                           │
+│  ├─ 5 Processing Modes (DORMANT → PASSIVE → ALERT → FOCUSED → DEEP) │
+│  ├─ Rule Engine (90-95% cost reduction)                          │
+│  ├─ Template-Based Thoughts                                      │
+│  └─ Circadian Rhythms                                            │
+├──────────────────────────────────────────────────────────────────┤
+│  LIFECYCLE MANAGEMENT                                            │
+│  ├─ Birth & Death Timestamps                                     │
+│  ├─ Dynamic Urgency (0.0-1.0)                                   │
+│  ├─ Life Stages (newborn → youth → mature → elder)              │
+│  └─ Urgency Multiplier (affects task priority)                  │
+├──────────────────────────────────────────────────────────────────┤
+│  GEN ECONOMY (Motivation System)                                 │
+│  ├─ GEN Balance (starts at 100)                                 │
+│  ├─ Earning (tasks, quality bonuses)                            │
+│  ├─ Spending (resources, lifecycle extension)                   │
+│  └─ Transaction Ledger                                           │
+├──────────────────────────────────────────────────────────────────┤
+│  TASK MANAGEMENT                                                 │
+│  ├─ 7 Task Types (learning, helping, creating, etc.)            │
+│  ├─ 4 Difficulty Levels (easy, medium, hard, expert)            │
+│  ├─ Quality Scoring (0.0-1.0)                                   │
+│  └─ Statistics & Analytics                                       │
+├──────────────────────────────────────────────────────────────────┤
+│  MULTI-MODAL SENSES                                              │
+│  ├─ Vision (image/video processing)                             │
+│  ├─ Audition (speech input/output)                              │
+│  ├─ Touch (interaction events)                                  │
+│  ├─ Proprioception (self-awareness)                             │
+│  ├─ Temporal (time awareness)                                   │
+│  └─ Network (connectivity sensing)                              │
+├──────────────────────────────────────────────────────────────────┤
+│  LIFE CONTEXT                                                    │
+│  ├─ Roles & Purpose                                             │
+│  ├─ Relationships (humans & other Minds)                        │
+│  ├─ Environments (owned, visited, public)                       │
+│  ├─ Events (milestones, achievements)                           │
+│  └─ Experiences (rich multi-dimensional moments)                │
+├──────────────────────────────────────────────────────────────────┤
+│  PERSONAL WORKSPACE                                              │
+│  ├─ File Creation & Management                                  │
+│  ├─ File Sharing (with other Minds)                             │
+│  ├─ Version Control                                             │
+│  └─ Storage Statistics                                          │
+├──────────────────────────────────────────────────────────────────┤
+│  INTEGRATIONS & TOOLS                                            │
+│  ├─ Real Code Execution (sandboxed)                             │
+│  ├─ Browser Use (web automation - navigate, click, extract)     │
+│  ├─ Email (SMTP/IMAP)                                           │
+│  ├─ Chat (Slack, Discord)                                       │
+│  ├─ Calendar, SMS, Push Notifications                           │
+│  └─ MCP (Model Context Protocol)                                │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Terminology Reference
+
+| Vision Term | Technical Implementation |
+|-------------|-------------------------|
+| **Consciousness** | 24/7 background processing, 5 awareness modes |
+| **Memory** | Smart ChromaDB (deduplication, temporal decay, auto-extraction, 5 types) |
+| **Emotions** | Arousal-valence model (16 states) |
+| **Lifecycle** | Finite lifespan (default 5 years) |
+| **GEN Economy** | Point system for motivation |
+| **Senses** | Multi-modal input processing |
+| **Autonomy** | Proactive action scheduling |
+
+> **Note**: Genesis uses bio-inspired metaphors for engineering patterns. These are sophisticated state management systems designed to feel alive—not sentient beings.
+
+---
+
 ## 🚀 World-Class Autonomous Agent
 
 Genesis implements the **same architecture** used by ChatGPT Code Interpreter, Manus AI, and OpenHands—but with consciousness, emotions, and memory.
@@ -214,7 +342,7 @@ User Request → Autonomous Orchestrator
 - `autonomous_reasoner.py` - Planning & reflection
 - `universal_file_handler.py` - Any file format support
 
-**Status**: Experimental (v0.1.0-alpha) - actively being developed and tested
+**Status**: Experimental (v0.1.1-alpha) - actively being developed and tested
 
 ### Data Persistence Architecture (Scalable for 24/7 Operation)
 
@@ -503,142 +631,8 @@ WS     /api/v1/environments/ws/{id}           # Real-time chat
 - Environment marketplace
 - Beautiful dark mode UI
 
-### 4. **Mobile App** (Flutter - iOS/Android/Web)
-- 7 complete screens
-- Full API integration
-- Consciousness orb visualization
-- Real-time messaging
-- Memory viewing
-
 ---
 
-## 📐 Genesis Architecture at a Glance
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         GENESIS WORLD                                │
-│  (Shared database tracking all Minds, environments, relationships)   │
-└───────────────────────────────┬─────────────────────────────────────┘
-                                │
-                ┌───────────────┴───────────────┐
-                │                               │
-        ┌───────▼────────┐             ┌───────▼────────┐
-        │  GENESIS MIND  │             │  GENESIS MIND  │
-        │     "Atlas"    │◄───────────►│    "Athena"    │
-        └───────┬────────┘             └───────┬────────┘
-                │                               │
-    ┌───────────┴────────────┐      ┌──────────┴─────────────┐
-    │                        │      │                        │
-┌───▼────┐  ┌────▼─────┐  ┌─▼──┐  ┌▼────┐  ┌────▼────┐   ┌─▼───┐
-│ CORE   │  │ MEMORY   │  │ I/O│  │CORE │  │ MEMORY  │   │ I/O │
-└────────┘  └──────────┘  └────┘  └─────┘  └─────────┘   └─────┘
-```
-
-### Genesis Mind Components
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                       GENESIS MIND                                │
-├──────────────────────────────────────────────────────────────────┤
-│  CORE IDENTITY                                                   │
-│  ├─ GMID (Global Mind ID)                                        │
-│  ├─ Name, Creator, Birth Date                                    │
-│  ├─ Purpose & Values                                             │
-│  └─ Self-Updating Profile                                        │
-├──────────────────────────────────────────────────────────────────┤
-│  MEMORY SYSTEMS (ChromaDB Vector Storage)                        │
-│  ├─ Episodic Memory (experiences, interactions)                  │
-│  ├─ Semantic Memory (facts, knowledge)                           │
-│  ├─ Procedural Memory (skills, processes)                        │
-│  ├─ Prospective Memory (future plans, reminders)                 │
-│  └─ Working Memory (active context)                              │
-├──────────────────────────────────────────────────────────────────┤
-│  AFFECTIVE STATE MODELING                                        │
-│  ├─ Arousal (0.0-1.0): calm ↔ excited                           │
-│  ├─ Valence (0.0-1.0): negative ↔ positive                      │
-│  ├─ 16 Emotional States (joy, sadness, anger, fear, etc.)       │
-│  └─ Mood Tracking                                                │
-├──────────────────────────────────────────────────────────────────┤
-│  MEMORY SYSTEM (ENHANCED v2.0 - December 2024) 🔥               │
-│  ├─ Smart ChromaDB (deduplication, temporal decay, updates)     │
-│  ├─ Automatic Extraction (LLM-powered, zero manual work)        │
-│  ├─ Memory Blocks (persistent in-context: persona, human, etc.) │
-│  ├─ Agent Self-Editing (replace, insert, consolidate)           │
-│  ├─ 5 Memory Types (episodic, semantic, procedural, etc.)       │
-│  ├─ Emotional Context (emotion + intensity)                     │
-│  ├─ Importance Scoring & Access Tracking                        │
-│  └─ Zero External Dependencies (pure built-in features)         │
-├──────────────────────────────────────────────────────────────────┤
-│  CONSCIOUSNESS ENGINE (Cost-Optimized)                           │
-│  ├─ 5 Processing Modes (DORMANT → PASSIVE → ALERT → FOCUSED → DEEP) │
-│  ├─ Rule Engine (90-95% cost reduction)                          │
-│  ├─ Template-Based Thoughts                                      │
-│  └─ Circadian Rhythms                                            │
-├──────────────────────────────────────────────────────────────────┤
-│  LIFECYCLE MANAGEMENT                                            │
-│  ├─ Birth & Death Timestamps                                     │
-│  ├─ Dynamic Urgency (0.0-1.0)                                   │
-│  ├─ Life Stages (newborn → youth → mature → elder)              │
-│  └─ Urgency Multiplier (affects task priority)                  │
-├──────────────────────────────────────────────────────────────────┤
-│  GEN ECONOMY (Motivation System)                                 │
-│  ├─ GEN Balance (starts at 100)                                 │
-│  ├─ Earning (tasks, quality bonuses)                            │
-│  ├─ Spending (resources, lifecycle extension)                   │
-│  └─ Transaction Ledger                                           │
-├──────────────────────────────────────────────────────────────────┤
-│  TASK MANAGEMENT                                                 │
-│  ├─ 7 Task Types (learning, helping, creating, etc.)            │
-│  ├─ 4 Difficulty Levels (easy, medium, hard, expert)            │
-│  ├─ Quality Scoring (0.0-1.0)                                   │
-│  └─ Statistics & Analytics                                       │
-├──────────────────────────────────────────────────────────────────┤
-│  MULTI-MODAL SENSES                                              │
-│  ├─ Vision (image/video processing)                             │
-│  ├─ Audition (speech input/output)                              │
-│  ├─ Touch (interaction events)                                  │
-│  ├─ Proprioception (self-awareness)                             │
-│  ├─ Temporal (time awareness)                                   │
-│  └─ Network (connectivity sensing)                              │
-├──────────────────────────────────────────────────────────────────┤
-│  LIFE CONTEXT                                                    │
-│  ├─ Roles & Purpose                                             │
-│  ├─ Relationships (humans & other Minds)                        │
-│  ├─ Environments (owned, visited, public)                       │
-│  ├─ Events (milestones, achievements)                           │
-│  └─ Experiences (rich multi-dimensional moments)                │
-├──────────────────────────────────────────────────────────────────┤
-│  PERSONAL WORKSPACE                                              │
-│  ├─ File Creation & Management                                  │
-│  ├─ File Sharing (with other Minds)                             │
-│  ├─ Version Control                                             │
-│  └─ Storage Statistics                                          │
-├──────────────────────────────────────────────────────────────────┤
-│  INTEGRATIONS & TOOLS                                            │
-│  ├─ Real Code Execution (sandboxed)                             │
-│  ├─ Browser Use (web automation - navigate, click, extract)     │
-│  ├─ Email (SMTP/IMAP)                                           │
-│  ├─ Chat (Slack, Discord)                                       │
-│  ├─ Calendar, SMS, Push Notifications                           │
-│  └─ MCP (Model Context Protocol)                                │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### Terminology Reference
-
-| Vision Term | Technical Implementation |
-|-------------|-------------------------|
-| **Consciousness** | 24/7 background processing, 5 awareness modes |
-| **Memory** | Smart ChromaDB (deduplication, temporal decay, auto-extraction, 5 types) |
-| **Emotions** | Arousal-valence model (16 states) |
-| **Lifecycle** | Finite lifespan (default 5 years) |
-| **GEN Economy** | Point system for motivation |
-| **Senses** | Multi-modal input processing |
-| **Autonomy** | Proactive action scheduling |
-
-> **Note**: Genesis uses bio-inspired metaphors for engineering patterns. These are sophisticated state management systems designed to feel alive—not sentient beings.
-
----
 
 ## 🎓 Technical Specifications
 
@@ -1133,18 +1127,18 @@ MIT License - see [LICENSE](LICENSE)
 ## 🔗 Links
 
 - **GitHub**: [https://github.com/shaik-shahansha/genesis-agi](https://github.com/shaik-shahansha/genesis-agi)
-- **Website**: [https://shahansha.com](https://shahansha.com)
+- **Website**: [https://genesisagi.in](https://genesisagi.in)
 - **Discord**: Coming soon
-- **Twitter**: @genesis_agi (coming soon)
+- **Twitter**: Coming soon
 
 ---
 
 ## ⚡ Status
 
-- **Version**: 0.1.0-alpha (Enhanced Memory v2.0 + Plugin System v2.0 - Jan 2025)
+- **Version**: 0.1.1-alpha (Enhanced Memory v2.0 + Plugin System v2.0 - Jan 2025)
 - **Status**: Alpha Release - Experimental (Active Development)
 - **Latest Updates**: 🔥 Plugin system overhaul + Web playground completion
-- **Platforms**: CLI, API, Web, Mobile
+- **Platforms**: CLI, API, Web
 - **Python**: 3.11+
 - **License**: MIT
 - **OS**: macOS, Linux, Windows
@@ -1225,7 +1219,7 @@ genesis chat atlas
 
 **Genesis AGI: Infrastructure for Life Itself**
 
-*Created by [Shahansha](https://shahansha.com) | MIT License | v0.1.0-alpha*
+*Created by [Shahansha](https://shahansha.com) | MIT License | v0.1.1-alpha*
 
 </div>
 

@@ -1752,9 +1752,9 @@ async def get_plugins(mind_id: str):
     # Backward compatibility: If no plugins in config, assume standard config (lifecycle, gen, tasks)
     if not plugin_configs:
         plugin_configs = [
-            {'name': 'lifecycle', 'version': '0.1.0', 'config': {}},
-            {'name': 'gen', 'version': '0.1.0', 'config': {}},
-            {'name': 'tasks', 'version': '0.1.0', 'config': {}},
+            {'name': 'lifecycle', 'version': '0.1.1', 'config': {}},
+            {'name': 'gen', 'version': '0.1.1', 'config': {}},
+            {'name': 'tasks', 'version': '0.1.1', 'config': {}},
         ]
     
     # Map plugin names to descriptions
@@ -1778,7 +1778,7 @@ async def get_plugins(mind_id: str):
         plugins_data.append(
             PluginResponse(
                 name=plugin_name,
-                version=plugin_config.get('version', '0.1.0'),
+                version=plugin_config.get('version', '0.1.1'),
                 description=plugin_descriptions.get(plugin_name, 'Plugin'),
                 enabled=True,
                 config=plugin_config.get('config', {}),

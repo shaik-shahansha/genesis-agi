@@ -38,7 +38,7 @@ class GoalsPlugin(Plugin):
         return "goals"
 
     def get_version(self) -> str:
-        return "0.1.0-experimental"
+        return "0.1.1-experimental"
 
     def get_description(self) -> str:
         return "⚠️ EXPERIMENTAL: Goal tracking (no autonomy)"

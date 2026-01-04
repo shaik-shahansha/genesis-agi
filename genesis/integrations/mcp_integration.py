@@ -117,7 +117,7 @@ class MCPClient:
                     },
                     "clientInfo": {
                         "name": "genesis-agi",
-                        "version": "0.1.0"
+                        "version": "0.1.1"
                     }
                 })
 
