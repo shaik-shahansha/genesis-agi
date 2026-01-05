@@ -1724,38 +1724,36 @@ async def list_available_plugins():
 
 @minds_router.get("/{mind_id}/plugins")
 async def get_plugins(mind_id: str):
-    """Get all plugins for a Mind (optimized - reads from config in JSON)."""
+    """Get all plugins for a Mind."""
     import json
     
-    # Find mind path by GMID or name (without loading full Mind)
-    mind_path = None
-    for path in settings.minds_dir.glob("*.json"):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            if data.get("identity", {}).get("gmid") == mind_id or data.get("identity", {}).get("name") == mind_id:
-                mind_path = path
-                break
-        except Exception:
-            continue
+    # Find mind path using the helper function
+    mind_path = _find_mind_path(mind_id)
     
-    if not mind_path:
-        raise HTTPException(status_code=404, detail=f"Mind '{mind_id}' not found")
-    
-    # Read config from JSON
+    # Read config from JSON first to check if migration is needed
     with open(mind_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
     config_data = data.get('config', {})
     plugin_configs = config_data.get('plugins', [])
     
-    # Backward compatibility: If no plugins in config, assume standard config (lifecycle, gen, tasks)
+    # If empty plugins, load the Mind to trigger migration, then save to persist it
     if not plugin_configs:
+        print(f"[get_plugins] Empty plugins detected for {mind_id}, loading Mind to trigger migration...")
+        mind = Mind.load(mind_path)
+        # Get the migrated plugin configs from the loaded mind
         plugin_configs = [
-            {'name': 'lifecycle', 'version': '0.1.1', 'config': {}},
-            {'name': 'gen', 'version': '0.1.1', 'config': {}},
-            {'name': 'tasks', 'version': '0.1.1', 'config': {}},
+            {
+                'name': p.get_name(),
+                'version': p.get_version(),
+                'config': p.config
+            }
+            for p in mind.config.get_all_plugins()
         ]
+        # Save to persist the migration
+        print(f"[get_plugins] Saving migrated config with {len(plugin_configs)} plugins...")
+        mind.save(mind_path)
+        print(f"[get_plugins] Migration persisted to disk")
     
     # Map plugin names to descriptions
     plugin_descriptions = {

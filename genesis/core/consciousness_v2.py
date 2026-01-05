@@ -45,7 +45,7 @@ import logging
 import random
 import secrets
 from datetime import datetime, timedelta, time
-from enum import Enum, auto
+from enum import Enum, IntEnum, auto
 from typing import Optional, Dict, Any, List, Callable, Tuple
 from dataclasses import dataclass, field
 from collections import deque
@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 # ENUMS AND CONSTANTS
 # =============================================================================
 
-class AwarenessLevel(Enum):
+class AwarenessLevel(IntEnum):
     """
     Consciousness operates at different levels, like humans.
     Lower levels = no LLM calls = nearly free to run.
@@ -831,8 +831,18 @@ class InternalMonologue:
         "autonomy": ["constrained", "wanting independence", "self-directed"],
     }
 
-    def __init__(self):
+    def __init__(self, mind_id: str):
+        self.mind_id = mind_id
         self.thought_history: List[InternalThought] = []
+        self._max_cache_size = 100
+        
+        # Initialize database connection for thought storage
+        try:
+            from genesis.database.manager import MetaverseDB
+            self.db = MetaverseDB()
+        except Exception as e:
+            logger.warning(f"Failed to initialize thought database: {e}")
+            self.db = None
 
     def generate_thought(
         self,
@@ -867,20 +877,21 @@ class InternalMonologue:
                 self.thought_history = self.thought_history[-50:]
 
             # Store in database for long-term scalability
-            try:
-                self.db.store_thought(
-                    mind_gmid=self.mind_id,
-                    content=content,
-                    thought_type=thought_type,
-                    awareness_level=thought.awareness_level.value,
-                    timestamp=thought.timestamp,
-                    extra_data={
-                        "thought_id": thought.thought_id,
-                        "triggered_by": thought.triggered_by,
-                    }
-                )
-            except Exception as e:
-                logger.warning(f"Failed to store thought in database: {e}")
+            if self.db:
+                try:
+                    self.db.store_thought(
+                        mind_gmid=self.mind_id,
+                        content=content,
+                        thought_type=thought_type,
+                        awareness_level=thought.awareness_level.value,
+                        timestamp=thought.timestamp,
+                        extra_data={
+                            "thought_id": thought.thought_id,
+                            "triggered_by": thought.triggered_by,
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to store thought in database: {e}")
 
             return thought
 

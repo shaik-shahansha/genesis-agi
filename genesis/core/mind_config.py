@@ -310,7 +310,8 @@ class MindConfig:
         # MIGRATION: If plugins array is empty, assume standard config for backward compatibility
         # This handles minds that were saved with the buggy from_dict that returned minimal()
         if not plugin_configs:
-            print("[MIGRATION] Empty plugins array detected - using standard config (lifecycle, gen, tasks)")
+            print("[MIGRATION] Empty plugins array detected - using standard config (lifecycle, gen, tasks, workspace)")
+            print("[MIGRATION] Note: The mind will be saved with these plugins on next save operation")
             return cls.standard()
         
         for plugin_config in plugin_configs:

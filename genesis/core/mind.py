@@ -1089,14 +1089,8 @@ class Mind:
         """Stream a thought/response in real-time."""
         self.state.status = "thinking"
         
-        # DEBUG: Log task detector status
-        print(f"[DEBUG stream_think] Has task_detector: {hasattr(self, 'task_detector')}")
-        if hasattr(self, 'task_detector'):
-            print(f"[DEBUG stream_think] task_detector is None: {self.task_detector is None}")
-        
         # TASK DETECTION: Check if this is an actionable task
         detection = self.task_detector.detect(prompt)
-        print(f"[DEBUG stream_think] Detection result: {detection}")
         
         # If it's a task with high confidence, execute in background
         if detection["is_task"] and detection["confidence"] >= 0.7:

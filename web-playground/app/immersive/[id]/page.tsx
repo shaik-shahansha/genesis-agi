@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { VoiceInput, VoiceOutput, WebcamCapture, UserContext } from '@/lib/multimodal';
 import { EnhancedVideoProcessor } from '@/lib/videoProcessor';
 import MindAvatar from '@/components/MindAvatar';
+import VideoCallModal from '@/components/VideoCallModal';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -36,6 +37,10 @@ export default function ImmersiveChatPage() {
   const [currentEmotion, setCurrentEmotion] = useState<any>(null);
   const [mindAvatarUrl, setMindAvatarUrl] = useState<string>('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  
+  // Call modal states
+  const [isCallModalOpen, setIsCallModalOpen] = useState(false);
+  const [callType, setCallType] = useState<'audio' | 'video'>('video');
   
   // Enhanced video analytics
   const [videoAnalytics, setVideoAnalytics] = useState<any>(null);
@@ -284,6 +289,20 @@ export default function ImmersiveChatPage() {
     }
   };
 
+  const startAudioCall = () => {
+    setCallType('audio');
+    setIsCallModalOpen(true);
+  };
+
+  const startVideoCall = () => {
+    setCallType('video');
+    setIsCallModalOpen(true);
+  };
+
+  const handleCloseCall = () => {
+    setIsCallModalOpen(false);
+  };
+
   if (!mind) {
     return (
       <AuthRequired>
@@ -332,17 +351,35 @@ export default function ImmersiveChatPage() {
                   {voiceEnabled ? '🔊' : '🔇'}
                 </button>
 
-                {/* Video Toggle */}
+                {/* Audio Call Button */}
+                <button
+                  onClick={startAudioCall}
+                  className="p-3 rounded-xl bg-gray-800/50 text-gray-400 hover:bg-green-600 hover:text-white hover:shadow-lg hover:shadow-green-500/50 transition-all"
+                  title="Start audio call"
+                >
+                  📞
+                </button>
+
+                {/* Video Call Button */}
+                <button
+                  onClick={startVideoCall}
+                  className="p-3 rounded-xl bg-gray-800/50 text-gray-400 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-500/50 transition-all"
+                  title="Start video call"
+                >
+                  📹
+                </button>
+
+                {/* Camera Toggle (for existing video analytics) */}
                 <button
                   onClick={() => videoEnabled ? stopVideo() : startVideo()}
                   className={`p-3 rounded-xl transition-all ${
                     videoEnabled 
-                      ? 'bg-green-600 text-white shadow-lg shadow-green-500/50' 
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' 
                       : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
                   }`}
-                  title="Toggle video call"
+                  title="Toggle camera analytics"
                 >
-                  {videoEnabled ? '📹' : '📷'}
+                  {videoEnabled ? '📷' : '📷'}
                 </button>
               </div>
             </div>
@@ -668,6 +705,16 @@ export default function ImmersiveChatPage() {
           }
         `}</style>
       </div>
+
+      {/* Video Call Modal */}
+      <VideoCallModal
+        isOpen={isCallModalOpen}
+        callType={callType}
+        recipientName={mind.name}
+        recipientAvatar={mindAvatarUrl}
+        onClose={handleCloseCall}
+        initialState="calling"
+      />
     </AuthRequired>
   );
 }

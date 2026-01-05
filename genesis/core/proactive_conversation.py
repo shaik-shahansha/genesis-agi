@@ -185,8 +185,13 @@ class ProactiveConversationManager:
         self._running = False
         self._check_task: Optional[asyncio.Task] = None
         
-        # Load existing contexts from memory
-        asyncio.create_task(self._load_contexts())
+        # Load existing contexts from memory (only if event loop is running)
+        try:
+            loop = asyncio.get_running_loop()
+            asyncio.create_task(self._load_contexts())
+        except RuntimeError:
+            # No event loop running - defer loading until async context
+            logger.debug("No event loop running, deferring context loading")
     
     async def _load_contexts(self):
         """Load conversation contexts from memory."""
@@ -234,6 +239,11 @@ class ProactiveConversationManager:
             
         except Exception as e:
             logger.error(f"Error loading conversation contexts: {e}")
+    
+    async def _ensure_loaded(self):
+        """Ensure contexts are loaded (call this before first use in async context)."""
+        if not self.active_contexts and hasattr(self.mind, 'memory'):
+            await self._load_contexts()
     
     async def _save_context(self, context: ConversationContext):
         """Save conversation context to memory."""
@@ -312,6 +322,9 @@ class ProactiveConversationManager:
         Returns:
             ConversationContext if follow-up needed, None otherwise
         """
+        # Ensure contexts are loaded
+        await self._ensure_loaded()
+        
         try:
             # Build analysis prompt - keep it concise
             analysis_prompt = f"""Analyze: "{user_message}"
@@ -622,6 +635,9 @@ If nothing resolved: {{"resolved": [], "reasoning": {{}}}}"""
         if self._running:
             logger.warning("Proactive conversation monitoring already running")
             return
+        
+        # Ensure contexts are loaded
+        await self._ensure_loaded()
         
         self._running = True
         self._check_task = asyncio.create_task(self._monitor_loop(check_interval))
