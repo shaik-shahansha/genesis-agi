@@ -101,18 +101,31 @@ export default function ImmersiveChatPage() {
 
   const generateAvatar = async (expression: string = 'neutral') => {
     try {
-      // Call Pollinations.AI directly from frontend for instant, seamless avatar generation
-      const mindNameHash = mind?.name ? Math.abs(mind.name.split('').reduce((a: number, b: string) => ((a << 5) - a) + b.charCodeAt(0), 0)) : 12345;
-      const prompt = encodeURIComponent(`portrait of ${mind?.name || 'AI assistant'}, ${expression} expression, professional headshot, soft lighting, neutral background`);
-      const avatarUrl = `https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&seed=${mindNameHash}&model=flux&nologo=true`;
+      if (!mind) return;
       
+      // Generate dynamic prompt based on mind's purpose/personality
+      const mindPurpose = mind.purpose || mind.personality || 'AI assistant';
+      const mindNameHash = mind.name ? Math.abs(mind.name.split('').reduce((a: number, b: string) => ((a << 5) - a) + b.charCodeAt(0), 0)) : 12345;
+      
+      // Create detailed prompt for better avatar generation (remove special chars for URL)
+      const cleanExpression = expression.replace(/[^a-z0-9]/gi, '_');
+      const basePrompt = `professional portrait of ${mind.name}, ${mindPurpose}, ${expression} expression, photorealistic, soft studio lighting, neutral background, high quality`;
+      const prompt = encodeURIComponent(basePrompt);
+      
+      // Use time-based seed variation for expression changes, but consistent base
+      const expressionSeed = expression === 'neutral' ? mindNameHash : mindNameHash + expression.length * 1000;
+      const avatarUrl = `https://image.pollinations.ai/prompt/${prompt}?width=512&height=512&seed=${expressionSeed}&model=flux&nologo=true`;
+      
+      console.log('🎨 Generating avatar:', { name: mind.name, expression, purpose: mindPurpose });
       setMindAvatarUrl(avatarUrl);
       
-      // Save avatar URL to backend for persistence
-      try {
-        await api.updateMindSettings(mindId, { avatar_url: avatarUrl });
-      } catch (err) {
-        console.log('Could not persist avatar:', err);
+      // Save avatar URL to backend for persistence (only if neutral)
+      if (expression === 'neutral') {
+        try {
+          await api.updateMindSettings(mindId, { avatar_url: avatarUrl });
+        } catch (err) {
+          console.log('Could not persist avatar:', err);
+        }
       }
     } catch (error) {
       console.error('Error generating avatar:', error);
@@ -292,15 +305,34 @@ export default function ImmersiveChatPage() {
   const startAudioCall = () => {
     setCallType('audio');
     setIsCallModalOpen(true);
+    if (!voiceEnabled) {
+      setVoiceEnabled(true);
+      console.log('🔊 Voice output enabled for call');
+    }
+    console.log('📞 Starting audio call...');
   };
 
   const startVideoCall = () => {
     setCallType('video');
     setIsCallModalOpen(true);
+    if (!voiceEnabled) {
+      setVoiceEnabled(true);
+      console.log('🔊 Voice output enabled for call');
+    }
+    console.log('📹 Starting video call...');
   };
 
   const handleCloseCall = () => {
     setIsCallModalOpen(false);
+    console.log('✖️ Call ended by user');
+  };
+
+  const handleVoiceInputFromCall = (text: string) => {
+    console.log('🎤 Voice input from call:', text);
+    setInput(text);
+    if (text.trim()) {
+      sendMessage(text, true);
+    }
   };
 
   if (!mind) {
@@ -713,6 +745,8 @@ export default function ImmersiveChatPage() {
         recipientName={mind.name}
         recipientAvatar={mindAvatarUrl}
         onClose={handleCloseCall}
+        onVoiceInput={handleVoiceInputFromCall}
+        isSpeaking={isSpeaking}
         initialState="calling"
       />
     </AuthRequired>
