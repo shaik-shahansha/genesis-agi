@@ -38,7 +38,7 @@ class KnowledgePlugin(Plugin):
         return "knowledge"
 
     def get_version(self) -> str:
-        return "0.1.1-experimental"
+        return "0.1.2-experimental"
 
     def get_description(self) -> str:
         return "⚠️ EXPERIMENTAL: Basic knowledge graph"

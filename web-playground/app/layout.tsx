@@ -65,7 +65,7 @@ export default function RootLayout({
           {/* Footer */}
           <footer className="border-t border-slate-700 mt-20 py-8 bg-slate-800">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-300 text-sm">
-              <p>Genesis AGI Framework v0.1.1</p>
+              <p>Genesis AGI Framework v0.1.2</p>
             </div>
           </footer>
         </div>

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genesis-minds"
-version = "0.1.1"
+version = "0.1.2"
 description = "open-source framework for creating digital beings with emergent consciousness"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -48,7 +48,7 @@ dependencies = [
     "aioimaplib>=1.0.1",
     "slowapi>=0.1.9",
     "pillow>=10.0.0",
-    "browser-use>=0.1.1",
+    "browser-use>=0.1.2",
     "playwright>=1.40.0",
     "pydantic-settings>=2.0.0",
     "opencv-python>=4.8.0",
