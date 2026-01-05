@@ -1,6 +1,7 @@
 ﻿"""API routes for Genesis."""
 
 import asyncio
+import json
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
@@ -46,6 +47,45 @@ auth_router = APIRouter()
 # This keeps background tasks alive!
 _mind_cache: Dict[str, Mind] = {}
 _mind_cache_lock = asyncio.Lock()
+
+
+def _extract_provider(intelligence_dict: Dict[str, Any]) -> str:
+    """
+    Extract the provider from intelligence configuration.
+    
+    Looks for reasoning_model first, then fast_model, and extracts provider
+    from the model string (e.g., "openrouter/..." -> "openrouter").
+    """
+    # Try reasoning_model first, then fast_model, fallback to old format
+    model_str = intelligence_dict.get('reasoning_model') or intelligence_dict.get('fast_model') or intelligence_dict.get('primary_model', '')
+    
+    if not model_str:
+        return 'openrouter'  # Default to openrouter
+    
+    # Extract provider from model string (e.g., "openrouter/meta-llama/..." -> "openrouter")
+    if '/' in model_str:
+        return model_str.split('/')[0]
+    
+    # If no slash, it might be a simple provider name or model name
+    # Check if it's a known provider
+    known_providers = ['openrouter', 'groq', 'openai', 'anthropic', 'ollama', 'cohere']
+    for provider in known_providers:
+        if provider in model_str.lower():
+            return provider
+    
+    return 'openrouter'  # Default
+
+
+def _extract_model(intelligence_dict: Dict[str, Any]) -> str:
+    """
+    Extract the display model name from intelligence configuration.
+    
+    Returns the full model string from reasoning_model or fast_model.
+    """
+    # Try reasoning_model first, then fast_model, fallback to old format
+    model_str = intelligence_dict.get('reasoning_model') or intelligence_dict.get('fast_model') or intelligence_dict.get('primary_model', 'openrouter/meta-llama/llama-3.3-70b-instruct:free')
+    
+    return model_str
 
 
 async def _get_cached_mind(mind_id: str) -> Mind:
@@ -475,8 +515,8 @@ async def list_minds():
                     template=identity.get('template'),
                     primary_purpose=identity.get('primary_purpose'),
                     description=identity.get('description'),
-                    llm_provider=data.get('intelligence', {}).get('primary_provider', 'groq'),
-                    llm_model=data.get('intelligence', {}).get('primary_model', 'mixtral-8x7b-32768'),
+                    llm_provider=_extract_provider(data.get('intelligence', {})),
+                    llm_model=_extract_model(data.get('intelligence', {})),
                     max_tokens=data.get('intelligence', {}).get('max_tokens', 8000),
                     autonomy_level=data.get('autonomy', {}).get('level', 5),
                     created_at=identity.get('birth_timestamp'),
@@ -493,6 +533,9 @@ async def get_mind(mind_id: str):
     """Get a specific Mind."""
     mind = await _load_mind(mind_id)
 
+    # Extract provider and model from Intelligence configuration
+    intelligence_dict = json.loads(mind.intelligence.model_dump_json())
+    
     return MindResponse(
         gmid=mind.identity.gmid,
         name=mind.identity.name,
@@ -508,8 +551,8 @@ async def get_mind(mind_id: str):
         template=getattr(mind.identity, 'template', None),
         primary_purpose=getattr(mind.identity, 'primary_purpose', None),
         description=getattr(mind.identity, 'description', None),
-        llm_provider=getattr(mind.intelligence, 'primary_provider', 'groq'),
-        llm_model=getattr(mind.intelligence, 'primary_model', 'mixtral-8x7b-32768'),
+        llm_provider=_extract_provider(intelligence_dict),
+        llm_model=_extract_model(intelligence_dict),
         max_tokens=getattr(mind.intelligence, 'max_tokens', 8000),
         autonomy_level=getattr(mind.autonomy, 'level', 5),
         created_at=mind.identity.birth_timestamp.isoformat() if hasattr(mind.identity, 'birth_timestamp') else None,
@@ -925,21 +968,22 @@ async def update_mind_settings(
             mind.identity.description = settings.get('description', '')
         
         # Update LLM configuration
-        if 'llm_provider' in settings:
-            mind.intelligence.primary_provider = settings['llm_provider']
+        # Map llm_model to both reasoning_model and fast_model for consistency
         if 'llm_model' in settings:
-            mind.intelligence.primary_model = settings['llm_model']
+            model_value = settings['llm_model']
+            mind.intelligence.reasoning_model = model_value
+            mind.intelligence.fast_model = model_value
+        
+        # Note: llm_provider is derived from the model string, not stored separately
         if 'api_key' in settings and settings['api_key']:
-            # Store API key securely (this would need proper encryption in production)
-            mind.intelligence.api_key = settings['api_key']
+            # Store API key securely in the api_keys dict
+            provider = _extract_provider(settings)
+            if not mind.intelligence.api_keys:
+                mind.intelligence.api_keys = {}
+            mind.intelligence.api_keys[provider] = settings['api_key']
+        
         if 'max_tokens' in settings:
             mind.intelligence.max_tokens = settings['max_tokens']
-        
-        # Update Ollama configuration
-        if 'use_ollama' in settings:
-            mind.intelligence.use_ollama = settings['use_ollama']
-        if 'ollama_url' in settings:
-            mind.intelligence.ollama_url = settings['ollama_url']
         
         # Update autonomy settings
         if 'autonomy_level' in settings:
