@@ -13,7 +13,7 @@ Complete guide for deploying Genesis in production.
 
 1. **Clone repository**
 ```bash
-git clone https://github.com/sshaik37/Genesis-AGI.git
+git clone https://github.com/shaik-shahansha/genesis-agi.git
 cd Genesis-AGI
 ```
 
@@ -59,7 +59,7 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install python3.11 python3.11-venv python3-pip -y
 
 # Install Genesis
-git clone https://github.com/sshaik37/Genesis-AGI.git
+git clone https://github.com/shaik-shahansha/genesis-agi.git
 cd Genesis-AGI
 python3.11 -m venv venv
 source venv/bin/activate
@@ -527,7 +527,7 @@ sudo swapon /swapfile
 
 ## Support
 
-- GitHub Issues: https://github.com/sshaik37/Genesis-AGI/issues
+- GitHub Issues: https://github.com/shaik-shahansha/genesis-agi/issues
 - Documentation: https://shahansha.com
 
 ---

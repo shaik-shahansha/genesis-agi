@@ -241,7 +241,7 @@ vercel
 4. Review error messages
 
 ### Need Help?
-- GitHub Issues: [Genesis-AGI Issues](https://github.com/sshaik37/Genesis-AGI/issues)
+- GitHub Issues: [Genesis-AGI Issues](https://github.com/shaik-shahansha/genesis-agi/issues)
 - Documentation: [Main README](../README.md)
 - Examples: [examples/](../examples/)
 

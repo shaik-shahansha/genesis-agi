@@ -43,7 +43,7 @@ export default function RootLayout({
                     Settings
                   </Link>
                   <a 
-                    href="https://github.com/sshaik37/Genesis-AGI" 
+                    href="https://github.com/shaik-shahansha/genesis-agi" 
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn-ghost"

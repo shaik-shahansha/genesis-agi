@@ -13,7 +13,7 @@ This guide will get you up and running with Genesis AGI in 10 minutes.
 
 ```bash
 # Clone repository
-git clone https://github.com/sshaik37/Genesis-AGI.git
+git clone https://github.com/shaik-shahansha/genesis-agi.git
 cd Genesis-AGI
 
 # Install dependencies

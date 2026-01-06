@@ -82,7 +82,7 @@ genesis = "genesis.cli:app"
 
 [project.urls]
 Homepage = "https://shahansha.com"
-Repository = "https://github.com/sshaik37/Genesis-AGI"
+Repository = "https://github.com/shaik-shahansha/genesis-agi"
 Documentation = "https://genesis-agi.readthedocs.io"
 
 [tool.setuptools.packages.find]
