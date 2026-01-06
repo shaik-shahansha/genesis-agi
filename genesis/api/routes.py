@@ -1885,6 +1885,9 @@ async def add_plugin(
                 auto_search=config.get('auto_search', True),
                 default_mode=config.get('default_mode', 'detailed')
             )
+        elif request.plugin_name == "browser_use":
+            from genesis.plugins.browser_use_plugin import BrowserUsePlugin
+            plugin = BrowserUsePlugin(**(request.config or {}))
         elif request.plugin_name == "mcp":
             from genesis.plugins.mcp import MCPPlugin
             plugin = MCPPlugin(**(request.config or {}))

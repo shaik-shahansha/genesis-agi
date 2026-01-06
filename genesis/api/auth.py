@@ -70,7 +70,7 @@ def _initialize_default_users():
         USERS_DB["admin"] = {
             "username": "admin",
             "email": "admin@genesis.local",
-            "hashed_password": get_password_hash("genesis-admin-2024"),  # Default password
+            "hashed_password": get_password_hash("genesis-admin-2026"),  # Default password
             "role": UserRole.ADMIN,
             "disabled": False,
         }

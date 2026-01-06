@@ -202,7 +202,7 @@ Response:"""
         
         response = await self.mind.orchestrator.generate(
             messages=[{"role": "user", "content": prompt}],
-            model=self.mind.intelligence.default_model,
+            model=self.mind.intelligence.reasoning_model,
             temperature=0.8,
             max_tokens=250
         )
@@ -411,7 +411,7 @@ Response:"""
         
         response = await self.mind.orchestrator.generate(
             messages=[{"role": "user", "content": prompt}],
-            model=self.mind.intelligence.default_model,
+            model=self.mind.intelligence.reasoning_model,
             temperature=0.8,
             max_tokens=250
         )

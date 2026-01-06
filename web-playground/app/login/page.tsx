@@ -142,7 +142,7 @@ export default function LoginPage() {
             Sign in to Genesis
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Default: admin / genesis-admin-2024
+            Default: admin / genesis-admin-2026
           </p>
         </div>
         
@@ -182,7 +182,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="genesis-admin-2024"
+                placeholder="genesis-admin-2026"
               />
             </div>
           </div>

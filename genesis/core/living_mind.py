@@ -117,13 +117,13 @@ class LLMGateway:
     def select_model(self, awareness_level: AwarenessLevel) -> str:
         """Select appropriate model based on awareness level."""
         if awareness_level == AwarenessLevel.ALERT:
-            return self.models["quick"]
+            return self.complexity_models["simple"]
         elif awareness_level == AwarenessLevel.FOCUSED:
-            return self.models["normal"]
+            return self.complexity_models["normal"]
         elif awareness_level == AwarenessLevel.DEEP:
-            return self.models["extended"]
+            return self.complexity_models["complex"]
         else:
-            return self.models["quick"]
+            return self.complexity_models["simple"]
 
     async def request(
         self,
