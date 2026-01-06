@@ -57,6 +57,28 @@
   @apply inline-block w-4 h-4 border-2 border-slate-600 border-t-purple-500 rounded-full animate-spin;
 }
 
+.spinner-large {
+  @apply inline-block w-12 h-12 border-4 border-slate-700 border-t-purple-500 border-r-pink-500 rounded-full animate-spin;
+  animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+}
+
+.spinner-xl {
+  @apply inline-block w-16 h-16 border-4 border-slate-700 rounded-full animate-spin;
+  border-top-color: #a855f7;
+  border-right-color: #ec4899;
+  border-bottom-color: #8b5cf6;
+  animation: spin 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 /* Card styles */
 .card {
   @apply bg-slate-800/70 border border-slate-700 rounded-xl p-6 backdrop-blur-sm;

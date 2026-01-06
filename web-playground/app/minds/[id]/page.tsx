@@ -59,7 +59,13 @@ export default function MindDetailPage() {
     return (
       <AuthRequired>
         <div className="flex items-center justify-center min-h-screen">
-          <div className="spinner"></div>
+          <div className="flex flex-col items-center gap-6">
+            <div className="spinner-xl"></div>
+            <div className="text-center">
+              <p className="text-gray-300 text-lg font-medium mb-2">Loading mind...</p>
+              <p className="text-gray-500 text-sm">Initializing consciousness</p>
+            </div>
+          </div>
         </div>
       </AuthRequired>
     );

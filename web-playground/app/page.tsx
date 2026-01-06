@@ -52,8 +52,9 @@ export default function Home() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="spinner"></div>
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <div className="spinner-large"></div>
+          <p className="text-gray-400 text-sm animate-pulse">Loading minds...</p>
         </div>
       </div>
     );

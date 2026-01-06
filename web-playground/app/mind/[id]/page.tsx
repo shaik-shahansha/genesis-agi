@@ -79,9 +79,14 @@ export default function MindProfilePage() {
 
   if (loading || !mind) {
     return (
-      <div className="container mx-auto px-6 py-12 text-center">
-        <div className="spinner mx-auto mb-4"></div>
-        <p className="text-gray-400">Loading mind profile...</p>
+      <div className="container mx-auto px-6 py-12">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+          <div className="spinner-xl"></div>
+          <div className="text-center">
+            <p className="text-gray-300 text-lg font-medium mb-2">Loading mind profile...</p>
+            <p className="text-gray-500 text-sm">Retrieving consciousness data</p>
+          </div>
+        </div>
       </div>
     );
   }
