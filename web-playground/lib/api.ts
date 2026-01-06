@@ -609,6 +609,24 @@ export class GenesisAPI {
   async searchWorkspaceFiles(mindId: string, query: string) {
     return this.request(`/api/v1/minds/${mindId}/workspace/search?query=${encodeURIComponent(query)}`);
   }
+
+  // ==================== Feedback ====================
+
+  async submitFeedback(
+    mindId: string,
+    feedbackType: 'positive' | 'negative',
+    message?: string,
+    context?: string
+  ) {
+    return this.request(`/api/v1/minds/${mindId}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({
+        feedback_type: feedbackType,
+        message,
+        context,
+      }),
+    });
+  }
 }
 
 // Export singleton instance
