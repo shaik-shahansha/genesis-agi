@@ -4,6 +4,7 @@ FastAPI server for Genesis Minds.
 Provides REST API and WebSocket endpoints for web/mobile apps.
 """
 
+import os
 import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +19,17 @@ from genesis.config import get_settings
 from genesis.api import routes
 from genesis.api import marketplace_routes
 from genesis.api import environment_routes
-from genesis.api import multimodal_routes
+
+# Conditionally import multimodal if not disabled
+DISABLE_MULTIMODAL = os.getenv("DISABLE_MULTIMODAL", "false").lower() == "true"
+if not DISABLE_MULTIMODAL:
+    try:
+        from genesis.api import multimodal_routes
+    except ImportError:
+        DISABLE_MULTIMODAL = True
+        multimodal_routes = None
+else:
+    multimodal_routes = None
 
 settings = get_settings()
 
@@ -77,7 +88,10 @@ def create_app() -> FastAPI:
     app.include_router(routes.settings_router, prefix="/api/v1/settings", tags=["Settings"])
     app.include_router(marketplace_routes.router, prefix="/api/v1/marketplace", tags=["Marketplace"])
     app.include_router(environment_routes.router, prefix="/api/v1/environments", tags=["Environments"])
-    app.include_router(multimodal_routes.router, prefix="/api/v1/multimodal", tags=["Multimodal"])
+    
+    # Include multimodal routes only if enabled
+    if not DISABLE_MULTIMODAL and multimodal_routes:
+        app.include_router(multimodal_routes.router, prefix="/api/v1/multimodal", tags=["Multimodal"])
 
     @app.get("/")
     @limiter.limit("10/minute")
