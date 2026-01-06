@@ -9,16 +9,18 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy project files
 COPY pyproject.toml ./
-
-# Install Genesis
-RUN pip install --no-cache-dir -e .
-
-# Copy application
+COPY README.md ./
 COPY genesis ./genesis
+COPY alembic ./alembic
+COPY alembic.ini ./
+
+# Install Genesis and dependencies
+RUN pip install --no-cache-dir -e .
 
 # Create data directories
 RUN mkdir -p /data/.genesis/minds /data/.genesis/logs /data/chroma
