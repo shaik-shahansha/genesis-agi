@@ -20,8 +20,9 @@ wheels/
 .installed.cfg
 *.egg
 
-# But allow mobile-app/lib (Flutter)
+# But allow mobile-app/lib (Flutter) and web-playground/lib (Next.js)
 !mobile-app/lib/
+!web-playground/lib/
 
 # Virtual environments
 venv/
