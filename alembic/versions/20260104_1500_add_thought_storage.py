@@ -55,7 +55,7 @@ def upgrade() -> None:
     op.create_index('ix_thoughts_type', 'thoughts', ['thought_type'])
     op.create_index('ix_thoughts_awareness', 'thoughts', ['awareness_level'])
     
-    print("✅ Created 'thoughts' table for scalable consciousness storage")
+    print("[Done]Created 'thoughts' table for scalable consciousness storage")
     print("   Consciousness thoughts will now be stored in SQLite instead of JSON")
     print("   This prevents JSON file bloat during 24/7 daemon operation")
 

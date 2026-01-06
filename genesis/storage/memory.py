@@ -63,7 +63,12 @@ class Memory(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def access(self) -> None:
-        """Record memory access."""
+        """
+        Record memory access.
+        
+        Note: Emotional processing from recalled memories is handled by
+        Mind's emotional_intelligence system in the think() method.
+        """
         self.access_count += 1
         self.last_accessed = datetime.now()
     
@@ -307,6 +312,34 @@ class MemoryManager:
         memory_type: Optional[MemoryType] = None,
     ) -> List[Memory]:
         """Get most recent memories."""
+        # If in-memory cache is empty, load from vector store
+        if not self.memories and self.vector_store:
+            try:
+                # Load all memories from vector store
+                vector_memories = self.vector_store.get_all(limit=limit * 5)  # Get more for filtering
+                
+                # Convert to Memory objects and populate cache
+                for vm in vector_memories:
+                    try:
+                        metadata = vm.get("metadata", {})
+                        memory = Memory(
+                            id=vm["id"],
+                            type=MemoryType(metadata.get("type", "episodic")),
+                            content=vm["content"],
+                            timestamp=datetime.fromisoformat(metadata.get("timestamp", datetime.now().isoformat())),
+                            emotion=metadata.get("emotion"),
+                            importance=float(metadata.get("importance", 0.5)),
+                            tags=metadata.get("tags", "").split(",") if metadata.get("tags") else [],
+                            metadata=metadata,
+                        )
+                        self.memories[memory.id] = memory
+                    except Exception as e:
+                        # Skip invalid memories
+                        continue
+            except Exception as e:
+                # If loading fails, just work with empty cache
+                pass
+        
         memories = list(self.memories.values())
 
         # Filter by type if specified
@@ -352,8 +385,11 @@ class MemoryManager:
         Returns:
             Statistics about consolidation
         """
+        # Get total count from vector store (source of truth for persistent storage)
+        total_memories = self.vector_store.count() if self.vector_store else len(self.memories)
+        
         stats = {
-            "total_memories": len(self.memories),
+            "total_memories": total_memories,
             "episodic": 0,
             "semantic": 0,
             "procedural": 0,
@@ -362,7 +398,8 @@ class MemoryManager:
             "high_importance": 0,
         }
 
-        # Count by type
+        # Count by type (only for in-memory cache)
+        # Note: This may undercount if not all memories are loaded into self.memories
         for memory in self.memories.values():
             if memory.type == MemoryType.EPISODIC:
                 stats["episodic"] += 1

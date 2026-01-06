@@ -95,7 +95,7 @@ class BrowserUsePlugin(BasePlugin):
                 use_vision=True,  # Enable vision for screenshot understanding
             )
             
-            print(f"✅ Browser Use plugin initialized for {mind.identity.name}")
+            print(f"[Done]Browser Use plugin initialized for {mind.identity.name}")
             print(f"   Capabilities: web scraping, form filling, automation")
             
         except ImportError as e:

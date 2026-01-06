@@ -132,7 +132,7 @@ class AutonomousIntelligence:
             if len(self.decision_history) > 100:
                 self.decision_history = self.decision_history[-50:]
             
-            logger.info(f"✅ Decision Category: {decision['category']}")
+            logger.info(f"[Done]Decision Category: {decision['category']}")
             logger.info(f"   Priority: {decision['priority']}")
             logger.info(f"   Action: {decision['action'][:150]}")
             logger.info("="*70 + "\n")

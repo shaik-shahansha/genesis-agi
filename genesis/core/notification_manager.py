@@ -393,7 +393,7 @@ class NotificationManager:
             
             if not websocket:
                 # No active connection - store for later retrieval
-                logger.debug(f"No websocket connection for {notification.recipient} - storing notification")
+                logger.info(f"[PROACTIVE] No active chat - storing notification for {notification.recipient}")
                 stored = await self._store_pending_notification(notification)
                 # If successfully stored, treat as delivered (will be sent when user connects)
                 return stored
@@ -405,21 +405,29 @@ class NotificationManager:
                 self.unregister_websocket(notification.recipient)
                 return False
             
-            # Send proactive message
+            logger.info(f"[PROACTIVE] 💬 Sending proactive message to active chat: '{notification.message[:50]}...'")
+            
+            # Send as CHAT MESSAGE when WebSocket is active (not as notification)
+            # This makes it feel like WhatsApp - the Mind proactively sends a message
             # Ensure metadata is JSON serializable (convert Path objects, etc.)
             serializable_metadata = make_json_serializable(notification.metadata)
             
             await websocket.send_json({
-                "type": "proactive_message",
-                "notification_id": notification.notification_id,
+                "type": "message",  # Regular chat message, not notification
+                "content": notification.message,
+                "role": "assistant",
                 "mind_id": self.mind_id,
                 "mind_name": self.mind_name,
-                "title": notification.title,
-                "message": notification.message,
-                "priority": notification.priority.value,
                 "timestamp": notification.created_at.isoformat(),
-                "metadata": serializable_metadata
+                "metadata": {
+                    "is_proactive": True,
+                    "proactive_title": notification.title,
+                    "priority": notification.priority.value,
+                    **serializable_metadata
+                }
             })
+            
+            logger.info(f"[PROACTIVE] ✓ Proactive message delivered as chat message")
             
             return True
             

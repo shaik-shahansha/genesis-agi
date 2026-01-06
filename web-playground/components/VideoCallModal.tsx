@@ -94,7 +94,7 @@ export default function VideoCallModal({
     if (callState === 'calling') {
       const timeout = setTimeout(() => {
         setCallState('connected');
-        console.log('✅ Call connected!');
+        console.log('[Done]Call connected!');
       }, 2000);
       return () => clearTimeout(timeout);
     }
@@ -121,7 +121,7 @@ export default function VideoCallModal({
       console.log('📹 Setting video source in useEffect...');
       localVideoRef.current.srcObject = localStream;
       localVideoRef.current.play().then(() => {
-        console.log('✅ Video playing from effect');
+        console.log('[Done]Video playing from effect');
       }).catch((err) => {
         console.error('❌ Video play error from effect:', err);
       });
@@ -152,7 +152,7 @@ export default function VideoCallModal({
         throw new Error(error);
       }
 
-      console.log('✅ MediaDevices API available');
+      console.log('[Done]MediaDevices API available');
 
       const constraints = {
         audio: {
@@ -170,7 +170,7 @@ export default function VideoCallModal({
       console.log('📞 Requesting getUserMedia with constraints:', constraints);
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
-      console.log('✅ Media stream obtained:', {
+      console.log('[Done]Media stream obtained:', {
         id: stream.id,
         active: stream.active,
         audioTracks: stream.getAudioTracks().length,
@@ -205,14 +205,14 @@ export default function VideoCallModal({
         localVideoRef.current.srcObject = stream;
         try {
           await localVideoRef.current.play();
-          console.log('✅ Video element playing');
+          console.log('[Done]Video element playing');
         } catch (playError) {
           console.error('❌ Video play error:', playError);
         }
       }
 
       if (callType === 'audio') {
-        console.log('✅ Audio call ready, microphone active');
+        console.log('[Done]Audio call ready, microphone active');
       }
 
       setMediaError(null);

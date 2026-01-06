@@ -41,6 +41,11 @@ class Event(BaseModel):
 
     Events have emotional impact, involve other beings, and shape
     the Mind's development and memories.
+    
+    Note: Emotional responses to events are processed by Mind's
+    emotional_intelligence system, which analyzes event type,
+    significance, and emotional_impact to determine appropriate
+    emotional reactions.
     """
 
     id: str  # Unique event ID

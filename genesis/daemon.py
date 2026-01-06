@@ -147,6 +147,17 @@ class MindDaemon:
                     # Don't fail daemon if scheduler fails
             else:
                 logger.warning("[WARN] No action scheduler found")
+            
+            # Start notification manager for proactive messaging
+            logger.info("Starting notification manager...")
+            if hasattr(self.mind, 'notification_manager'):
+                try:
+                    await self.mind.notification_manager.start()
+                    logger.info("[OK] Notification manager active")
+                except Exception as e:
+                    logger.error(f"[WARN] Notification manager failed: {e}")
+            else:
+                logger.warning("[WARN] No notification manager found")
 
             # Register signal handlers for graceful shutdown
             self._register_signal_handlers()
@@ -304,13 +315,16 @@ class MindDaemon:
                             try:
                                 stats = self.mind.memory.get_memory_stats()
                                 recent_memories = self.mind.memory.get_recent_memories(limit=3)
-                                logger.info(f"[MEMORY] Memory: {stats.get('total_memories', 0)} total memories")
+                                memory_count = stats.get('total_memories', 0)
+                                logger.info(f"[MEMORY] Memory: {memory_count} total memories")
                                 logger.info(f"   Status: {self.mind.state.status}")
                                 if recent_memories:
                                     logger.info(f"   Recent memories:")
                                     for i, mem in enumerate(recent_memories[:3], 1):
                                         content_preview = mem.content[:80] if hasattr(mem, 'content') else str(mem)[:80]
                                         logger.info(f"     {i}. {content_preview}...")
+                                else:
+                                    logger.info(f"   No recent memories found")
                             except Exception as e:
                                 logger.error(f"Error getting memory stats: {e}")
                         
@@ -355,7 +369,7 @@ class MindDaemon:
                             try:
                                 log_stats = self.mind.logger.get_stats()
                                 recent_logs = self.mind.logger.get_recent_logs(limit=5)
-                                logger.info(f"📝 Activity: {log_stats.get('total_logs', 0)} total log entries")
+                                logger.info(f"[LOGS] Activity: {log_stats.get('total_logs', 0)} total log entries")
                                 if recent_logs:
                                     logger.info(f"   Recent activities:")
                                     for i, log_entry in enumerate(recent_logs[-5:], 1):
@@ -474,9 +488,13 @@ class MindDaemon:
                 # Get pending follow-ups
                 pending = await self.mind.proactive_conversation.get_pending_follow_ups()
                 
+                # Log check even if no pending (helps debug)
+                active_count = len(self.mind.proactive_conversation.active_contexts)
                 if pending:
                     logger.info(f"\n💬 PROACTIVE CONVERSATION CHECK")
-                    logger.info(f"   Found {len(pending)} pending follow-ups")
+                    logger.info(f"   Found {len(pending)} pending follow-ups (out of {active_count} total contexts)")
+                elif active_count > 0:
+                    logger.debug(f"[PROACTIVE] Check: {active_count} active contexts, none ready for follow-up yet")
                     
                     # Send each follow-up via notification system
                     for context in pending:
@@ -490,12 +508,22 @@ class MindDaemon:
                                 metadata: Dict[str, Any]
                             ):
                                 if hasattr(self.mind, 'notification_manager'):
+                                    from genesis.core.notification_manager import NotificationPriority
+                                    # Convert priority string to enum
+                                    priority_map = {
+                                        "low": NotificationPriority.LOW,
+                                        "normal": NotificationPriority.NORMAL,
+                                        "medium": NotificationPriority.NORMAL,
+                                        "high": NotificationPriority.HIGH,
+                                        "urgent": NotificationPriority.URGENT
+                                    }
+                                    priority_enum = priority_map.get(priority.lower(), NotificationPriority.NORMAL)
+                                    
                                     await self.mind.notification_manager.send_notification(
-                                        recipient_email=user_email,
+                                        recipient=user_email,
                                         title=title,
                                         message=message,
-                                        priority=priority,
-                                        notification_type="proactive_message",
+                                        priority=priority_enum,
                                         metadata=metadata
                                     )
                             

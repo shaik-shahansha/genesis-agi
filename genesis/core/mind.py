@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from genesis.config import get_settings
 from genesis.core.autonomy import Autonomy
 from genesis.core.emotions import Emotion, EmotionalState
+from genesis.core.emotional_intelligence import EmotionalIntelligence
 from genesis.core.identity import MindIdentity
 from genesis.core.intelligence import Intelligence
 from genesis.core.mind_config import MindConfig
@@ -98,6 +99,10 @@ class Mind:
         # CORE: State
         self.state = MindState()
         self.emotional_state = EmotionalState()
+        
+        # EMOTIONAL INTELLIGENCE: Context-aware emotional processing
+        # Initialize after emotional_state is created
+        self.emotional_intelligence: Optional[EmotionalIntelligence] = None
 
         # CORE: Model orchestrator (pass API keys from intelligence config)
         self.orchestrator = ModelOrchestrator(api_keys=self.intelligence.api_keys)
@@ -195,6 +200,14 @@ class Mind:
                 # Register plugin actions to action executor
                 if hasattr(plugin, 'register_actions'):
                     plugin.register_actions(self.action_executor)
+        
+        # Initialize emotional intelligence engine (after all systems are ready)
+        self.emotional_intelligence = EmotionalIntelligence(self)
+        
+        # INTELLIGENT GEN ECONOMY: Add smart async gen manager (if gen plugin is enabled)
+        if hasattr(self, 'gen'):
+            from genesis.core.gen_intelligence import IntelligentGenManager
+            self.gen_intelligence = IntelligentGenManager(self)
         
         # PROACTIVE SYSTEMS: Notification manager and proactive consciousness (optional)
         try:
@@ -673,6 +686,30 @@ class Mind:
                 metadata={"user_email": user_email}
             )
 
+        # EMOTIONAL INTELLIGENCE: Process context and update emotional state
+        # This happens fast (<1ms) and doesn't impact response time
+        if self.emotional_intelligence:
+            new_emotional_state = self.emotional_intelligence.quick_process(
+                user_message=prompt,
+                user_email=user_email,
+                recalled_memories=relevant_memories
+            )
+            
+            # Update emotional state if it changed significantly
+            if abs(new_emotional_state.intensity - self.emotional_state.intensity) > 0.1 or \
+               new_emotional_state.primary_emotion != self.emotional_state.primary_emotion:
+                
+                old_emotion = self.emotional_state.get_emotion_value()
+                self.emotional_state = new_emotional_state
+                
+                # Log emotional change
+                if self.logger and new_emotional_state.trigger:
+                    self.logger.emotion_change(
+                        old_emotion,
+                        new_emotional_state.get_emotion_value(),
+                        new_emotional_state.trigger
+                    )
+
         # Build messages
         messages = []
 
@@ -955,7 +992,7 @@ class Mind:
                         
                         # If concern detected with sufficient confidence, create it immediately
                         if analysis.has_concern and analysis.confidence >= 0.7 and analysis.requires_followup:
-                            print(f"[DEBUG CONCERN] ✅ {analysis.concern_type.upper()} concern detected!")
+                            print(f"[DEBUG CONCERN] [Done]{analysis.concern_type.upper()} concern detected!")
                             print(f"[DEBUG CONCERN]    Confidence: {analysis.confidence:.2f}")
                             print(f"[DEBUG CONCERN]    Severity: {analysis.severity}")
                             print(f"[DEBUG CONCERN]    Will follow up in {analysis.suggested_followup_hours}h")

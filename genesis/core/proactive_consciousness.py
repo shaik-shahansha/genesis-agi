@@ -212,7 +212,7 @@ class ProactiveConsciousnessModule:
                 
                 # If concern detected with sufficient confidence
                 if analysis.has_concern and analysis.confidence >= 0.7 and analysis.requires_followup:
-                    logger.info(f"[PROACTIVE] ✅ {analysis.concern_type.upper()} concern detected!")
+                    logger.info(f"[PROACTIVE] [Done]{analysis.concern_type.upper()} concern detected!")
                     logger.info(f"[PROACTIVE]    Confidence: {analysis.confidence:.2f}")
                     logger.info(f"[PROACTIVE]    Severity: {analysis.severity}")
                     logger.info(f"[PROACTIVE]    Urgency: {analysis.urgency}")
@@ -593,7 +593,7 @@ Follow-up message:"""
                     # Remove scenario
                     del self.active_scenarios[concern.concern_id]
                     
-                    logger.info(f"[SCENARIO] ✅ Concern resolved via scenario handler: {concern.concern_type}")
+                    logger.info(f"[SCENARIO] [Done]Concern resolved via scenario handler: {concern.concern_type}")
                     
                     # Send positive acknowledgment
                     if hasattr(self.mind, 'notification_manager'):
@@ -647,7 +647,7 @@ Follow-up message:"""
         # Save to disk
         self._save_concerns()
         
-        logger.info(f"✅ Resolved concern: {concern.concern_type} for {user_email}")
+        logger.info(f"[Done]Resolved concern: {concern.concern_type} for {user_email}")
         
         # Send positive acknowledgment notification
         if hasattr(self.mind, 'notification_manager'):

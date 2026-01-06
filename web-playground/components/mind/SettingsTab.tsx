@@ -31,7 +31,7 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   const [dreamingEnabled, setDreamingEnabled] = useState(mind.dreaming_enabled || true);
   
   // Currency
-  const [currency, setCurrency] = useState(mind.gens || 1000);
+  const [currency, setCurrency] = useState(mind.gens || 100);
 
   useEffect(() => {
     // Reset form when mind changes
@@ -44,7 +44,7 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
     setAutonomyLevel(mind.autonomy_level || 5);
     setConsciousnessActive(mind.consciousness_active !== false);
     setDreamingEnabled(mind.dreaming_enabled !== false);
-    setCurrency(mind.gens || 1000);
+    setCurrency(mind.gens || 100);
   }, [mind]);
 
   const handleSave = async () => {

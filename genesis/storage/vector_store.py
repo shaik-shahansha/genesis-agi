@@ -116,6 +116,32 @@ class VectorStore:
     def count(self) -> int:
         """Get total number of memories."""
         return self.collection.count()
+    
+    def get_all(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get all memories from the vector store.
+        
+        Args:
+            limit: Maximum number of memories to return (None = all)
+            
+        Returns:
+            List of all memories with their metadata
+        """
+        # ChromaDB get() with no IDs returns all documents
+        results = self.collection.get(
+            limit=limit,
+            include=["documents", "metadatas"]
+        )
+        
+        memories = []
+        if results["ids"]:
+            for i, memory_id in enumerate(results["ids"]):
+                memories.append({
+                    "id": memory_id,
+                    "content": results["documents"][i] if results["documents"] else "",
+                    "metadata": results["metadatas"][i] if results["metadatas"] else {},
+                })
+        
+        return memories
 
     def clear(self) -> None:
         """Clear all memories (dangerous!)."""

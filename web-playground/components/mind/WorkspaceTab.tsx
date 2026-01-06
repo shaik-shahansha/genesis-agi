@@ -320,12 +320,12 @@ export default function WorkspaceTab({ mindId }: WorkspaceTabProps) {
       <div className="bg-gradient-to-br from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-3">✨ Smart Workspace Features</h3>
         <ul className="space-y-2 text-sm text-gray-700">
-          <li>✅ <strong>Universal File Support:</strong> PDF, DOCX, XLSX, CSV, images, code files, and more</li>
-          <li>✅ <strong>Automatic Processing:</strong> Files are intelligently parsed and analyzed</li>
-          <li>✅ <strong>Vector Embeddings:</strong> Content is embedded using ChromaDB for semantic search</li>
-          <li>✅ <strong>Memory Integration:</strong> Mind remembers all uploaded files</li>
-          <li>✅ <strong>Semantic Search:</strong> Find files by meaning, not just filename</li>
-          <li>✅ <strong>Chat Integration:</strong> Reference files in conversations</li>
+          <li>[Done]<strong>Universal File Support:</strong> PDF, DOCX, XLSX, CSV, images, code files, and more</li>
+          <li>[Done]<strong>Automatic Processing:</strong> Files are intelligently parsed and analyzed</li>
+          <li>[Done]<strong>Vector Embeddings:</strong> Content is embedded using ChromaDB for semantic search</li>
+          <li>[Done]<strong>Memory Integration:</strong> Mind remembers all uploaded files</li>
+          <li>[Done]<strong>Semantic Search:</strong> Find files by meaning, not just filename</li>
+          <li>[Done]<strong>Chat Integration:</strong> Reference files in conversations</li>
         </ul>
       </div>
     </div>

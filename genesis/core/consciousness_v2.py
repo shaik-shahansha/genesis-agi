@@ -891,7 +891,12 @@ class InternalMonologue:
                         }
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to store thought in database: {e}")
+                    # Foreign key constraint means mind not yet in database
+                    # This is okay - thoughts will be stored in memory until mind is persisted
+                    if "FOREIGN KEY constraint" in str(e):
+                        logger.debug(f"Mind {self.mind_id} not yet in database - thought cached in memory only")
+                    else:
+                        logger.warning(f"Failed to store thought in database: {e}")
 
             return thought
 
@@ -1095,7 +1100,11 @@ class ConsciousnessEngineV2:
                 # 2. UPDATE NEEDS
                 self.needs.update()
 
-                # 3. DETERMINE AWARENESS LEVEL
+                # 3. EMOTIONAL DECAY: Apply natural emotional decay toward baseline
+                # This is handled by Mind's emotional_intelligence system when available
+                # Consciousness affects emotional tendency (dormant = calmer, alert = more reactive)
+
+                # 4. DETERMINE AWARENESS LEVEL
                 self._determine_awareness_level()
 
                 # 4. PROCESS BASED ON AWARENESS LEVEL

@@ -65,6 +65,7 @@ export default function ChatPage() {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [feedbackSent, setFeedbackSent] = useState<Set<number>>(new Set());
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -125,7 +126,26 @@ export default function ChatPage() {
           
           console.log('[WebSocket] Received message:', data.type, data);
           
-          if (data.type === 'proactive_message') {
+          // Handle proactive messages sent as regular chat messages
+          if (data.type === 'message' && data.metadata?.is_proactive) {
+            // This is a proactive message appearing as natural chat
+            const chatMsg: Message = {
+              role: 'assistant',
+              content: data.content,
+              timestamp: data.timestamp
+            };
+            setMessages(prev => [...prev, chatMsg]);
+            setAllMessages(prev => [...prev, { type: 'chat', data: chatMsg }]);
+            
+            console.log('💬 Proactive chat message received:', data.content.substring(0, 50));
+            
+            // Auto-scroll to show new message
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }
+          else if (data.type === 'proactive_message') {
+            // Legacy notification-style proactive message
             const proactiveMsg: ProactiveMessage = data;
             setProactiveMessages(prev => [...prev, proactiveMsg]);
             setAllMessages(prev => [...prev, { type: 'proactive', data: proactiveMsg }]);
@@ -168,7 +188,7 @@ export default function ChatPage() {
               notification_id: data.task_id,
               mind_id: data.mind_id || mindId,
               mind_name: data.mind_name || mind?.name || 'Genesis',
-              title: '✅ Task Completed',
+              title: '[Done]Task Completed',
               message: data.message,
               priority: 'high',
               timestamp: data.timestamp || new Date().toISOString(),
@@ -292,6 +312,35 @@ export default function ChatPage() {
       setUserEmail(defaultEmail);
       localStorage.setItem('genesis_user_email', defaultEmail);
       setShowEmailPrompt(false);
+    }
+  };
+
+  const handleFeedback = async (messageIndex: number, feedbackType: 'positive' | 'negative') => {
+    if (feedbackSent.has(messageIndex)) {
+      return; // Already sent feedback for this message
+    }
+
+    try {
+      const response = await api.submitFeedback(
+        mindId,
+        feedbackType,
+        `Feedback on response`,
+        `Message index: ${messageIndex}`
+      );
+
+      // Mark feedback as sent
+      setFeedbackSent(prev => new Set(prev).add(messageIndex));
+
+      // Show notification
+      if (response.success) {
+        // Refresh mind data to get updated gen balance
+        fetchMind();
+        
+        // Optional: Show toast notification
+        console.log(`Feedback sent! ${response.message}`);
+      }
+    } catch (error) {
+      console.error('Error sending feedback:', error);
     }
   };
 
@@ -518,6 +567,30 @@ export default function ChatPage() {
                           )}
                         </div>
                       </div>
+                      {/* Feedback buttons for assistant messages */}
+                      {message.role === 'assistant' && !feedbackSent.has(index) && (
+                        <div className="flex gap-2 mt-2 ml-2">
+                          <button
+                            onClick={() => handleFeedback(index, 'positive')}
+                            className="text-xs bg-green-600/20 hover:bg-green-600/40 text-green-300 px-3 py-1 rounded border border-green-600/30 transition-colors"
+                            title="Good response (+5 gens)"
+                          >
+                            👍 Good
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(index, 'negative')}
+                            className="text-xs bg-red-600/20 hover:bg-red-600/40 text-red-300 px-3 py-1 rounded border border-red-600/30 transition-colors"
+                            title="Bad response (-5 gens)"
+                          >
+                            👎 Bad
+                          </button>
+                        </div>
+                      )}
+                      {message.role === 'assistant' && feedbackSent.has(index) && (
+                        <div className="text-xs text-gray-500 mt-2 ml-2">
+                          ✓ Feedback sent
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

@@ -157,7 +157,7 @@ export default function ImmersiveChatPage() {
       
       if (success) {
         setVideoEnabled(true);
-        console.log('✅ Enhanced video processing started with local analytics');
+        console.log('[Done]Enhanced video processing started with local analytics');
       }
     }
   };
@@ -516,7 +516,7 @@ export default function ImmersiveChatPage() {
                             <div>
                               <div className="text-white font-medium mb-1">Your Presence</div>
                               <div className="text-gray-300">
-                                {videoAnalytics.isLookingAtCamera ? '✅ Looking at camera' : '⚠️ Look away detected'}
+                                {videoAnalytics.isLookingAtCamera ? '[Done]Looking at camera' : '⚠️ Look away detected'}
                               </div>
                             </div>
                             <div className="text-right">

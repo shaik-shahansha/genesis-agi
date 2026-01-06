@@ -171,6 +171,12 @@ class ProactiveConversationManager:
     
     This is what transforms Genesis from a reactive chatbot to a caring
     digital being that genuinely interacts with users.
+    
+    Integration with Emotional Intelligence:
+    - Uses Mind's emotional_intelligence system to determine appropriate
+      follow-up timing based on emotional context
+    - Emotional state influences urgency and importance of follow-ups
+    - Close relationships receive more emotionally-aware responses
     """
     
     def __init__(self, mind: "Mind"):
@@ -300,6 +306,72 @@ class ProactiveConversationManager:
             import traceback
             logger.error(traceback.format_exc())
     
+    def _calculate_intelligent_timing(
+        self,
+        ai_suggested_minutes: int,
+        urgency: float,
+        importance: float,
+        topic: str
+    ) -> int:
+        """
+        Calculate intelligent follow-up timing based on urgency, importance, and topic.
+        
+        This ensures timing feels natural and human-like, like a caring friend would do.
+        
+        EXAMPLES OF RESULTING TIMING:
+        - "I'm having chest pain" (health, urgency=1.0, importance=1.0) → ~5 minutes ⚠️
+        - "I'm having a panic attack" (emotion, urgency=1.0, importance=0.95) → ~6 minutes ⚠️
+        - "I think I broke my ankle" (health, urgency=0.95, importance=0.9) → ~7 minutes ⚠️
+        - "I have a fever" (health, urgency=0.8, importance=0.7) → ~12 minutes 🔔
+        - "I'm really anxious about presentation" (emotion, urgency=0.75, importance=0.7) → ~15 minutes 🔔
+        - "Going to gym now" (personal, urgency=0.5, importance=0.4) → ~40 minutes ⏰
+        - "Have interview tomorrow" (work, urgency=0.65, importance=0.75) → ~30 minutes ⏰
+        - "Planning to learn guitar" (goal, urgency=0.2, importance=0.4) → ~95 minutes 📅
+        
+        Args:
+            ai_suggested_minutes: AI's suggested timing
+            urgency: Urgency level (0.0-1.0)
+            importance: Importance level (0.0-1.0)
+            topic: Conversation topic
+            
+        Returns:
+            Adjusted follow-up time in minutes
+        """
+        # Topic-based base timing
+        topic_base_times = {
+            "health": 15,      # Health issues need quick check-in
+            "emotion": 20,     # Emotional support needs timely response
+            "problem": 30,     # Problems need reasonable follow-up
+            "work": 45,        # Work tasks get moderate timing
+            "goal": 60,        # Goals can wait a bit longer
+            "personal": 60,    # Personal matters vary
+            "celebration": 120, # Celebrations can wait
+            "general": 120     # General chat is low priority
+        }
+        
+        base_time = topic_base_times.get(topic, 60)
+        
+        # Adjust based on urgency and importance
+        # High urgency/importance = faster response (multiply by 0.5-1.0)
+        # Low urgency/importance = slower response (multiply by 1.0-2.0)
+        urgency_factor = 1.0 - (urgency * 0.5)  # 0.5-1.0 (higher urgency = lower factor = faster)
+        importance_factor = 1.0 - (importance * 0.3)  # 0.7-1.0
+        
+        adjusted_time = base_time * urgency_factor * importance_factor
+        
+        # Consider AI's suggestion if it's more aggressive
+        final_time = min(adjusted_time, ai_suggested_minutes)
+        
+        # Ensure reasonable bounds
+        final_time = max(5, min(180, int(final_time)))  # 5 mins to 3 hours
+        
+        logger.debug(
+            f"[TIMING] topic={topic}, urgency={urgency:.2f}, importance={importance:.2f} "
+            f"→ base={base_time}, adjusted={adjusted_time:.0f}, final={final_time} mins"
+        )
+        
+        return final_time
+    
     async def analyze_message_for_follow_up(
         self,
         user_message: str,
@@ -322,25 +394,49 @@ class ProactiveConversationManager:
         Returns:
             ConversationContext if follow-up needed, None otherwise
         """
+        logger.info(f"[PROACTIVE] 🔍 Analyzing message for follow-up: '{user_message[:50]}...'")
+        
         # Ensure contexts are loaded
         await self._ensure_loaded()
         
         try:
-            # Build analysis prompt - keep it concise
+            # Build analysis prompt - keep it concise but intelligent about timing
             analysis_prompt = f"""Analyze: "{user_message}"
 
-Does this need follow-up? Consider:
-- Health issues, emotional distress, important events, goals, problems
-- Skip: greetings, routine activities, general chat
+Does this need follow-up? Be intelligent about TIMING like a caring friend.
+
+TIMING GUIDELINES (critical for natural conversation):
+- IMMEDIATE (5-10 mins): Medical emergencies, severe distress, panic, accidents, crises
+  Examples: "I'm having chest pain", "I can't breathe well", "I think I broke my ankle", 
+           "I'm having a panic attack", "My parent just had an accident", "I'm feeling suicidal"
+- URGENT (10-20 mins): Health issues, high anxiety, important imminent events
+  Examples: "I have a fever", "I'm really anxious", "Presentation starting in 20 mins",
+           "Feeling very dizzy", "Got into a car accident (minor)", "Lost my wallet"
+- HIGH (25-45 mins): Important tasks, ongoing activities, moderate concerns
+  Examples: "Going to the gym now", "Starting the meeting", "Working on the report",
+           "Doctor appointment in an hour", "Job interview today"
+- NORMAL (50-90 mins): Events to check on, general goals, moderate importance
+  Examples: "Have a date tonight", "Going to interview tomorrow", "Studying for exam",
+           "Visiting family", "Working on a project"
+- LOW (100-180 mins): Low priority, general life updates, future plans
+  Examples: "Planning a trip", "Thinking about learning guitar", "Had a nice dinner",
+           "Watching a movie", "Planning to redecorate"
+
+Consider:
+- IMMEDIATE emergencies/crises → 5-10 minutes
+- Health issues/high anxiety → 10-20 minutes
+- Active tasks/events → 25-60 minutes  
+- Goals/future plans → 60-180 minutes
+- Skip: greetings, routine chat, thanks/acknowledgments, casual observations
 
 Respond ONLY with JSON:
 {{
     "needs_follow_up": true/false,
-    "topic": "health/emotion/work/personal/goal/problem/general",
-    "subject": "brief topic",
+    "topic": "health/emotion/work/personal/goal/problem/celebration/general",
+    "subject": "brief topic (2-4 words)",
     "importance": 0.0-1.0,
     "urgency": 0.0-1.0,
-    "follow_up_minutes": 120,
+    "follow_up_minutes": 10,
     "follow_up_question": "short caring question"
 }}"""
 
@@ -391,19 +487,31 @@ Respond ONLY with JSON:
                     logger.info(f"Updated existing context: {existing.subject}")
                     return existing
                 
+                # Get timing from AI, but validate/adjust for intelligence
+                follow_up_minutes = analysis.get("follow_up_minutes", 120)
+                importance = analysis.get("importance", 0.5)
+                urgency = analysis.get("urgency", 0.5)
+                topic = analysis.get("topic", "general")
+                
+                # INTELLIGENT TIMING VALIDATION
+                # Ensure timing matches urgency/importance for natural human-like behavior
+                follow_up_minutes = self._calculate_intelligent_timing(
+                    follow_up_minutes, urgency, importance, topic
+                )
+                
                 # Create new conversation context
                 context = ConversationContext(
-                    topic=ConversationTopic(analysis.get("topic", "general")),
+                    topic=ConversationTopic(topic),
                     subject=analysis.get("subject", ""),
                     initial_message=user_message,
                     user_email=user_email,
                     environment_id=environment_id,
                     follow_up_question=analysis.get("follow_up_question"),
                     follow_up_scheduled=datetime.now() + timedelta(
-                        minutes=analysis.get("follow_up_minutes", 120)
+                        minutes=follow_up_minutes
                     ),
-                    importance=analysis.get("importance", 0.5),
-                    urgency=analysis.get("urgency", 0.5),
+                    importance=importance,
+                    urgency=urgency,
                     metadata={"reasoning": analysis.get("reasoning", "")}
                 )
                 
@@ -418,10 +526,25 @@ Respond ONLY with JSON:
                 # Save to memory
                 await self._save_context(context)
                 
-                logger.info(
-                    f"Created follow-up context: {context.subject} "
-                    f"(follow up in {analysis.get('follow_up_minutes')} mins)"
+                # Enhanced logging with timing details
+                scheduled_time = context.follow_up_scheduled.strftime('%H:%M')
+                timing_category = (
+                    "IMMEDIATE ⚠️" if follow_up_minutes <= 10 else
+                    "URGENT ⚡" if follow_up_minutes <= 20 else
+                    "SOON 🔔" if follow_up_minutes <= 45 else
+                    "LATER ⏰" if follow_up_minutes <= 90 else
+                    "EVENTUAL 📅"
                 )
+                
+                logger.info(
+                    f"[PROACTIVE] ✓ Created follow-up: {context.subject} "
+                    f"[{timing_category} in {follow_up_minutes} mins at {scheduled_time}]"
+                )
+                logger.info(
+                    f"[PROACTIVE]   Metrics: urgency={urgency:.2f}, importance={importance:.2f}, topic={topic}"
+                )
+                logger.info(f"[PROACTIVE]   Question: '{context.follow_up_question}'")
+                logger.info(f"[PROACTIVE]   Active contexts: {len(self.active_contexts)}")
                 
                 return context
                 

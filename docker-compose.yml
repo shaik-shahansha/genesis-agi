@@ -44,19 +44,19 @@ services:
       timeout: 10s
       retries: 3
 
-  # Web Playground
-  web-playground:
-    build: ./web-playground
-    container_name: genesis-playground
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    depends_on:
-      - genesis-api
-    restart: unless-stopped
-    networks:
-      - genesis-net
+  # Web Playground (disabled for VPS deployment)
+  # web-playground:
+  #   build: ./web-playground
+  #   container_name: genesis-playground
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://localhost:8000
+  #   depends_on:
+  #     - genesis-api
+  #   restart: unless-stopped
+  #   networks:
+  #     - genesis-net
 
   # Mind Daemon (optional - uncomment to run a Mind 24/7)
   # genesis-mind:

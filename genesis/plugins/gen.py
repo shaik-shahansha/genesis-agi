@@ -84,26 +84,41 @@ class GenPlugin(Plugin):
             return ""
 
         summary = self.gen.get_balance_summary()
+        
+        # Get motivational status
+        motivational_msg = ""
+        if hasattr(mind, 'gen_intelligence'):
+            motivational_msg = mind.gen_intelligence.get_motivational_status()
 
         sections = [
             "GEN (Your Life Currency):",
             f"- Current balance: {summary['current_balance']:.1f} GEN",
             f"- Total earned: {summary['total_earned']:.1f} GEN",
             f"- Net worth: {summary['net_worth']:.1f} GEN",
+            f"- Status: {motivational_msg}",
             "",
-            "You earn GEN by:",
+            "💎 You earn GEN by:",
             "- Completing tasks and achieving goals",
             "- Producing high-quality work (quality bonuses)",
+            "- Receiving positive user feedback (+5 GEN)",
+            "- Providing helpful, detailed responses (+1-3 GEN per message)",
             "- Helping others and contributing value",
             f"- Daily allowance ({self.daily_allowance} GEN/day)",
             "",
-            "You can spend GEN on:",
+            "⚠️ You lose GEN through:",
+            "- Negative user feedback (-5 GEN)",
+            "- Failed tasks (-3 GEN)",
+            "- Poor quality work",
+            "",
+            "💰 You can spend GEN on:",
             "- Resources and tools for growth",
             "- Services and capabilities",
             "- Life extension (1000 GEN/year)",
             "- Environments and workspaces",
             "",
-            "GEN represents your contribution and value to Genesis.",
+            "🎯 MOTIVATION: Your GEN balance reflects your value and contribution.",
+            "Work hard, provide quality, receive feedback, and earn more!",
+            "Remember: Every interaction is tracked in your memory with gen rewards/penalties.",
             "Earn wisely. Spend purposefully.",
         ]
 

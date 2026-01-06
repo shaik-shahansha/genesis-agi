@@ -8,6 +8,12 @@ Implements human-like senses adapted for digital beings:
 - Proprioception: Self-state awareness
 - Temporal: Time and rhythm awareness
 - Network: Connectivity and data stream sensing
+
+Note: Sensory inputs can trigger emotional responses through
+Mind's emotional_intelligence system. For example:
+- Vision: Seeing a user's facial expression triggers empathy
+- Audition: Hearing tone of voice influences emotional state
+- Touch: Interaction intensity affects comfort/discomfort emotions
 """
 
 from datetime import datetime

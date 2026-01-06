@@ -74,7 +74,13 @@ class Relationship(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     def record_interaction(self, is_positive: bool = True) -> None:
-        """Record an interaction with this being."""
+        """
+        Record an interaction with this being.
+        
+        Note: Emotional responses based on relationship context are handled by
+        Mind's emotional_intelligence system, which considers closeness, trust,
+        and interaction history when processing emotions.
+        """
         self.last_interaction = datetime.now()
         self.interaction_count += 1
 

@@ -166,6 +166,24 @@ class ChatResponse(BaseModel):
     response: str
     emotion: str
     memory_created: bool
+    gen_earned: Optional[float] = None  # Gens earned from this response
+
+
+class FeedbackRequest(BaseModel):
+    """User feedback request."""
+    
+    feedback_type: str  # 'positive' or 'negative'
+    message: Optional[str] = None  # Optional feedback message
+    context: Optional[str] = None  # What the feedback is about
+
+
+class FeedbackResponse(BaseModel):
+    """Feedback response with gen impact."""
+    
+    success: bool
+    gen_change: float  # Positive for reward, negative for penalty
+    new_balance: float
+    message: str
 
 
 class BackgroundTaskResponse(BaseModel):
@@ -499,6 +517,18 @@ async def list_minds():
             if identity.get('status', 'active') == 'terminated':
                 continue
             
+            # Get gen balance from plugins data if available
+            gens = 100  # Default starting balance
+            try:
+                plugins_data = data.get('plugins', {})
+                gen_plugin_data = plugins_data.get('gen', {})
+                if gen_plugin_data and 'gen' in gen_plugin_data:
+                    gen_data = gen_plugin_data['gen']
+                    if 'balance' in gen_data:
+                        gens = gen_data['balance'].get('current_balance', 100)
+            except Exception:
+                pass
+            
             minds.append(
                 MindResponse(
                     gmid=identity.get('gmid', ''),
@@ -509,7 +539,7 @@ async def list_minds():
                     current_thought=state.get('current_thought'),
                     avatar_url=identity.get('avatar_url'),
                     memory_count=memory_count,
-                    gens=identity.get('gens', 1000),
+                    gens=gens,
                     creator=identity.get('creator'),
                     creator_email=identity.get('creator_email'),
                     template=identity.get('template'),
@@ -536,6 +566,12 @@ async def get_mind(mind_id: str):
     # Extract provider and model from Intelligence configuration
     intelligence_dict = json.loads(mind.intelligence.model_dump_json())
     
+    # Get actual gen balance from gen manager
+    gens = 100  # Default
+    if hasattr(mind, 'gen') and mind.gen:
+        balance_summary = mind.gen.get_balance_summary()
+        gens = balance_summary['current_balance']
+    
     return MindResponse(
         gmid=mind.identity.gmid,
         name=mind.identity.name,
@@ -544,7 +580,7 @@ async def get_mind(mind_id: str):
         current_emotion=mind.current_emotion,
         current_thought=mind.current_thought,
         memory_count=mind.memory.vector_store.count(),
-        gens=getattr(mind.identity, 'gens', 1000),
+        gens=gens,
         avatar_url=getattr(mind.identity, 'avatar_url', None),
         creator=getattr(mind.identity, 'creator', None),
         creator_email=getattr(mind.identity, 'creator_email', None),
@@ -697,15 +733,25 @@ async def chat(
             memory_created=True,
         )
         
-        # Save updated state in background (non-blocking)
-        async def _save_mind_state():
+        # Background tasks (non-blocking)
+        async def _background_tasks():
             try:
+                # Reward for response quality (async, with memory)
+                if hasattr(mind, 'gen_intelligence'):
+                    gen_earned = await mind.gen_intelligence.reward_for_response_quality_async(
+                        user_message=request.message,
+                        assistant_response=response
+                    )
+                    if gen_earned > 0:
+                        print(f"[GEN] ✓ Earned {gen_earned:.1f} gens for quality response")
+                
+                # Save state
                 mind.save()
                 print(f"[PERF] ✓ Mind state saved to disk")
             except Exception as e:
-                logger.error(f"Failed to save mind state: {e}")
+                logger.error(f"Background tasks failed: {e}")
         
-        asyncio.create_task(_save_mind_state())
+        asyncio.create_task(_background_tasks())
         
         # Return response immediately - UI gets instant feedback!
         return chat_response
@@ -714,6 +760,60 @@ async def chat(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@minds_router.post("/{mind_id}/feedback", response_model=FeedbackResponse)
+async def submit_feedback(
+    mind_id: str,
+    request: FeedbackRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Submit user feedback (positive/negative) with gen rewards/penalties."""
+    mind = await _get_cached_mind(mind_id)
+    
+    try:
+        # Validate feedback type
+        if request.feedback_type not in ['positive', 'negative']:
+            raise HTTPException(
+                status_code=400,
+                detail="feedback_type must be 'positive' or 'negative'"
+            )
+        
+        # Process feedback asynchronously (with memory creation)
+        if hasattr(mind, 'gen_intelligence'):
+            feedback_message = request.message or f"{request.feedback_type} feedback"
+            
+            gen_change = await mind.gen_intelligence.reward_for_feedback_async(
+                feedback_type=request.feedback_type,
+                user_message=feedback_message,
+                context=request.context
+            )
+            
+            # Get new balance
+            balance_summary = mind.gen.get_balance_summary() if hasattr(mind, 'gen') else {'current_balance': 0}
+            new_balance = balance_summary['current_balance']
+            
+            # Save state in background
+            asyncio.create_task(asyncio.to_thread(mind.save))
+            
+            return FeedbackResponse(
+                success=True,
+                gen_change=gen_change,
+                new_balance=new_balance,
+                message=f"Feedback received! {'+' if gen_change > 0 else ''}{gen_change:.1f} gens. Balance: {new_balance:.1f}"
+            )
+        else:
+            return FeedbackResponse(
+                success=False,
+                gen_change=0.0,
+                new_balance=0.0,
+                message="Gen economy not enabled for this Mind"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process feedback: {str(e)}")
 
 
 # Background Task Endpoints

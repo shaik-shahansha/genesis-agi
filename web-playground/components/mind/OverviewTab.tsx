@@ -130,7 +130,7 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-300 rounded-lg p-4">
           <div className="text-sm text-yellow-700 font-medium">💰 Gens</div>
-          <div className="text-2xl font-bold text-yellow-900 mt-1">{mind.gens || 1000}</div>
+          <div className="text-2xl font-bold text-yellow-900 mt-1">{mind.gens !== undefined ? mind.gens : 100}</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm text-gray-600">Memories</div>

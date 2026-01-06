@@ -115,6 +115,28 @@ class EmotionalState(BaseModel):
                 break
 
         return f"{intensity_word} {self.get_emotion_value()}"
+    
+    def blend_with(self, other: "EmotionalState", weight: float = 0.5) -> "EmotionalState":
+        """
+        Blend this emotional state with another.
+        
+        Args:
+            other: Other emotional state to blend with
+            weight: Weight of other state (0.0 = all self, 1.0 = all other)
+        
+        Returns:
+            New blended emotional state
+        """
+        return EmotionalState(
+            primary_emotion=other.primary_emotion if weight > 0.5 else self.primary_emotion,
+            intensity=self.intensity * (1 - weight) + other.intensity * weight,
+            arousal=self.arousal * (1 - weight) + other.arousal * weight,
+            valence=self.valence * (1 - weight) + other.valence * weight,
+            emotions={**self.emotions, **other.emotions},  # Combine emotion blends
+            mood=self.mood,  # Mood changes more slowly
+            mood_stability=self.mood_stability,
+            trigger=other.trigger if weight > 0.5 else self.trigger
+        )
 
     class Config:
         use_enum_values = True
