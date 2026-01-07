@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_reload: bool = False
-    cors_origins: list[str] = ["*"]
+    cors_origins: str = "*"  # Comma-separated list of allowed origins or * for all
 
     # Security & Authentication
     api_secret_key: str = "your-secret-key-change-this-in-production"
@@ -69,6 +69,13 @@ class Settings(BaseSettings):
     secret_key: str = "your-secret-key-change-this-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS origins string into list."""
+        if self.cors_origins == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
