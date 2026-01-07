@@ -509,7 +509,7 @@ section {
 .playground-content {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 4rem;
+    gap: 3rem;
     align-items: start;
     margin-top: 3rem;
 }
@@ -518,7 +518,9 @@ section {
     background: var(--background-card);
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 2.5rem;
+    padding: 2rem;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .playground-description h3 {
@@ -536,7 +538,9 @@ section {
     background: var(--background-card);
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 2.5rem;
+    padding: 2rem;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .setup-step {
@@ -2162,12 +2166,12 @@ section {
     
     .playground-content {
         grid-template-columns: 1fr;
-        gap: 2rem;
+        gap: 1.5rem;
     }
     
     .playground-description,
     .playground-setup {
-        padding: 1.5rem;
+        padding: 1.25rem;
     }
     
     .setup-step {
@@ -2310,7 +2314,7 @@ section {
     }
     
     .playground-content {
-        gap: 1.5rem;
+        gap: 1rem;
     }
     
     .playground-description,
@@ -2320,16 +2324,23 @@ section {
     
     .playground-description h3,
     .playground-setup h3 {
-        font-size: 1.3rem !important;
+        font-size: 1.2rem !important;
+        margin-bottom: 0.75rem !important;
     }
     
     .playground-description p {
-        font-size: 0.95rem !important;
+        font-size: 0.9rem !important;
+        line-height: 1.5 !important;
+        margin-bottom: 1rem !important;
     }
     
     .playground-description ul li {
-        font-size: 0.9rem;
-        padding: 0.4rem 0 !important;
+        font-size: 0.85rem;
+        padding: 0.3rem 0 !important;
+    }
+    
+    .playground-description ul li span:last-child {
+        font-size: 0.85rem !important;
     }
     
     .setup-step-content h4 {
