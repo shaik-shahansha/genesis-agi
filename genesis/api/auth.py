@@ -2,6 +2,7 @@
 
 Provides:
 - JWT token generation and validation
+- Firebase ID token verification
 - API key authentication
 - User management
 - Role-based access control
@@ -19,6 +20,7 @@ import bcrypt
 from pydantic import BaseModel
 
 from genesis.config import get_settings
+from genesis.api.firebase_auth import verify_firebase_token, is_firebase_enabled
 
 settings = get_settings()
 
@@ -142,12 +144,43 @@ def revoke_api_key(api_key: str) -> bool:
 async def get_current_user_from_token(
     credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
 ) -> Optional[User]:
-    """Get current user from JWT token."""
+    """Get current user from JWT token or Firebase ID token."""
     if not credentials:
         return None
 
     token = credentials.credentials
 
+    # First, try Firebase token verification if Firebase is enabled
+    if is_firebase_enabled():
+        firebase_user = await verify_firebase_token(token)
+        if firebase_user:
+            # Create or get user from Firebase data
+            email = firebase_user.get('email')
+            uid = firebase_user.get('uid')
+            
+            if email:
+                # Use Firebase UID as username (prefixed to avoid collisions)
+                username = f"firebase_{uid}"
+                
+                # Check if user exists in local DB, create if not
+                _initialize_default_users()
+                if username not in USERS_DB:
+                    # Auto-create user from Firebase
+                    USERS_DB[username] = {
+                        "username": username,
+                        "email": email,
+                        "hashed_password": "",  # No password for Firebase users
+                        "role": UserRole.USER,
+                        "disabled": False,
+                    }
+                
+                user_dict = USERS_DB[username]
+                # Update email in case it changed
+                user_dict["email"] = email
+                
+                return User(**user_dict)
+
+    # Fallback to JWT token verification
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")

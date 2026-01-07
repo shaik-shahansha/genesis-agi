@@ -39,7 +39,10 @@ def _interactive_model_selection() -> Intelligence:
 
     choice = typer.prompt("Select option", type=int, default=1)
 
-    intelligence = Intelligence()
+    # Will build and return Intelligence at the end with proper model
+    reasoning_model = None
+    fast_model = None
+    api_keys = {}
 
     if choice == 2:
         # Local Ollama
@@ -89,8 +92,8 @@ def _interactive_model_selection() -> Intelligence:
                     console.print(f"[red][FAILED] Download failed[/red]\n")
                     raise typer.Exit(1)
 
-        intelligence.reasoning_model = f"ollama/{model_name}"
-        intelligence.fast_model = f"ollama/{model_name}"
+        reasoning_model = f"ollama/{model_name}"
+        fast_model = f"ollama/{model_name}"
         console.print(f"\n[green][SUCCESS] Using local model: {model_name}[/green]\n")
 
     else:
@@ -113,10 +116,7 @@ def _interactive_model_selection() -> Intelligence:
             if api_key:
                 import os
                 os.environ["OPENROUTER_API_KEY"] = api_key
-                # Store in Intelligence config so it persists with the Mind
-                if not intelligence.api_keys:
-                    intelligence.api_keys = {}
-                intelligence.api_keys['openrouter'] = api_key
+                api_keys['openrouter'] = api_key
 
             # Recommend best free models
             console.print("\n[bold]Select a free model:[/bold]")
@@ -129,24 +129,24 @@ def _interactive_model_selection() -> Intelligence:
             model_choice = typer.prompt("Select model", type=int, default=1)
             
             if model_choice == 1:
-                intelligence.reasoning_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
-                intelligence.fast_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
+                reasoning_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
+                fast_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
                 console.print("\n[green][SUCCESS] Using Llama 3.3 70B (FREE, RECOMMENDED)[/green]\n")
             elif model_choice == 2:
-                intelligence.reasoning_model = "openrouter/deepseek/deepseek-r1-0528:free"
-                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                reasoning_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
                 console.print("\n[green][SUCCESS] Using DeepSeek Chat (FREE, excellent quality)[/green]\n")
             elif model_choice == 3:
-                intelligence.reasoning_model = "openrouter/deepseek/deepseek-r1-0528:free"
-                intelligence.fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                reasoning_model = "openrouter/deepseek/deepseek-r1-0528:free"
+                fast_model = "openrouter/deepseek/deepseek-r1-0528:free"
                 console.print("\n[green][SUCCESS] Using Xiaomi MiMo V2 Flash (FREE, ultra-fast)[/green]\n")
             elif model_choice == 4:
-                intelligence.reasoning_model = "openrouter/mistralai/devstral-2512:free"
-                intelligence.fast_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
+                reasoning_model = "openrouter/mistralai/devstral-2512:free"
+                fast_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
                 console.print("\n[green][SUCCESS] Using Mistral Devstral 2 (FREE, best for coding)[/green]\n")
             else:
-                intelligence.reasoning_model = "openrouter/nex-agi/deepseek-v3.1-nex-n1:free"
-                intelligence.fast_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
+                reasoning_model = "openrouter/nex-agi/deepseek-v3.1-nex-n1:free"
+                fast_model = "openrouter/meta-llama/llama-3.3-70b-instruct:free"
                 console.print("\n[green][SUCCESS] Using DeepSeek V3.1 Nex N1 (FREE, agent optimized)[/green]\n")
 
         elif provider_choice == 2:
@@ -155,27 +155,23 @@ def _interactive_model_selection() -> Intelligence:
             if api_key:
                 import os
                 os.environ["GROQ_API_KEY"] = api_key
-                # Store in Intelligence config so it persists with the Mind
-                if not intelligence.api_keys:
-                    intelligence.api_keys = {}
-                intelligence.api_keys['groq'] = api_key
+                api_keys['groq'] = api_key
 
-            intelligence.reasoning_model = "groq/openai/gpt-oss-120b"
-            intelligence.fast_model = "groq/openai/gpt-oss-120b"
-            console.print("\n[green][SUCCESS] Using Groq openai/gpt-oss-120b (FREE, ultra-fast)[/green]\n")
+            # Set BOTH models to ensure consistency
+            selected_model = "groq/openai/gpt-oss-120b"
+            reasoning_model = selected_model
+            fast_model = selected_model
+            console.print(f"\n[green][SUCCESS] Using Groq {selected_model} for both reasoning and fast responses[/green]\n")
 
         elif provider_choice == 3:
             # OpenAI
             api_key = typer.prompt("Enter OpenAI API key")
             import os
             os.environ["OPENAI_API_KEY"] = api_key
-            # Store in Intelligence config
-            if not intelligence.api_keys:
-                intelligence.api_keys = {}
-            intelligence.api_keys['openai'] = api_key
+            api_keys['openai'] = api_key
 
-            intelligence.reasoning_model = "openai/gpt-5.2"
-            intelligence.fast_model = "openai/gpt-5-mini"
+            reasoning_model = "openai/gpt-5.2"
+            fast_model = "openai/gpt-5-mini"
             console.print("\n[green][SUCCESS] Using OpenAI (GPT-5.2 / GPT-5 mini)[/green]\n")
 
         elif provider_choice == 4:
@@ -183,15 +179,19 @@ def _interactive_model_selection() -> Intelligence:
             api_key = typer.prompt("Enter Anthropic API key")
             import os
             os.environ["ANTHROPIC_API_KEY"] = api_key
-            # Store in Intelligence config
-            if not intelligence.api_keys:
-                intelligence.api_keys = {}
-            intelligence.api_keys['anthropic'] = api_key
+            api_keys['anthropic'] = api_key
 
-            intelligence.reasoning_model = "anthropic/claude-sonnet-4.5"
-            intelligence.fast_model = "anthropic/claude-haiku-4.5"
+            reasoning_model = "anthropic/claude-sonnet-4.5"
+            fast_model = "anthropic/claude-haiku-4.5"
             console.print("\n[green][SUCCESS] Using Anthropic Claude 4.5[/green]\n")
 
+    # Now build Intelligence with the collected models and API keys
+    intelligence = Intelligence(
+        reasoning_model=reasoning_model,
+        fast_model=fast_model,
+        api_keys=api_keys if api_keys else None
+    )
+    
     return intelligence
 
 
@@ -301,15 +301,27 @@ def birth(
         raise typer.Exit(1)
 
     # Create intelligence config
-    intelligence = Intelligence()
+    intelligence = None
 
     # Interactive model selection if no models specified
     if interactive and not reasoning_model and not fast_model:
         intelligence = _interactive_model_selection()
     elif reasoning_model:
-        intelligence.reasoning_model = reasoning_model
+        # Create Intelligence with reasoning_model
+        intelligence = Intelligence(reasoning_model=reasoning_model)
+        # If fast_model not specified, sync it with reasoning_model (validator does this)
+        if not fast_model:
+            console.print(f"[dim]   fast_model synced to reasoning_model: {reasoning_model}[/dim]")
+        else:
+            intelligence.fast_model = fast_model
     elif fast_model:
-        intelligence.fast_model = fast_model
+        # Create Intelligence with fast_model as reasoning_model
+        intelligence = Intelligence(reasoning_model=fast_model)
+        console.print(f"[dim]   reasoning_model synced to fast_model: {fast_model}[/dim]")
+    else:
+        # No model specified and not interactive - error
+        console.print("[red][ERROR] No model specified. Please specify --reasoning-model or use interactive mode.[/red]")
+        raise typer.Exit(1)
 
     # Interactive email prompt if not specified
     if interactive and not email:

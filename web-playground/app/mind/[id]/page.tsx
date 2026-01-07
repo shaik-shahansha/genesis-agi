@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard } from '@/components/ui/StatCard';
 import { ConsciousnessOrb } from '@/components/ConsciousnessOrb';
+import AuthRequired from '@/components/AuthRequired';
 
 interface Mind {
   gmid: string;
@@ -37,7 +38,7 @@ interface Dream {
   timestamp: string;
 }
 
-export default function MindProfilePage() {
+function MindProfilePage() {
   const params = useParams();
   const router = useRouter();
   const mindId = params.id as string;
@@ -381,3 +382,12 @@ export default function MindProfilePage() {
     </div>
   );
 }
+
+// Wrap with AuthRequired
+const MindProfilePageWithAuth = () => (
+  <AuthRequired>
+    <MindProfilePage />
+  </AuthRequired>
+);
+
+export default MindProfilePageWithAuth;

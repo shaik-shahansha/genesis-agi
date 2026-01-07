@@ -233,13 +233,74 @@ class GenManager:
     Manager for a single Mind's GEN operations.
 
     Handles balance, transactions, earning, and spending.
+    Now stores transactions in SQLite database for scalability.
     """
 
     def __init__(self, mind_gmid: str, initial_balance: float = 100.0):
         """Initialize GEN manager for a Mind."""
         self.mind_gmid = mind_gmid
         self.balance = GenBalance(current_balance=initial_balance)
-        self.transaction_history: list[GenTransaction] = []
+        # Load balance from database
+        self._load_balance_from_db()
+
+    def _load_balance_from_db(self) -> None:
+        """Load current balance from MindRecord in database."""
+        try:
+            from genesis.database.base import get_session
+            from genesis.database.models import MindRecord
+            
+            with get_session() as session:
+                mind_record = session.query(MindRecord).filter_by(gmid=self.mind_gmid).first()
+                if mind_record:
+                    # Extract values while session is still active
+                    self.balance.current_balance = float(mind_record.gen_balance)
+                    self.balance.total_earned = float(mind_record.total_gen_earned)
+                    self.balance.total_spent = float(mind_record.total_gen_spent)
+        except Exception as e:
+            print(f"[GEN] Could not load balance from DB: {e}")
+
+    def _save_balance_to_db(self) -> None:
+        """Save current balance to MindRecord in database."""
+        try:
+            from genesis.database.manager import MetaverseDB
+            db = MetaverseDB()
+            db.update_mind_gen_balance(
+                self.mind_gmid,
+                gen_balance=self.balance.current_balance,
+                total_earned=self.balance.total_earned,
+                total_spent=self.balance.total_spent
+            )
+        except Exception as e:
+            print(f"[GEN] Could not save balance to DB: {e}")
+
+    def _save_transaction_to_db(self, transaction: 'GenTransaction') -> None:
+        """Save transaction to database."""
+        try:
+            from genesis.database.manager import MetaverseDB
+            from genesis.database.models import GenTransaction as DBGenTransaction
+            from genesis.database.base import get_session
+            
+            db_txn = DBGenTransaction(
+                transaction_id=transaction.transaction_id,
+                mind_gmid=self.mind_gmid,
+                counterparty_gmid=transaction.counterparty_gmid,
+                transaction_type=transaction.transaction_type.value,
+                amount=transaction.amount,
+                balance_after=transaction.balance_after,
+                reason=transaction.reason,
+                related_task_id=transaction.related_task_id,
+                related_entity=transaction.related_entity,
+                timestamp=transaction.timestamp,
+                extra_metadata=transaction.metadata
+            )
+            
+            with get_session() as session:
+                session.add(db_txn)
+                session.commit()
+        except Exception as e:
+            print(f"[GEN] Could not save transaction to DB: {e}")
+            import traceback
+            traceback.print_exc()
 
     def earn(
         self,
@@ -260,7 +321,10 @@ class GenManager:
             **kwargs
         )
 
-        self.transaction_history.append(transaction)
+        # Save to database immediately
+        self._save_transaction_to_db(transaction)
+        self._save_balance_to_db()
+        
         return transaction
 
     def spend(
@@ -289,7 +353,10 @@ class GenManager:
             **kwargs
         )
 
-        self.transaction_history.append(transaction)
+        # Save to database immediately
+        self._save_transaction_to_db(transaction)
+        self._save_balance_to_db()
+        
         return transaction
 
     def transfer(
@@ -309,35 +376,63 @@ class GenManager:
 
     def get_balance_summary(self) -> dict:
         """Get complete balance summary."""
+        # Get transaction count from database
+        transaction_count = 0
+        try:
+            from genesis.database.manager import MetaverseDB
+            from genesis.database.base import get_session
+            from genesis.database.models import GenTransaction
+            
+            with get_session() as session:
+                transaction_count = session.query(GenTransaction).filter_by(mind_gmid=self.mind_gmid).count()
+        except Exception as e:
+            print(f"[GEN] Could not get transaction count: {e}")
+        
         return {
             "current_balance": round(self.balance.current_balance, 2),
             "total_earned": round(self.balance.total_earned, 2),
             "total_spent": round(self.balance.total_spent, 2),
             "net_worth": round(self.balance.get_net_worth(), 2),
             "is_in_debt": self.balance.is_in_debt(),
-            "transaction_count": len(self.transaction_history),
+            "transaction_count": transaction_count,
         }
 
     def get_recent_transactions(self, limit: int = 10) -> list[dict]:
-        """Get recent transactions."""
-        return [
-            {
-                "id": txn.transaction_id,
-                "type": txn.transaction_type.value,
-                "amount": txn.amount,
-                "balance_after": txn.balance_after,
-                "reason": txn.reason,
-                "timestamp": txn.timestamp.isoformat(),
-            }
-            for txn in self.transaction_history[-limit:]
-        ]
+        """Get recent transactions from database."""
+        try:
+            from genesis.database.base import get_session
+            from genesis.database.models import GenTransaction
+            from sqlalchemy import desc
+            
+            with get_session() as session:
+                transactions = (
+                    session.query(GenTransaction)
+                    .filter_by(mind_gmid=self.mind_gmid)
+                    .order_by(desc(GenTransaction.timestamp))
+                    .limit(limit)
+                    .all()
+                )
+                # Extract values while session is active
+                return [
+                    {
+                        "id": txn.transaction_id,
+                        "type": txn.transaction_type,
+                        "amount": float(txn.amount),
+                        "balance_after": float(txn.balance_after),
+                        "reason": txn.reason,
+                        "timestamp": txn.timestamp.isoformat(),
+                    }
+                    for txn in transactions
+                ]
+        except Exception as e:
+            print(f"[GEN] Could not load transactions: {e}")
+            return []
 
     def to_dict(self) -> dict:
-        """Serialize to dictionary."""
+        """Serialize to dictionary (balance only - transactions in DB)."""
         return {
             "mind_gmid": self.mind_gmid,
             "balance": self.balance.model_dump(mode='json'),
-            "transaction_history": [txn.model_dump(mode='json') for txn in self.transaction_history],
         }
 
     @classmethod
@@ -345,7 +440,4 @@ class GenManager:
         """Deserialize from dictionary."""
         manager = cls(mind_gmid=data["mind_gmid"])
         manager.balance = GenBalance(**data["balance"])
-        manager.transaction_history = [
-            GenTransaction(**txn) for txn in data.get("transaction_history", [])
-        ]
         return manager

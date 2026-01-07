@@ -65,18 +65,24 @@ class GenPlugin(Plugin):
 
     def on_init(self, mind: "Mind") -> None:
         """Attach GEN manager to Mind."""
-        self.gen = GenManager(mind_gmid=mind.identity.gmid)
+        # Initialize with balance from identity.gens if available
+        initial_balance = getattr(mind.identity, 'gens', self.starting_balance)
+        self.gen = GenManager(mind_gmid=mind.identity.gmid, initial_balance=initial_balance)
         mind.gen = self.gen
 
     def on_birth(self, mind: "Mind") -> None:
-        """Give starting balance as birth gift."""
+        """Give starting balance as birth gift (only for newly created Minds)."""
         if self.gen:
-            self.gen.earn(
-                amount=self.starting_balance,
-                reason="Birth gift - welcome to Genesis",
-                transaction_type=TransactionType.BONUS
-            )
-            print(f"   Starting GEN: {self.starting_balance}")
+            # Only give birth gift if balance matches starting balance (new Mind)
+            # If loaded from disk, the balance is already set from identity.gens
+            balance_summary = self.gen.get_balance_summary()
+            if balance_summary['current_balance'] == self.starting_balance and balance_summary['transaction_count'] == 0:
+                self.gen.earn(
+                    amount=self.starting_balance,
+                    reason="Birth gift - welcome to Genesis",
+                    transaction_type=TransactionType.BONUS
+                )
+                print(f"   Starting GEN: {self.starting_balance}")
 
     def extend_system_prompt(self, mind: "Mind") -> str:
         """Add GEN context to system prompt."""
@@ -125,21 +131,23 @@ class GenPlugin(Plugin):
         return "\n".join(sections)
 
     def on_save(self, mind: "Mind") -> Dict[str, Any]:
-        """Save GEN state."""
-        if not self.gen:
-            return {}
-
+        """Save GEN plugin configuration only (balance is in database)."""
+        # Gen transactions and balance are now stored in SQLite database
+        # We only save plugin configuration here
         return {
-            "gen": self.gen.to_dict(),
             "starting_balance": self.starting_balance,
             "daily_allowance": self.daily_allowance,
         }
 
     def on_load(self, mind: "Mind", data: Dict[str, Any]) -> None:
-        """Restore GEN state."""
+        """Restore GEN plugin configuration (balance loaded from database)."""
+        # Legacy support: Load gen data from JSON if it exists
         if "gen" in data:
             self.gen = GenManager.from_dict(data["gen"])
             mind.gen = self.gen
+        else:
+            # Gen balance is now in database, GenManager will load it automatically
+            pass
 
         if "starting_balance" in data:
             self.starting_balance = data["starting_balance"]

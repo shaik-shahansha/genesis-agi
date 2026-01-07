@@ -345,6 +345,18 @@ async def create_new_api_key(
     }
 
 
+@auth_router.get("/firebase/status")
+async def firebase_status() -> Dict[str, Any]:
+    """Check if Firebase authentication is enabled and available."""
+    from genesis.api.firebase_auth import is_firebase_enabled
+    
+    enabled = is_firebase_enabled()
+    return {
+        "firebase_enabled": enabled,
+        "message": "Firebase authentication is enabled" if enabled else "Firebase authentication is not configured",
+    }
+
+
 # =============================================================================
 # MIND ENDPOINTS (Protected)
 # =============================================================================
@@ -376,12 +388,24 @@ async def create_mind(
             detail=f"Mind with name '{request.name}' already exists. Please choose a different name."
         )
 
-    # Build intelligence config
-    intelligence = Intelligence()
-    if request.reasoning_model:
-        intelligence.reasoning_model = request.reasoning_model
+    # Build intelligence config - reasoning_model is REQUIRED
+    if not request.reasoning_model:
+        raise HTTPException(
+            status_code=400,
+            detail="reasoning_model is required. Please specify a model like 'groq/llama-3.1-70b-versatile'"
+        )
+    
+    # Create Intelligence with reasoning_model
+    intelligence = Intelligence(reasoning_model=request.reasoning_model)
+    
+    # Set fast_model if provided, otherwise it defaults to reasoning_model (via validator)
     if request.fast_model:
         intelligence.fast_model = request.fast_model
+        logger.info(f"Using reasoning_model={request.reasoning_model}, fast_model={request.fast_model}")
+    else:
+        logger.info(f"fast_model synced to reasoning_model: {request.reasoning_model}")
+    
+    # Set API keys if provided
     if request.api_keys:
         intelligence.api_keys = request.api_keys
 
@@ -443,6 +467,12 @@ async def create_mind(
             # Log but don't fail Mind creation if environment creation fails
             print(f"Warning: Could not create default environment for {mind.identity.gmid}: {env_error}")
 
+        # Get actual gen balance if GenManager is available
+        gens = 1000  # Default
+        if hasattr(mind, 'gen') and mind.gen:
+            balance_summary = mind.gen.get_balance_summary()
+            gens = int(balance_summary['current_balance'])
+
         return MindResponse(
             gmid=mind.identity.gmid,
             name=mind.identity.name,
@@ -451,6 +481,7 @@ async def create_mind(
             current_emotion=mind.current_emotion,
             current_thought=mind.current_thought,
             memory_count=mind.memory.vector_store.count(),
+            gens=gens,
             avatar_url=getattr(mind.identity, 'avatar_url', None),
             creator=mind.identity.creator,
             creator_email=getattr(mind.identity, 'creator_email', None),
@@ -1069,11 +1100,19 @@ async def update_mind_settings(
             mind.identity.description = settings.get('description', '')
         
         # Update LLM configuration
-        # Map llm_model to both reasoning_model and fast_model for consistency
+        # Update reasoning_model (and optionally fast_model if they were the same before)
         if 'llm_model' in settings:
             model_value = settings['llm_model']
-            mind.intelligence.reasoning_model = model_value
-            mind.intelligence.fast_model = model_value
+            # If both models were the same before, update both (maintain consistency)
+            # If they were different, only update reasoning_model (respect user's choice)
+            if mind.intelligence.reasoning_model == mind.intelligence.fast_model:
+                # They were synced, keep them synced
+                mind.intelligence.reasoning_model = model_value
+                mind.intelligence.fast_model = model_value
+            else:
+                # They were different, only update reasoning (user may have customized fast)
+                mind.intelligence.reasoning_model = model_value
+                logger.info(f"Updated reasoning_model to {model_value}, kept fast_model as {mind.intelligence.fast_model}")
         
         # Note: llm_provider is derived from the model string, not stored separately
         if 'api_key' in settings and settings['api_key']:

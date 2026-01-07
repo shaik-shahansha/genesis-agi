@@ -90,7 +90,7 @@ class LLMGateway:
     - Implement caching strategies
     """
 
-    def __init__(self, orchestrator=None):
+    def __init__(self, orchestrator=None, reasoning_model: Optional[str] = None, fast_model: Optional[str] = None):
         self.orchestrator = orchestrator
         self.request_queue: List[LLMRequest] = []
 
@@ -104,12 +104,19 @@ class LLMGateway:
         self.daily_request_limit = 200
         self.daily_token_limit = 100000
 
-        # Model selection
-        settings = get_settings()
+        # Model selection - use Mind's configured models, NOT settings defaults
+        # If models not provided, they MUST be provided by the caller
+        if not reasoning_model or not fast_model:
+            logger.warning(
+                "LLMGateway initialized without models. "
+                "This may cause errors if LLM calls are made. "
+                "Please provide reasoning_model and fast_model from Mind's intelligence config."
+            )
+        
         self.complexity_models = {
-            "simple": "groq/llama-3.1-8b-instant",     # Quick responses
-            "normal": "groq/openai/gpt-oss-120b",   # Balanced
-            "complex": settings.default_reasoning_model,  # Advanced reasoning
+            "simple": fast_model,      # Quick responses - use fast model
+            "normal": fast_model,      # Balanced - use fast model  
+            "complex": reasoning_model,  # Advanced reasoning - use reasoning model
         }
         # Callbacks
         self.on_response: Optional[Callable] = None
@@ -601,7 +608,9 @@ class LivingMind:
         mind_name: str,
         orchestrator=None,
         memory_manager=None,
-        timezone_offset: int = 0
+        timezone_offset: int = 0,
+        reasoning_model: Optional[str] = None,
+        fast_model: Optional[str] = None,
     ):
         self.mind_id = mind_id
         self.mind_name = mind_name
@@ -613,7 +622,12 @@ class LivingMind:
             timezone_offset=timezone_offset
         )
         self.activities = LifeActivityEngine(mind_id=mind_id)
-        self.llm_gateway = LLMGateway(orchestrator=orchestrator)
+        # Pass Mind's models to LLMGateway
+        self.llm_gateway = LLMGateway(
+            orchestrator=orchestrator,
+            reasoning_model=reasoning_model,
+            fast_model=fast_model
+        )
         self.memory = MemoryIntegration(memory_manager=memory_manager)
 
         # State

@@ -16,6 +16,7 @@ from genesis.database.models import (
     SharedEvent,
     MetaverseState,
     ThoughtRecord,
+    GenTransaction,
 )
 
 
@@ -743,3 +744,66 @@ class MetaverseDB:
             )
             session.commit()
             return deleted
+
+    # =========================================================================
+    # GEN ECONOMY
+    # =========================================================================
+
+    def update_mind_gen_balance(
+        self,
+        gmid: str,
+        gen_balance: float,
+        total_earned: float,
+        total_spent: float,
+    ) -> None:
+        """Update Mind's GEN balance in database."""
+        with get_session() as session:
+            mind = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if mind:
+                mind.gen_balance = gen_balance
+                mind.total_gen_earned = total_earned
+                mind.total_gen_spent = total_spent
+                session.commit()
+
+    def get_gen_transactions(
+        self,
+        mind_gmid: str,
+        limit: int = 10,
+    ) -> List[GenTransaction]:
+        """Get recent GEN transactions for a Mind."""
+        with get_session() as session:
+            return (
+                session.query(GenTransaction)
+                .filter_by(mind_gmid=mind_gmid)
+                .order_by(desc(GenTransaction.timestamp))
+                .limit(limit)
+                .all()
+            )
+
+    def update_mind_state(
+        self,
+        gmid: str,
+        current_emotion: Optional[str] = None,
+        current_thought: Optional[str] = None,
+        emotional_valence: Optional[float] = None,
+        emotional_arousal: Optional[float] = None,
+        emotional_dominance: Optional[float] = None,
+        current_mood: Optional[str] = None,
+    ) -> None:
+        """Update Mind's current state and emotional state."""
+        with get_session() as session:
+            mind = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if mind:
+                if current_emotion is not None:
+                    mind.current_emotion = current_emotion
+                if current_thought is not None:
+                    mind.current_thought = current_thought
+                if emotional_valence is not None:
+                    mind.emotional_valence = emotional_valence
+                if emotional_arousal is not None:
+                    mind.emotional_arousal = emotional_arousal
+                if emotional_dominance is not None:
+                    mind.emotional_dominance = emotional_dominance
+                if current_mood is not None:
+                    mind.current_mood = current_mood
+                session.commit()

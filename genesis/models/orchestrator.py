@@ -137,9 +137,14 @@ class ModelOrchestrator:
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
         """
-        # Use default if no model specified
+        # CRITICAL: model is REQUIRED - do NOT fall back to settings defaults
+        # Always use the Mind's configured models, never global defaults
         if model is None:
-            model = self.settings.default_fast_model
+            raise ValueError(
+                "Model is required but was None. "
+                "Mind's intelligence configuration must specify reasoning_model and fast_model. "
+                "This is a configuration error - please ensure the Mind was created with proper model settings."
+            )
 
         provider_name, model_name = self.parse_model_string(model)
 
@@ -167,8 +172,13 @@ class ModelOrchestrator:
         **kwargs: Any,
     ):
         """Stream generate responses."""
+        # CRITICAL: model is REQUIRED - do NOT fall back to settings defaults
         if model is None:
-            model = self.settings.default_fast_model
+            raise ValueError(
+                "Model is required but was None. "
+                "Mind's intelligence configuration must specify reasoning_model and fast_model. "
+                "This is a configuration error - please ensure the Mind was created with proper model settings."
+            )
 
         provider_name, model_name = self.parse_model_string(model)
 

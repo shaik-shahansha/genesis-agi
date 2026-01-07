@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import AuthRequired from '@/components/AuthRequired';
 
 interface Mind {
   gmid: string;
@@ -15,17 +16,12 @@ interface Mind {
   daemon_running?: boolean;
 }
 
-export default function Home() {
+function Home() {
   const [minds, setMinds] = useState<Mind[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // Check authentication first
-    if (!api.isAuthenticated()) {
-      router.push('/login');
-      return;
-    }
     fetchMinds();
     
     // Reload when window gains focus (e.g., after navigation back)
@@ -115,3 +111,12 @@ export default function Home() {
     </div>
   );
 }
+
+// Wrap with AuthRequired
+const HomeWithAuth = () => (
+  <AuthRequired>
+    <Home />
+  </AuthRequired>
+);
+
+export default HomeWithAuth;

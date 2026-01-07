@@ -1,37 +1,32 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 
 export default function AuthRequired({ children }: { children: React.ReactNode }) {
-  const [isChecking, setIsChecking] = useState(true);
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    if (!api.isAuthenticated()) {
-      router.push('/login');
-      return;
-    }
-
-    try {
-      await api.getCurrentUser();
-      setIsChecking(false);
-    } catch {
+    if (!loading && !user) {
       router.push('/login');
     }
-  };
+  }, [user, loading, router]);
 
-  if (isChecking) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="spinner"></div>
+      <div className="flex items-center justify-center min-h-screen bg-slate-900">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
+          <p className="mt-4 text-gray-400">Loading...</p>
+        </div>
       </div>
     );
+  }
+
+  if (!user) {
+    return null; // Will redirect in useEffect
   }
 
   return <>{children}</>;

@@ -64,6 +64,16 @@ class MindRecord(Base):
     total_gen_earned = Column(Float, default=100.0)
     total_gen_spent = Column(Float, default=0.0)
 
+    # Current state (frequently changing - store in DB not JSON)
+    current_emotion = Column(String(50), default="neutral")
+    current_thought = Column(Text, nullable=True)
+    
+    # Emotional state (frequently changing - store in DB not JSON)
+    emotional_valence = Column(Float, default=0.5)  # 0.0-1.0 (negative to positive)
+    emotional_arousal = Column(Float, default=0.5)  # 0.0-1.0 (calm to excited)
+    emotional_dominance = Column(Float, default=0.5)  # 0.0-1.0 (submissive to dominant)
+    current_mood = Column(String(50), default="calm")
+
     # Task completion stats
     tasks_completed = Column(Integer, default=0)
     tasks_failed = Column(Integer, default=0)

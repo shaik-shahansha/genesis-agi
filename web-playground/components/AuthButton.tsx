@@ -1,47 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 
 export default function AuthButton() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState<string | null>(null);
+  const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    checkAuth();
-  }, [pathname]);
-
-  const checkAuth = async () => {
-    if (api.isAuthenticated()) {
-      try {
-        const user = await api.getCurrentUser();
-        setIsAuthenticated(true);
-        setUsername(user.username);
-      } catch {
-        setIsAuthenticated(false);
-        setUsername(null);
-      }
-    } else {
-      setIsAuthenticated(false);
-      setUsername(null);
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.push('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
     }
   };
 
-  const handleLogout = () => {
-    api.logout();
-    setIsAuthenticated(false);
-    setUsername(null);
-    router.push('/login');
-  };
-
-  if (pathname === '/login') {
+  if (pathname === '/login' || loading) {
     return null;
   }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <button
         onClick={() => router.push('/login')}
@@ -54,7 +34,7 @@ export default function AuthButton() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-200 font-medium">{username}</span>
+      <span className="text-sm text-gray-200 font-medium">{user.email || 'User'}</span>
       <button
         onClick={handleLogout}
         className="btn-ghost text-sm"

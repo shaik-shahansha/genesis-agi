@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import AuthRequired from '@/components/AuthRequired';
 
 interface Environment {
   id: string;
@@ -16,7 +17,7 @@ interface Environment {
   created_at: string;
 }
 
-export default function EnvironmentsPage() {
+function EnvironmentsPage() {
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [active, setActive] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -293,3 +294,12 @@ export default function EnvironmentsPage() {
     </div>
   );
 }
+
+// Wrap with AuthRequired
+const EnvironmentsPageWithAuth = () => (
+  <AuthRequired>
+    <EnvironmentsPage />
+  </AuthRequired>
+);
+
+export default EnvironmentsPageWithAuth;

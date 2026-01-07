@@ -100,6 +100,10 @@ class Mind:
         self.state = MindState()
         self.emotional_state = EmotionalState()
         
+        # Load state and emotional state from database if Mind exists
+        if self.identity.gmid:
+            self._load_state_from_db()
+        
         # EMOTIONAL INTELLIGENCE: Context-aware emotional processing
         # Initialize after emotional_state is created
         self.emotional_intelligence: Optional[EmotionalIntelligence] = None
@@ -164,7 +168,9 @@ class Mind:
             mind_name=self.identity.name,
             orchestrator=self.orchestrator,
             memory_manager=self.memory,
-            timezone_offset=timezone_offset
+            timezone_offset=timezone_offset,
+            reasoning_model=self.intelligence.reasoning_model,
+            fast_model=self.intelligence.fast_model,
         )
         self.consciousness = self.living_mind.consciousness
 
@@ -279,6 +285,43 @@ class Mind:
         
         # Register memory tools for agent self-editing (Letta pattern)
         self._register_memory_tools()
+
+    def _load_state_from_db(self) -> None:
+        """Load current state and emotional state from database."""
+        try:
+            from genesis.database.base import get_session
+            from genesis.database.models import MindRecord
+            
+            with get_session() as session:
+                mind_record = session.query(MindRecord).filter_by(gmid=self.identity.gmid).first()
+                if mind_record:
+                    # Load current thought from database (MindState has this field)
+                    if mind_record.current_thought:
+                        self.state.current_thought = mind_record.current_thought
+                    
+                    # Load emotional state from database
+                    if mind_record.emotional_valence is not None:
+                        self.emotional_state.valence = mind_record.emotional_valence
+                    if mind_record.emotional_arousal is not None:
+                        self.emotional_state.arousal = mind_record.emotional_arousal
+        except Exception as e:
+            print(f"[MIND] Could not load state from DB: {e}")
+
+    def _save_state_to_db(self) -> None:
+        """Save current state and emotional state to database."""
+        try:
+            from genesis.database.manager import MetaverseDB
+            db = MetaverseDB()
+            db.update_mind_state(
+                gmid=self.identity.gmid,
+                current_emotion=self.emotional_state.get_emotion_value(),
+                current_thought=self.state.current_thought,
+                emotional_valence=self.emotional_state.valence,
+                emotional_arousal=self.emotional_state.arousal,
+                current_mood=self.emotional_state.get_mood_value(),
+            )
+        except Exception as e:
+            print(f"[MIND] Could not save state to DB: {e}")
 
     @classmethod
     def birth(
@@ -1551,11 +1594,23 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
             except Exception as e:
                 print(f"[WARNING] Could not verify intelligence config: {e}")
 
+        # Sync GenManager balance to identity.gens before saving
+        # NOTE: This is only for backward compatibility - balance is now stored in SQLite
+        if hasattr(self, 'gen') and self.gen:
+            balance_summary = self.gen.get_balance_summary()
+            self.identity.gens = int(balance_summary['current_balance'])
+        
+        # Save current state and emotional state to database
+        self._save_state_to_db()
+
         # CORE DATA (always present)
+        # NOTE: state, emotional_state, and gen data are now stored in SQLite, not JSON
+        # We keep them here only for backward compatibility with old code that reads JSON directly
         data = {
             "identity": json.loads(self.identity.model_dump_json()),
             "intelligence": json.loads(self.intelligence.model_dump_json()),
             "autonomy": json.loads(self.autonomy.model_dump_json()),
+            # state and emotional_state are now in database, but kept for backward compat
             "state": json.loads(self.state.model_dump_json()),
             "emotional_state": json.loads(self.emotional_state.model_dump_json()),
             # conversation_history no longer serialized - stored in SQLite for scalability

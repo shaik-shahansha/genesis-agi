@@ -9,14 +9,14 @@ class Intelligence(BaseModel):
     """Intelligence configuration for a Mind."""
 
     # Model selection
-    reasoning_model: str = Field(
-        default="openrouter/meta-llama/llama-3.3-70b-instruct:free",
-        description="Model for complex reasoning tasks",
+    reasoning_model: Optional[str] = Field(
+        default=None,
+        description="Model for complex reasoning tasks (REQUIRED - must be set during Mind creation)",
     )
 
-    fast_model: str = Field(
-        default="openrouter/meta-llama/llama-3.3-70b-instruct:free",
-        description="Model for quick responses"
+    fast_model: Optional[str] = Field(
+        default=None,
+        description="Model for quick responses (defaults to reasoning_model if not set)"
     )
 
     vision_model: Optional[str] = Field(
@@ -55,6 +55,24 @@ class Intelligence(BaseModel):
         default=None,
         description="API keys for model providers (e.g., {'groq': 'gsk_...', 'openai': 'sk-...'})"
     )
+
+    @model_validator(mode='after')
+    def sync_and_validate_models(self) -> 'Intelligence':
+        """Ensure fast_model defaults to reasoning_model and validate required fields."""
+        # CRITICAL: reasoning_model is REQUIRED
+        if not self.reasoning_model:
+            raise ValueError(
+                "reasoning_model is REQUIRED. Mind cannot be created without a model. "
+                "Please specify a model like 'groq/llama-3.1-70b-versatile' or 'openai/gpt-4o'"
+            )
+        
+        # If fast_model not set (None), default to reasoning_model
+        # IMPORTANT: Only set if None, never overwrite existing values
+        if self.fast_model is None:
+            self.fast_model = self.reasoning_model
+            print(f"[Intelligence] fast_model not specified, defaulting to reasoning_model: {self.fast_model}")
+        
+        return self
 
     def get_model_for_task(self, task_type: str) -> str:
         """Get the appropriate model for a task type."""

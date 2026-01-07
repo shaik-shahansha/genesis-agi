@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import AuthRequired from '@/components/AuthRequired';
 
 interface Listing {
   id: string;
@@ -18,7 +19,7 @@ interface Listing {
   tags: string[];
 }
 
-export default function MarketplacePage() {
+function MarketplacePage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [trending, setTrending] = useState<Listing[]>([]);
   const [featured, setFeatured] = useState<Listing[]>([]);
@@ -229,3 +230,12 @@ export default function MarketplacePage() {
     </div>
   );
 }
+
+// Wrap with AuthRequired
+const MarketplacePageWithAuth = () => (
+  <AuthRequired>
+    <MarketplacePage />
+  </AuthRequired>
+);
+
+export default MarketplacePageWithAuth;

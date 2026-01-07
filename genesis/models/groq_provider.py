@@ -25,6 +25,13 @@ class GroqProvider(ModelProvider):
         else:
             self.client = None
 
+    def _clean_messages(self, messages: list[dict]) -> list[dict]:
+        """Clean messages to only include fields supported by Groq API."""
+        return [
+            {"role": msg["role"], "content": msg["content"]}
+            for msg in messages
+        ]
+
     def is_available(self) -> bool:
         """Check if Groq is available."""
         return self.client is not None
@@ -43,6 +50,9 @@ class GroqProvider(ModelProvider):
 
         start_time = time.time()
 
+        # Clean messages - remove Genesis-specific fields
+        clean_messages = self._clean_messages(messages)
+
         # Convert 'functions' to 'tools' format if present (Groq uses new OpenAI tools format)
         if 'functions' in kwargs:
             functions = kwargs.pop('functions')
@@ -57,7 +67,7 @@ class GroqProvider(ModelProvider):
 
         response = await self.client.chat.completions.create(
             model=model,
-            messages=messages,
+            messages=clean_messages,
             temperature=temperature,
             max_tokens=max_tokens,
             **kwargs,
@@ -98,9 +108,12 @@ class GroqProvider(ModelProvider):
         if not self.is_available():
             raise ValueError("Groq API key not configured")
 
+        # Clean messages - remove Genesis-specific fields
+        clean_messages = self._clean_messages(messages)
+
         stream = await self.client.chat.completions.create(
             model=model,
-            messages=messages,
+            messages=clean_messages,
             temperature=temperature,
             max_tokens=max_tokens,
             stream=True,
