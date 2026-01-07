@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { StatCard } from '@/components/ui/StatCard';
 import { ConsciousnessOrb } from '@/components/ConsciousnessOrb';
 import AuthRequired from '@/components/AuthRequired';
+import { getFirebaseToken } from '@/lib/firebase';
 
 interface Mind {
   gmid: string;
@@ -57,18 +58,28 @@ function MindProfilePage() {
 
   const fetchData = async () => {
     try {
+      const token = await getFirebaseToken();
+      if (!token) {
+        console.error('No authentication token available');
+        return;
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`
+      };
+
       // Fetch mind details
-      const mindRes = await fetch(`${API_URL}/api/v1/minds/${mindId}`);
+      const mindRes = await fetch(`${API_URL}/api/v1/minds/${mindId}`, { headers });
       const mindData = await mindRes.json();
       setMind(mindData);
 
       // Fetch memories
-      const memRes = await fetch(`${API_URL}/api/v1/minds/${mindId}/memories`);
+      const memRes = await fetch(`${API_URL}/api/v1/minds/${mindId}/memories`, { headers });
       const memData = await memRes.json();
       setMemories(memData.slice(0, 10));
 
       // Fetch dreams
-      const dreamRes = await fetch(`${API_URL}/api/v1/minds/${mindId}/dreams`);
+      const dreamRes = await fetch(`${API_URL}/api/v1/minds/${mindId}/dreams`, { headers });
       const dreamData = await dreamRes.json();
       setDreams(dreamData.slice(0, 5));
     } catch (error) {

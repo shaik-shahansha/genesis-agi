@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import AuthRequired from '@/components/AuthRequired';
+import { getFirebaseToken } from '@/lib/firebase';
 
 export default function CreateMindPage() {
   const router = useRouter();
@@ -250,14 +251,18 @@ export default function CreateMindPage() {
         api_keys: Object.keys(formData.api_keys).length > 0 ? formData.api_keys : undefined,
       };
 
+      // Get Firebase token for authentication
+      const token = await getFirebaseToken();
+      if (!token) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
       const response = await fetch(`${API_URL}/api/v1/minds`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          // Add authentication header
-          ...(typeof window !== 'undefined' && localStorage.getItem('genesis_token')
-            ? { 'Authorization': `Bearer ${localStorage.getItem('genesis_token')}` }
-            : {})
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(requestBody),
       });

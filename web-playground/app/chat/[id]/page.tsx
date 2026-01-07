@@ -7,6 +7,7 @@ import Link from 'next/link';
 import AuthRequired from '@/components/AuthRequired';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { api } from '@/lib/api';
+import { getFirebaseToken } from '@/lib/firebase';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -264,11 +265,17 @@ export default function ChatPage() {
     if (!userEmail) return;
     
     try {
+      const token = await getFirebaseToken();
+      if (!token) {
+        console.error('No authentication token available');
+        return;
+      }
+      
       const response = await fetch(
         `${API_URL}/api/v1/minds/${mindId}/conversations?user_email=${encodeURIComponent(userEmail)}`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${token}`,
           },
         }
       );
@@ -295,11 +302,17 @@ export default function ChatPage() {
         params.append('environment_id', envId);
       }
       
+      const token = await getFirebaseToken();
+      if (!token) {
+        console.error('No authentication token available');
+        return;
+      }
+      
       const response = await fetch(
         `${API_URL}/api/v1/minds/${mindId}/conversations/messages?${params}`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${token}`,
           },
         }
       );

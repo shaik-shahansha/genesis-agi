@@ -2,6 +2,8 @@
  * Genesis API Client - Complete API integration
  */
 
+import { getFirebaseToken } from './firebase';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Request cache to deduplicate in-flight requests
@@ -18,7 +20,7 @@ export class GenesisAPI {
 
   constructor() {
     this.baseURL = API_URL;
-    // Load token from localStorage if available
+    // Load token from localStorage if available (legacy support)
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('genesis_token');
     }
@@ -35,6 +37,7 @@ export class GenesisAPI {
     this.token = null;
     if (typeof window !== 'undefined') {
       localStorage.removeItem('genesis_token');
+      localStorage.removeItem('genesis_firebase_token');
     }
   }
 
@@ -59,8 +62,12 @@ export class GenesisAPI {
       ...options.headers,
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    // Try to get Firebase token first, then fall back to legacy token
+    const firebaseToken = await getFirebaseToken();
+    const authToken = firebaseToken || this.token;
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
 
     const requestPromise = (async () => {

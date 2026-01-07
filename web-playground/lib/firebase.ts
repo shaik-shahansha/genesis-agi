@@ -36,3 +36,22 @@ if (getApps().length === 0) {
 }
 
 export { app, auth, analytics };
+
+/**
+ * Get the current Firebase ID token for API authentication
+ * @returns Promise<string | null> - The ID token or null if not authenticated
+ */
+export async function getFirebaseToken(): Promise<string | null> {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return null;
+    }
+    // Force refresh to ensure token is valid
+    const token = await currentUser.getIdToken(true);
+    return token;
+  } catch (error) {
+    console.error('Error getting Firebase token:', error);
+    return null;
+  }
+}
