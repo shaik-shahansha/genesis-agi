@@ -2106,7 +2106,7 @@ async def get_plugins(mind_id: str):
         plugins_data.append(
             PluginResponse(
                 name=plugin_name,
-                version=plugin_config.get('version', '0.1.2'),
+                version=plugin_config.get('version', '0.1.3'),
                 description=plugin_descriptions.get(plugin_name, 'Plugin'),
                 enabled=True,
                 config=plugin_config.get('config', {}),

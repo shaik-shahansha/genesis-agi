@@ -6,7 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.1.2--alpha-blue.svg)](https://github.com/shaik-shahansha/genesis-agi)
+[![Version](https://img.shields.io/badge/version-0.1.3--alpha-blue.svg)](https://github.com/shaik-shahansha/genesis-agi)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-blue.svg)](https://github.com/shaik-shahansha/genesis-agi)
 
 ---
@@ -342,7 +342,7 @@ User Request → Autonomous Orchestrator
 - `autonomous_reasoner.py` - Planning & reflection
 - `universal_file_handler.py` - Any file format support
 
-**Status**: Experimental (v0.1.2-alpha) - actively being developed and tested
+**Status**: Experimental (v0.1.3-alpha) - actively being developed and tested
 
 ### Data Persistence Architecture (Scalable for 24/7 Operation)
 
@@ -1135,7 +1135,7 @@ MIT License - see [LICENSE](LICENSE)
 
 ## ⚡ Status
 
-- **Version**: 0.1.2-alpha (Enhanced Memory v2.0 + Plugin System v2.0 - Jan 2025)
+- **Version**: 0.1.3-alpha (Enhanced Memory v2.0 + Plugin System v2.0 - Jan 2025)
 - **Status**: Alpha Release - Experimental (Active Development)
 - **Latest Updates**: 🔥 Plugin system overhaul + Web playground completion
 - **Platforms**: CLI, API, Web
@@ -1219,7 +1219,7 @@ genesis chat atlas
 
 **Genesis AGI: Infrastructure for Life Itself**
 
-*Created by [Shahansha](https://shahansha.com) | MIT License | v0.1.2-alpha*
+*Created by [Shahansha](https://shahansha.com) | MIT License | v0.1.3-alpha*
 
 </div>
 

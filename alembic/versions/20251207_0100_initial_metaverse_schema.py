@@ -140,7 +140,7 @@ def upgrade() -> None:
         sa.Column('last_mind_birth', sa.DateTime, nullable=True),
         sa.Column('last_interaction', sa.DateTime, nullable=True),
         sa.Column('total_interactions_today', sa.Integer, default=0),
-        sa.Column('metaverse_version', sa.String(20), default='0.1.2'),
+        sa.Column('metaverse_version', sa.String(20), default='0.1.3'),
         sa.Column('created_at', sa.DateTime, nullable=False),
         sa.Column('updated_at', sa.DateTime, nullable=False),
         sa.Column('daily_stats', sa.JSON, default={}),

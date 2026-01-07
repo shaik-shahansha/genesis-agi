@@ -73,7 +73,7 @@ class MindIdentity(BaseModel):
     avatar_url: Optional[str] = None  # Last generated avatar URL
 
     # Genesis version
-    genesis_version: str = "0.1.2"
+    genesis_version: str = "0.1.3"
 
     def __init__(self, **data):
         super().__init__(**data)
