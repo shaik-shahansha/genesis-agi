@@ -266,6 +266,18 @@ img {
     font-size: 1.05rem;
 }
 
+.btn-icon {
+    padding: 0.75rem;
+    min-width: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon svg {
+    margin: 0;
+}
+
 /* ============= HERO SECTION ============= */
 .hero {
     position: relative;
@@ -2158,6 +2170,28 @@ section {
         padding: 1.5rem;
     }
     
+    .setup-step {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .setup-step-number {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+    
+    .playground-note {
+        padding: 1.25rem !important;
+    }
+    
+    .playground-cta a {
+        display: block;
+        width: 100%;
+        margin: 0.5rem 0 !important;
+        text-align: center;
+    }
+    
     .quickstart-steps {
         grid-template-columns: 1fr;
     }
@@ -2269,6 +2303,45 @@ section {
     
     .enterprise-stats {
         grid-template-columns: 1fr;
+    }
+    
+    .web-playground-section {
+        padding: 3rem 0;
+    }
+    
+    .playground-content {
+        gap: 1.5rem;
+    }
+    
+    .playground-description,
+    .playground-setup {
+        padding: 1rem;
+    }
+    
+    .playground-description h3,
+    .playground-setup h3 {
+        font-size: 1.3rem !important;
+    }
+    
+    .playground-description p {
+        font-size: 0.95rem !important;
+    }
+    
+    .playground-description ul li {
+        font-size: 0.9rem;
+        padding: 0.4rem 0 !important;
+    }
+    
+    .setup-step-content h4 {
+        font-size: 1rem !important;
+    }
+    
+    .playground-note p {
+        font-size: 0.85rem !important;
+    }
+    
+    .playground-cta {
+        margin-top: 2rem !important;
     }
 }
 
