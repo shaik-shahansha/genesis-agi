@@ -559,9 +559,13 @@ class Mind:
                 
                 response += f"\nI'm working on this in the background and will notify you when complete!"
                 
+                # Get current environment
+                current_env = self.environments.get_current_environment()
+                env_id = current_env.env_id if current_env else None
+                
                 # Store in history
-                self.conversation.add_message(role="user", content=prompt, user_email=user_email)
-                self.conversation.add_message(role="assistant", content=response)
+                self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
+                self.conversation.add_message(role="assistant", content=response, environment_id=env_id)
                 
                 # Create memory with rich metadata
                 self.memory.add_memory(
@@ -612,9 +616,13 @@ class Mind:
                     f"You can continue with other things while I work on this."
                 )
                 
+                # Get current environment
+                current_env = self.environments.get_current_environment()
+                env_id = current_env.env_id if current_env else None
+                
                 # Store in history
-                self.conversation.add_message(role="user", content=prompt, user_email=user_email)
-                self.conversation.add_message(role="assistant", content=response)
+                self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
+                self.conversation.add_message(role="assistant", content=response, environment_id=env_id)
                 
                 # Create memory
                 self.memory.add_memory(
@@ -943,9 +951,13 @@ class Mind:
             try:
                 print(f"[PERF] Starting background post-response processing...")
                 
+                # Get current environment
+                current_env = self.environments.get_current_environment()
+                env_id = current_env.env_id if current_env else None
+                
                 # Store in conversation history (SQLite)
-                self.conversation.add_message(role="user", content=prompt, user_email=user_email)
-                self.conversation.add_message(role="assistant", content=final_response)
+                self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
+                self.conversation.add_message(role="assistant", content=final_response, environment_id=env_id)
                 print(f"[PERF] ✓ Conversation history saved")
 
                 # Add action context if actions were taken
@@ -1156,10 +1168,14 @@ class Mind:
             for part in response_parts:
                 yield part
             
+            # Get current environment
+            current_env = self.environments.get_current_environment()
+            env_id = current_env.env_id if current_env else None
+            
             # Store acknowledgment in history (SQLite)
             full_response = "".join(response_parts)
-            self.conversation.add_message(role="user", content=prompt, user_email=user_email)
-            self.conversation.add_message(role="assistant", content=full_response)
+            self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
+            self.conversation.add_message(role="assistant", content=full_response, environment_id=env_id)
             
             self.memory.add_memory(
                 content=f"User requested task: {prompt}\nI started background task {task.task_id}",
@@ -1195,9 +1211,13 @@ class Mind:
             full_response += chunk
             yield chunk
 
+        # Get current environment
+        current_env = self.environments.get_current_environment()
+        env_id = current_env.env_id if current_env else None
+
         # Update history and create memory
-        self.conversation.add_message(role="user", content=prompt, user_email=user_email)
-        self.conversation.add_message(role="assistant", content=full_response)
+        self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
+        self.conversation.add_message(role="assistant", content=full_response, environment_id=env_id)
 
         self.memory.add_memory(
             content=f"User said: {prompt}\nI responded: {full_response}",

@@ -29,6 +29,9 @@ export default function EnvironmentChatPage() {
   const [mindName, setMindName] = useState('');
   const [joined, setJoined] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [showAccessControl, setShowAccessControl] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newMindGmid, setNewMindGmid] = useState('');
 
   const wsRef = useRef<EnvironmentWebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -176,6 +179,58 @@ export default function EnvironmentChatPage() {
     setInputMessage('');
   };
 
+  const handleAddUser = async () => {
+    if (!newUserEmail) {
+      alert('Please enter a user email');
+      return;
+    }
+    try {
+      await api.addUserToEnvironment(envId, newUserEmail);
+      setNewUserEmail('');
+      loadEnvironment();
+      alert(`Added user ${newUserEmail} to environment`);
+    } catch (error: any) {
+      alert(`Failed to add user: ${error.message}`);
+    }
+  };
+
+  const handleAddMind = async () => {
+    if (!newMindGmid) {
+      alert('Please enter a Mind GMID');
+      return;
+    }
+    try {
+      await api.addMindToEnvironment(envId, newMindGmid);
+      setNewMindGmid('');
+      loadEnvironment();
+      alert(`Added Mind ${newMindGmid} to environment`);
+    } catch (error: any) {
+      alert(`Failed to add Mind: ${error.message}`);
+    }
+  };
+
+  const handleRemoveUser = async (userEmail: string) => {
+    if (!confirm(`Remove ${userEmail} from environment?`)) return;
+    try {
+      await api.removeUserFromEnvironment(envId, userEmail);
+      loadEnvironment();
+      alert(`Removed user ${userEmail}`);
+    } catch (error: any) {
+      alert(`Failed to remove user: ${error.message}`);
+    }
+  };
+
+  const handleRemoveMind = async (mindGmid: string) => {
+    if (!confirm(`Remove ${mindGmid} from environment?`)) return;
+    try {
+      await api.removeMindFromEnvironment(envId, mindGmid);
+      loadEnvironment();
+      alert(`Removed Mind ${mindGmid}`);
+    } catch (error: any) {
+      alert(`Failed to remove Mind: ${error.message}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -212,14 +267,179 @@ export default function EnvironmentChatPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-screen flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-semibold text-white">{environment.name}</h1>
           <p className="text-gray-300 mt-1">{environment.description}</p>
+          
+          {/* Access Info Summary */}
+          <div className="flex items-center gap-4 mt-3 text-sm">
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 rounded ${environment.is_public ? 'bg-green-500/20 text-green-300' : 'bg-orange-500/20 text-orange-300'}`}>
+                {environment.is_public ? '🌍 Public' : '🔒 Private'}
+              </span>
+            </div>
+            
+            {environment.allowed_users && environment.allowed_users.length > 0 && (
+              <div className="flex items-center gap-2 text-gray-300">
+                <span>👤 {environment.allowed_users.length} user{environment.allowed_users.length !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+            
+            {environment.allowed_minds && environment.allowed_minds.length > 0 && (
+              <div className="flex items-center gap-2 text-gray-300">
+                <span>🤖 {environment.allowed_minds.length} mind{environment.allowed_minds.length !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+          </div>
         </div>
-        <Link href="/environments" className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition">
-          ← Back
-        </Link>
+        
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setShowAccessControl(!showAccessControl)} 
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded transition"
+          >
+            {showAccessControl ? 'Hide' : 'Manage Access'}
+          </button>
+          <Link href="/environments" className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition">
+            ← Back
+          </Link>
+        </div>
       </div>
+
+      {/* Access Lists (Always Visible) */}
+      {(!environment.is_public && (environment.allowed_users?.length > 0 || environment.allowed_minds?.length > 0)) && (
+        <div className="mb-6 clean-card p-4">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Allowed Users List */}
+            {environment.allowed_users && environment.allowed_users.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-400 mb-2">Allowed Users ({environment.allowed_users.length})</h3>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {environment.allowed_users.map((email: string) => (
+                    <div key={email} className="flex items-center gap-2 p-2 bg-slate-700/30 rounded text-sm">
+                      <span className="text-blue-400">👤</span>
+                      <span className="text-white">{email}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Allowed Minds List */}
+            {environment.allowed_minds && environment.allowed_minds.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-400 mb-2">Allowed Minds ({environment.allowed_minds.length})</h3>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {environment.allowed_minds.map((gmid: string) => (
+                    <div key={gmid} className="flex items-center gap-2 p-2 bg-slate-700/30 rounded text-sm">
+                      <span className="text-purple-400">🤖</span>
+                      <span className="text-white font-mono">{gmid}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Access Control Panel */}
+      {showAccessControl && (
+        <div className="mb-6 clean-card p-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Access Control</h2>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Allowed Users */}
+            <div>
+              <h3 className="text-lg font-medium text-white mb-3">Allowed Users</h3>
+              
+              {/* Add User */}
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="email"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="input flex-1"
+                />
+                <button
+                  onClick={handleAddUser}
+                  disabled={!newUserEmail}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded transition disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+              
+              {/* User List */}
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {environment.allowed_users && environment.allowed_users.length > 0 ? (
+                  environment.allowed_users.map((email: string) => (
+                    <div key={email} className="flex items-center justify-between p-2 bg-slate-700/50 rounded text-sm">
+                      <span className="text-white">{email}</span>
+                      <button
+                        onClick={() => handleRemoveUser(email)}
+                        className="text-red-400 hover:text-red-300 text-xs"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400 text-sm italic">No users added</p>
+                )}
+              </div>
+            </div>
+
+            {/* Allowed Minds */}
+            <div>
+              <h3 className="text-lg font-medium text-white mb-3">Allowed Minds</h3>
+              
+              {/* Add Mind */}
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newMindGmid}
+                  onChange={(e) => setNewMindGmid(e.target.value)}
+                  placeholder="GMD-2026-XXXX"
+                  className="input flex-1"
+                />
+                <button
+                  onClick={handleAddMind}
+                  disabled={!newMindGmid}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded transition disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+              
+              {/* Mind List */}
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {environment.allowed_minds && environment.allowed_minds.length > 0 ? (
+                  environment.allowed_minds.map((gmid: string) => (
+                    <div key={gmid} className="flex items-center justify-between p-2 bg-slate-700/50 rounded text-sm">
+                      <span className="text-white">{gmid}</span>
+                      <button
+                        onClick={() => handleRemoveMind(gmid)}
+                        className="text-red-400 hover:text-red-300 text-xs"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400 text-sm italic">No minds added</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded text-sm text-gray-300">
+            <strong>Note:</strong> Only the environment creator can manage access. 
+            If the environment is public, access control is not enforced.
+          </div>
+        </div>
+      )}
 
       {!joined ? (
         /* Join Form */

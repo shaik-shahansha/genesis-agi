@@ -56,7 +56,7 @@
 
 /* Message bubble styles */
 .message-bubble {
-  max-width: 75%;
+  max-width: 90%;
   word-wrap: break-word;
   position: relative;
   transition: all 0.2s ease;

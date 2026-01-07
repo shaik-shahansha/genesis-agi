@@ -62,20 +62,28 @@ class ConversationManager:
         Returns:
             Created message record
         """
-        with get_session() as session:
-            message = ConversationMessage(
-                mind_gmid=self.mind_gmid,
-                user_email=user_email,
-                environment_id=environment_id,
-                role=role,
-                content=content,
-                timestamp=timestamp or datetime.now(),
-                extra_data=metadata or {}
-            )
-            session.add(message)
-            session.commit()
-            session.refresh(message)
-            return message
+        print(f"[CONVERSATION] Adding message: role={role}, content_length={len(content)}, user={user_email}, env={environment_id}")
+        try:
+            with get_session() as session:
+                message = ConversationMessage(
+                    mind_gmid=self.mind_gmid,
+                    user_email=user_email,
+                    environment_id=environment_id,
+                    role=role,
+                    content=content,
+                    timestamp=timestamp or datetime.now(),
+                    extra_data=metadata or {}
+                )
+                session.add(message)
+                session.commit()
+                session.refresh(message)
+                print(f"[CONVERSATION] ✓ Message saved successfully: role={role}, id={message.id}")
+                return message
+        except Exception as e:
+            print(f"[CONVERSATION] ✗ ERROR saving message: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     def get_recent_messages(
         self,
@@ -102,8 +110,15 @@ class ConversationManager:
             )
             
             # Apply filters
+            # For user_email: Include messages FROM that user OR assistant/system responses
             if user_email:
-                query = query.filter(ConversationMessage.user_email == user_email)
+                from sqlalchemy import or_
+                query = query.filter(
+                    or_(
+                        ConversationMessage.user_email == user_email,
+                        ConversationMessage.role.in_(['assistant', 'system'])
+                    )
+                )
             if environment_id:
                 query = query.filter(ConversationMessage.environment_id == environment_id)
             if role:
@@ -267,6 +282,58 @@ class ConversationManager:
                 "oldest_message": oldest.timestamp.isoformat() if oldest else None,
                 "newest_message": newest.timestamp.isoformat() if newest else None
             }
+    
+    def get_conversation_threads(self, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get list of conversation threads (unique user+environment combinations).
+        
+        Args:
+            user_email: Filter by specific user
+            
+        Returns:
+            List of conversation threads with metadata (last message, count, etc.)
+        """
+        from sqlalchemy import func, desc
+        
+        with get_session() as session:
+            # Query for distinct user_email + environment_id combinations
+            query = session.query(
+                ConversationMessage.user_email,
+                ConversationMessage.environment_id,
+                func.max(ConversationMessage.timestamp).label('last_message_time'),
+                func.count(ConversationMessage.id).label('message_count')
+            ).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid
+            )
+            
+            if user_email:
+                query = query.filter(ConversationMessage.user_email == user_email)
+            
+            threads = query.group_by(
+                ConversationMessage.user_email,
+                ConversationMessage.environment_id
+            ).order_by(desc('last_message_time')).all()
+            
+            # Get last message preview for each thread
+            result = []
+            for thread in threads:
+                # Get the actual last message
+                last_msg = session.query(ConversationMessage).filter(
+                    ConversationMessage.mind_gmid == self.mind_gmid,
+                    ConversationMessage.user_email == thread.user_email,
+                    ConversationMessage.environment_id == thread.environment_id
+                ).order_by(ConversationMessage.timestamp.desc()).first()
+                
+                result.append({
+                    "user_email": thread.user_email,
+                    "environment_id": thread.environment_id,
+                    "last_message_time": thread.last_message_time.isoformat() if thread.last_message_time else None,
+                    "message_count": thread.message_count,
+                    "last_message_preview": last_msg.content[:100] if last_msg else None,
+                    "last_message_role": last_msg.role if last_msg else None
+                })
+            
+            return result
     
     def clear_all(self) -> int:
         """

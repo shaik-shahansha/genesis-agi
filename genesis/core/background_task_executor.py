@@ -16,6 +16,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -292,13 +293,18 @@ class BackgroundTaskExecutor:
                     
                     # Send via WebSocket for immediate delivery
                 # Convert any Path objects to strings for JSON serialization
+                # Only send filename, not full path, for security/UX
                 artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
                 serializable_artifacts = []
                 for artifact in artifacts:
                     if isinstance(artifact, dict):
                         serializable_artifact = artifact.copy()
                         if "path" in serializable_artifact:
-                            serializable_artifact["path"] = str(serializable_artifact["path"])
+                            # Extract just the filename from the path
+                            full_path = Path(str(serializable_artifact["path"]))
+                            serializable_artifact["filename"] = full_path.name
+                            # Remove the full path for security
+                            del serializable_artifact["path"]
                         serializable_artifacts.append(serializable_artifact)
                     else:
                         serializable_artifacts.append(artifact)
@@ -328,13 +334,18 @@ class BackgroundTaskExecutor:
                     # Fallback: Queue persistent notification for when user reconnects
                     result_summary = self._format_result_summary(result)
                     # Convert any Path objects to strings for JSON serialization
+                    # Only send filename, not full path, for security/UX
                     artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
                     serializable_artifacts = []
                     for artifact in artifacts:
                         if isinstance(artifact, dict):
                             serializable_artifact = artifact.copy()
                             if "path" in serializable_artifact:
-                                serializable_artifact["path"] = str(serializable_artifact["path"])
+                                # Extract just the filename from the path
+                                full_path = Path(str(serializable_artifact["path"]))
+                                serializable_artifact["filename"] = full_path.name
+                                # Remove the full path for security
+                                del serializable_artifact["path"]
                             serializable_artifacts.append(serializable_artifact)
                         else:
                             serializable_artifacts.append(artifact)
@@ -496,34 +507,27 @@ class BackgroundTaskExecutor:
                     for i, artifact in enumerate(artifacts[:10], 1):  # Max 10
                         artifact_type = artifact.get("type", "file")
                         artifact_name = artifact.get("name", "result")
-                        artifact_path = artifact.get("path", "")
                         
-                        if artifact_type == "file" and artifact_path:
-                            # Determine icon based on extension
-                            ext = artifact_name.split('.')[-1].lower() if '.' in artifact_name else ""
-                            icon = "📄"
-                            if ext in ['pptx', 'ppt']:
-                                icon = "📊"
-                            elif ext in ['docx', 'doc']:
-                                icon = "📝"
-                            elif ext in ['xlsx', 'xls', 'csv']:
-                                icon = "📈"
-                            elif ext in ['pdf']:
-                                icon = "📕"
-                            elif ext in ['jpg', 'jpeg', 'png', 'gif']:
-                                icon = "🖼️"
-                            
-                            msg += f"{i}. {icon} **{artifact_name}**\n"
-                            msg += f"   📂 `{artifact_path}`\n\n"
-                        else:
-                            msg += f"{i}. {artifact_type}: `{artifact_name}`\n\n"
+                        # Determine icon based on extension
+                        ext = artifact_name.split('.')[-1].lower() if '.' in artifact_name else ""
+                        icon = "📄"
+                        if ext in ['pptx', 'ppt']:
+                            icon = "📊"
+                        elif ext in ['docx', 'doc']:
+                            icon = "📝"
+                        elif ext in ['xlsx', 'xls', 'csv']:
+                            icon = "📈"
+                        elif ext in ['pdf']:
+                            icon = "📕"
+                        elif ext in ['jpg', 'jpeg', 'png', 'gif']:
+                            icon = "🖼️"
+                        
+                        msg += f"{i}. {icon} **{artifact_name}**\n\n"
                     
                     if len(artifacts) > 10:
                         msg += f"_...and {len(artifacts) - 10} more files_\n\n"
                     
-                    msg += "\n💡 **How to access:**\n"
-                    msg += "• Copy the file path above and paste in Windows Explorer\n"
-                    msg += "• Or navigate to your Genesis data directory\n"
+                    msg += "\n💡 **Click the download buttons below to save the files**\n"
                 else:
                     msg += "**Result:** Task completed successfully!\n\n"
                 

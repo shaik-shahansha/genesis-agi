@@ -187,6 +187,15 @@ If no memories should be extracted, respond with empty array: []
                 lines = response.split("\n")
                 response = "\n".join(lines[1:-1])  # Remove first and last lines
 
+            # Try to find JSON array in the response
+            # Handle cases where LLM adds explanation text before/after JSON
+            json_start = response.find('[')
+            json_end = response.rfind(']')
+            
+            if json_start != -1 and json_end != -1 and json_end > json_start:
+                # Extract just the JSON array portion
+                response = response[json_start:json_end + 1]
+            
             # Parse JSON
             memories = json.loads(response)
 

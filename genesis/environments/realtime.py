@@ -146,7 +146,7 @@ class EnvironmentServer:
             state.last_activity = datetime.utcnow().isoformat()
 
             # Record visit in database
-            self.db.record_environment_visit(environment_id, mind_id)
+            self.db.record_visit_start(mind_id, environment_id)
 
             # Broadcast join event
             await self.connection_manager.broadcast(

@@ -45,6 +45,17 @@ interface Environment {
   created_at?: string;
 }
 
+interface ConversationThread {
+  user_email: string;
+  environment_id: string | null;
+  environment_name: string;
+  environment_type: string;
+  last_message_time: string;
+  message_count: number;
+  last_message_preview: string;
+  last_message_role: string;
+}
+
 export default function ChatPage() {
   const params = useParams();
   const mindId = params.id as string;
@@ -58,6 +69,7 @@ export default function ChatPage() {
   const [showEmailPrompt, setShowEmailPrompt] = useState(true);
   const [selectedEnvironment, setSelectedEnvironment] = useState<string | null>(null);
   const [environments, setEnvironments] = useState<Environment[]>([]);
+  const [conversationThreads, setConversationThreads] = useState<ConversationThread[]>([]);
   const [showEnvironmentSelect, setShowEnvironmentSelect] = useState(false);
   const [proactiveMessages, setProactiveMessages] = useState<ProactiveMessage[]>([]);
   const [allMessages, setAllMessages] = useState<Array<{type: 'chat', data: Message} | {type: 'proactive', data: ProactiveMessage}>>([]);
@@ -103,8 +115,22 @@ export default function ChatPage() {
     }
   }, [mindId]);
 
+  // Fetch conversation threads when user email is available
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (userEmail) {
+      fetchConversationThreads();
+      // Also load messages for the current context (environment or general)
+      loadConversationMessages(selectedEnvironment);
+    }
+  }, [userEmail, mindId]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    // Use setTimeout to ensure DOM is updated
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+    return () => clearTimeout(timer);
   }, [allMessages]);
 
   // WebSocket connection for proactive messages
@@ -192,7 +218,11 @@ export default function ChatPage() {
               message: data.message,
               priority: 'high',
               timestamp: data.timestamp || new Date().toISOString(),
-              metadata: { task_id: data.task_id, result: data.result }
+              metadata: { 
+                task_id: data.task_id, 
+                result: data.result,
+                artifacts: data.artifacts || []
+              }
             };
             setProactiveMessages(prev => [...prev, taskCompleteMsg]);
             setAllMessages(prev => [...prev, { type: 'proactive', data: taskCompleteMsg }]);
@@ -228,6 +258,93 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Error fetching mind:', error);
     }
+  };
+
+  const fetchConversationThreads = async () => {
+    if (!userEmail) return;
+    
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/minds/${mindId}/conversations?user_email=${encodeURIComponent(userEmail)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setConversationThreads(data.threads || []);
+      }
+    } catch (error) {
+      console.error('Error fetching conversation threads:', error);
+    }
+  };
+
+  const loadConversationMessages = async (envId: string | null) => {
+    if (!userEmail) return;
+    
+    try {
+      const params = new URLSearchParams({
+        user_email: userEmail,
+        limit: '50'
+      });
+      
+      if (envId) {
+        params.append('environment_id', envId);
+      }
+      
+      const response = await fetch(
+        `${API_URL}/api/v1/minds/${mindId}/conversations/messages?${params}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        console.log('📥 Loaded messages from API:', data.messages?.length || 0);
+        console.log('📥 Message roles:', data.messages?.map((m: any) => m.role));
+        
+        // Convert messages to the format we need
+        const chatMessages: Message[] = data.messages
+          .filter((msg: any) => msg.role !== 'system')
+          .map((msg: any) => ({
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp
+          }));
+        
+        console.log('✅ Filtered chat messages:', chatMessages.length);
+        console.log('✅ Filtered roles:', chatMessages.map(m => m.role));
+        
+        setMessages(chatMessages);
+        
+        // Convert to allMessages format
+        const formattedMessages = chatMessages.map((msg: Message) => ({
+          type: 'chat' as const,
+          data: msg
+        }));
+        
+        setAllMessages(formattedMessages);
+        
+        // Scroll to bottom after messages load
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        }, 200);
+      }
+    } catch (error) {
+      console.error('Error loading conversation messages:', error);
+    }
+  };
+
+  const handleThreadSelect = (thread: ConversationThread) => {
+    setSelectedEnvironment(thread.environment_id);
+    loadConversationMessages(thread.environment_id);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,6 +403,9 @@ export default function ChatPage() {
       };
       setMessages(prev => [...prev, assistantMessage]);
       setAllMessages(prev => [...prev, { type: 'chat', data: assistantMessage }]);
+      
+      // Refresh conversation threads after sending message
+      fetchConversationThreads();
     } catch (error: any) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
@@ -428,109 +548,128 @@ export default function ChatPage() {
 
   return (
     <AuthRequired>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-6 pb-4 border-b border-slate-700">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Link href="/" className="text-gray-300 hover:text-white">
-                  ← Back
-                </Link>
-              </div>
-              <h1 className="text-2xl font-semibold text-white">{mind.name}</h1>
-              <p className="text-sm text-gray-300">
-                {mind.model} • {mind.memory_count} memories
-                {userEmail && <span className="ml-2">• 👤 {userEmail}</span>}
-              </p>
-            </div>
-            {userEmail && (
+      <div className="flex h-screen bg-slate-900" style={{height: '75vh'}}>
+        {/* Sidebar */}
+        <div className="w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
+          {/* Sidebar Header */}
+          <div className="p-4 border-b border-slate-700 flex-shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <Link href="/" className="text-gray-400 hover:text-white text-sm">
+                ← Back
+              </Link>
               <button
                 onClick={() => {
                   localStorage.removeItem('genesis_user_email');
                   setUserEmail('');
                   setShowEmailPrompt(true);
-                  setEnvironments([]);
-                  setSelectedEnvironment(null);
                 }}
                 className="text-xs text-gray-400 hover:text-white"
+                title="Change Identity"
               >
-                Change Identity
+                🔄
               </button>
-            )}
+            </div>
+            <h2 className="text-lg font-semibold text-white">{mind.name}</h2>
+            <p className="text-xs text-gray-400">{userEmail}</p>
           </div>
 
-          {/* Environment Selection */}
-          {userEmail && (
-            <div className="mt-3">
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-400">Environment:</label>
-                <button
-                  onClick={toggleEnvironmentSelect}
-                  className="text-sm bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded border border-slate-600 flex items-center gap-2"
-                >
-                  {selectedEnvironment 
-                    ? environments.find(e => e.env_id === selectedEnvironment)?.name || 'Select Environment'
-                    : 'Select Environment'}
-                  <span className="text-xs">{showEnvironmentSelect ? '▲' : '▼'}</span>
-                </button>
+          {/* Conversation Threads */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="p-2">
+              <div className="text-xs text-gray-500 px-2 py-2 font-medium">
+                CONVERSATIONS
               </div>
-
-              {showEnvironmentSelect && (
-                <div className="mt-2 bg-slate-700 border border-slate-600 rounded max-h-60 overflow-y-auto">
-                  {environments.length === 0 ? (
-                    <div className="p-3 text-sm text-gray-400">
-                      No accessible environments. The Mind's home environment will be used.
-                    </div>
-                  ) : (
-                    <>
-                      <div
-                        className={`p-3 text-sm cursor-pointer hover:bg-slate-600 ${!selectedEnvironment ? 'bg-slate-600 text-white' : 'text-gray-300'}`}
-                        onClick={() => {
-                          setSelectedEnvironment(null);
-                          setShowEnvironmentSelect(false);
-                        }}
+              
+              {conversationThreads.length === 0 ? (
+                <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                  <p>No conversations yet</p>
+                  <p className="text-xs mt-1">Start chatting to create threads</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {conversationThreads.map((thread, idx) => {
+                    const isSelected = thread.environment_id === selectedEnvironment;
+                    const timeAgo = new Date(thread.last_message_time).toLocaleString();
+                    
+                    // Environment icon
+                    let envIcon = '💬';
+                    if (thread.environment_type === 'direct') envIcon = '💬';
+                    else if (thread.environment_type === 'workspace') envIcon = '💼';
+                    else if (thread.environment_type === 'social') envIcon = '🌐';
+                    else if (thread.environment_type === 'metaverse') envIcon = '🎮';
+                    
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => handleThreadSelect(thread)}
+                        className={`w-full text-left px-3 py-3 rounded-lg transition-all ${
+                          isSelected
+                            ? 'bg-blue-600/20 border border-blue-500/50'
+                            : 'hover:bg-slate-700/50'
+                        }`}
                       >
-                        <div className="font-medium">No Environment</div>
-                        <div className="text-xs text-gray-400">Default mind context</div>
-                      </div>
-                      {environments.map((env) => (
-                        <div
-                          key={env.env_id}
-                          className={`p-3 text-sm cursor-pointer hover:bg-slate-600 border-t border-slate-600 ${selectedEnvironment === env.env_id ? 'bg-slate-600 text-white' : 'text-gray-300'}`}
-                          onClick={() => {
-                            setSelectedEnvironment(env.env_id);
-                            setShowEnvironmentSelect(false);
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="font-medium">{env.name}</div>
-                            <div className="text-xs">
-                              {env.is_public ? '🌐 Public' : '🔒 Private'}
+                        <div className="flex items-start gap-2">
+                          <span className="text-xl flex-shrink-0">{envIcon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-white text-sm truncate">
+                              {thread.environment_name}
+                            </div>
+                            <div className="text-xs text-gray-400 truncate mt-0.5">
+                              {thread.last_message_preview}
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-xs text-gray-500">
+                                {new Date(thread.last_message_time).toLocaleDateString()}
+                              </span>
+                              <span className="text-xs text-gray-600">
+                                {thread.message_count} msgs
+                              </span>
                             </div>
                           </div>
-                          <div className="text-xs text-gray-400 mt-1">
-                            {env.env_type} • {env.owner_gmid === mind?.gmid ? 'Owned' : 'Guest'}
-                          </div>
                         </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {selectedEnvironment && (
-                <div className="mt-2 text-xs text-purple-400">
-                  💬 Chatting in: {environments.find(e => e.env_id === selectedEnvironment)?.name}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          )}
+          </div>
+
+          {/* New Conversation Button */}
+          <div className="p-4 border-t border-slate-700 flex-shrink-0">
+            <button
+              onClick={() => {
+                setSelectedEnvironment(null);
+                setMessages([]);
+                setAllMessages([]);
+              }}
+              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+            >
+              ➕ New Conversation
+            </button>
+          </div>
         </div>
 
-        {/* Messages */}
-      <div className="bg-slate-800/50 border border-slate-700 rounded-lg mb-4" style={{ height: 'calc(100vh - 320px)' }}>
-        <div className="h-full overflow-y-auto p-6 space-y-4 messages-container">
+        {/* Main Chat Area */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Chat Header */}
+          <div className="px-6 py-4 border-b border-slate-700 bg-slate-800 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-semibold text-white">
+                  {selectedEnvironment
+                    ? conversationThreads.find(t => t.environment_id === selectedEnvironment)?.environment_name || 'Chat'
+                    : 'New Conversation'}
+                </h1>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {mind.model} • {mind.memory_count} total memories stored
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Messages Area - This will be our existing messages component */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 messages-container bg-slate-900">
           {allMessages.length === 0 && (
             <div className="text-center py-12 text-gray-400">
               <p className="text-lg mb-2">👋 Start a conversation with {mind.name}</p>
@@ -601,6 +740,7 @@ export default function ChatPage() {
                   minute: '2-digit' 
                 });
                 const isSpontaneous = proactiveMsg.metadata?.spontaneous || false;
+                const artifacts = proactiveMsg.metadata?.artifacts || [];
                 
                 return (
                   <div key={`proactive-${index}`} className="flex justify-start animate-fade-in-up">
@@ -618,6 +758,53 @@ export default function ChatPage() {
                         <div className="text-sm whitespace-pre-wrap">
                           {proactiveMsg.message}
                         </div>
+                        
+                        {/* Download buttons for artifacts */}
+                        {artifacts.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-gray-700">
+                            <div className="text-xs text-gray-400 mb-2">📥 Download Files:</div>
+                            <div className="space-y-2">
+                              {artifacts.map((artifact: any, idx: number) => {
+                                const artifactName = artifact.name || artifact.filename || 'file';
+                                const ext = artifactName.split('.').pop()?.toLowerCase() || '';
+                                
+                                // Determine icon based on extension
+                                let icon = '📄';
+                                if (['pptx', 'ppt'].includes(ext)) icon = '📊';
+                                else if (['docx', 'doc'].includes(ext)) icon = '📝';
+                                else if (['xlsx', 'xls', 'csv'].includes(ext)) icon = '📈';
+                                else if (ext === 'pdf') icon = '📕';
+                                else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) icon = '🖼️';
+                                else if (['py', 'js', 'ts', 'java', 'cpp', 'c', 'html', 'css'].includes(ext)) icon = '💻';
+                                
+                                // Use environment variable API URL (works with VPS + Vercel)
+                                const apiUrl = process.env.NEXT_PUBLIC_API_URL || API_URL;
+                                const downloadUrl = `${apiUrl}/api/v1/minds/${mindId}/artifacts/download?filename=${encodeURIComponent(artifactName)}`;
+                                
+                                return (
+                                  <a
+                                    key={idx}
+                                    href={downloadUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download={artifactName}
+                                    className="flex items-center justify-between p-2 bg-slate-700/50 hover:bg-slate-700 rounded border border-slate-600 hover:border-blue-500 transition-all group"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xl">{icon}</span>
+                                      <span className="text-sm text-gray-300 group-hover:text-white">
+                                        {artifactName}
+                                      </span>
+                                    </div>
+                                    <button className="text-blue-400 hover:text-blue-300 text-sm px-2 py-1 rounded hover:bg-blue-500/10 transition">
+                                      ⬇️ Download
+                                    </button>
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -641,68 +828,68 @@ export default function ChatPage() {
           )}
 
           <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* Input */}
-      <div className="chat-input-container space-y-2">
-        {/* File Attachments Preview */}
-        {attachedFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2 p-2 bg-slate-800 rounded border border-slate-700">
-            {attachedFiles.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-2 bg-slate-700 px-3 py-1 rounded text-sm"
-              >
-                <span className="text-gray-300">📎 {file.name}</span>
-                <button
-                  onClick={() => removeFile(index)}
-                  className="text-red-400 hover:text-red-300"
-                  title="Remove file"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
           </div>
-        )}
 
-        {/* Input Area */}
-        <div className="flex gap-3 items-end">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            multiple
-            className="hidden"
-            accept="*/*"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-full transition flex-shrink-0"
-            title="Attach files"
-          >
-            📎
-          </button>
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type a message..."
-            className="chat-input flex-1"
-            disabled={loading}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={(!input.trim() && attachedFiles.length === 0) || loading}
-            className="send-button flex-shrink-0"
-            title="Send message"
-          >
-            {loading ? '⏳' : '➤'}
-          </button>
+          {/* Input Area */}
+          <div className="p-4 border-t border-slate-700 bg-slate-800 flex-shrink-0">
+            {/* File Attachments Preview */}
+            {attachedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {attachedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-slate-700 px-3 py-1 rounded text-sm"
+                  >
+                    <span className="text-gray-300">📎 {file.name}</span>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="text-red-400 hover:text-red-300"
+                      title="Remove file"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Input Controls */}
+            <div className="flex gap-3 items-end">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                multiple
+                className="hidden"
+                accept="*/*"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-full transition flex-shrink-0"
+                title="Attach files"
+              >
+                📎
+              </button>
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type a message..."
+                className="chat-input flex-1"
+                disabled={loading}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={(!input.trim() && attachedFiles.length === 0) || loading}
+                className="send-button flex-shrink-0"
+                title="Send message"
+              >
+                {loading ? '⏳' : '➤'}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
       </div>
     </AuthRequired>
   );
