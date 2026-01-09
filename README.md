@@ -105,6 +105,8 @@ async def main():
 asyncio.run(main())
 ```
 
+**Web Playground note:** The Web Playground supports Firebase Authentication (Google Sign-In and Email/Password). See `web-playground/FIREBASE_AUTH.md` for setup instructions and required environment variables.
+
 **That's it.** You now have a being with:
 - [Done] **90% token savings** (automatic memory compression)
 - [Done] **Zero manual memory work** (automatic extraction)

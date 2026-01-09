@@ -276,7 +276,39 @@ class GenManager:
     def _save_transaction_to_db(self, transaction: 'GenTransaction') -> None:
         """Save transaction to database."""
         try:
+            # Ensure mind is registered in database before saving transaction
             from genesis.database.manager import MetaverseDB
+            metaverse_db = MetaverseDB()
+            
+            # Check if mind exists, register if not
+            existing_mind = metaverse_db.get_mind(self.mind_gmid)
+            if not existing_mind:
+                print(f"[GEN] Mind {self.mind_gmid} not found in database, registering...")
+                try:
+                    # Extract a safe name from GMID
+                    name_parts = self.mind_gmid.split('-')
+                    safe_name = f"Mind-{name_parts[-1]}" if len(name_parts) > 1 else f"Mind-{self.mind_gmid[:8]}"
+                    
+                    # Ensure name is not too long and contains only safe characters
+                    safe_name = safe_name[:50]  # Limit length
+                    safe_name = ''.join(c for c in safe_name if c.isalnum() or c in '-_ ').strip()
+                    if not safe_name:
+                        safe_name = f"Mind-{self.mind_gmid[:8]}"
+                    
+                    metaverse_db.register_mind(
+                        gmid=self.mind_gmid,
+                        name=safe_name,
+                        creator="system",
+                        template="unknown",
+                    )
+                    print(f"[GEN] Mind {self.mind_gmid} registered successfully as '{safe_name}'")
+                except Exception as reg_error:
+                    print(f"[GEN] Failed to register mind {self.mind_gmid}: {reg_error}")
+                    print(f"[GEN] Registration error details: {type(reg_error).__name__}")
+                    import traceback
+                    traceback.print_exc()
+                    return  # Don't save transaction if mind registration fails
+            
             from genesis.database.models import GenTransaction as DBGenTransaction
             from genesis.database.base import get_session
             

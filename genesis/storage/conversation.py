@@ -110,15 +110,10 @@ class ConversationManager:
             )
             
             # Apply filters
-            # For user_email: Include messages FROM that user OR assistant/system responses
+            # For user_email: Only include messages FROM that specific user
+            # This ensures users only see their own conversation history
             if user_email:
-                from sqlalchemy import or_
-                query = query.filter(
-                    or_(
-                        ConversationMessage.user_email == user_email,
-                        ConversationMessage.role.in_(['assistant', 'system'])
-                    )
-                )
+                query = query.filter(ConversationMessage.user_email == user_email)
             if environment_id:
                 query = query.filter(ConversationMessage.environment_id == environment_id)
             if role:

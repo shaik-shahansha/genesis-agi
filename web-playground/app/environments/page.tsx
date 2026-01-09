@@ -120,7 +120,7 @@ function EnvironmentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-semibold text-white">Environments</h1>
+          <h1 className="text-3xl font-semibold text-white">Environments - Work in Progress</h1>
           <p className="text-gray-300 mt-1">{environments.length} total</p>
         </div>
         <button onClick={() => setShowCreateModal(true)} className="btn-primary">

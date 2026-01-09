@@ -67,6 +67,7 @@ class Mind:
         primary_purpose: Optional[str] = None,
         config: Optional[MindConfig] = None,
         timezone_offset: int = 0,
+        gmid: Optional[str] = None,
     ):
         """
         Initialize a Mind (private - use Mind.birth() instead).
@@ -81,6 +82,7 @@ class Mind:
             primary_purpose: Primary purpose of the Mind
             config: MindConfig with plugins (default: standard config)
             timezone_offset: Hours offset from UTC for circadian rhythms
+            gmid: Optional GMID to use (for loading saved minds)
         """
         self.settings = get_settings()
 
@@ -90,6 +92,8 @@ class Mind:
             identity_kwargs["creator_email"] = creator_email
         if primary_purpose:
             identity_kwargs["primary_purpose"] = primary_purpose
+        if gmid:
+            identity_kwargs["gmid"] = gmid
         self.identity = MindIdentity(**identity_kwargs)
 
         # CORE: Configuration
@@ -608,7 +612,7 @@ class Mind:
                 
                 # Store in history
                 self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
-                self.conversation.add_message(role="assistant", content=response, environment_id=env_id)
+                self.conversation.add_message(role="assistant", content=response, user_email=user_email, environment_id=env_id)
                 
                 # Create memory with rich metadata
                 self.memory.add_memory(
@@ -665,7 +669,7 @@ class Mind:
                 
                 # Store in history
                 self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
-                self.conversation.add_message(role="assistant", content=response, environment_id=env_id)
+                self.conversation.add_message(role="assistant", content=response, user_email=user_email, environment_id=env_id)
                 
                 # Create memory
                 self.memory.add_memory(
@@ -1000,7 +1004,7 @@ class Mind:
                 
                 # Store in conversation history (SQLite)
                 self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
-                self.conversation.add_message(role="assistant", content=final_response, environment_id=env_id)
+                self.conversation.add_message(role="assistant", content=final_response, user_email=user_email, environment_id=env_id)
                 print(f"[PERF] ✓ Conversation history saved")
 
                 # Add action context if actions were taken
@@ -1107,6 +1111,12 @@ class Mind:
                 
                 # SPONTANEOUS CONVERSATION: Analyze for real-time interjections
                 if hasattr(self, 'spontaneous_conversation') and self.spontaneous_conversation and user_email:
+                    # Ensure it's the correct type
+                    from genesis.core.spontaneous_conversation import SpontaneousConversationEngine
+                    if not isinstance(self.spontaneous_conversation, SpontaneousConversationEngine):
+                        print(f"[WARN] spontaneous_conversation is not SpontaneousConversationEngine, got {type(self.spontaneous_conversation)}")
+                        self.spontaneous_conversation = SpontaneousConversationEngine(self)
+                    
                     try:
                         # Get recent conversation history for context
                         recent_history = self.conversation.get_messages(limit=10)
@@ -1218,7 +1228,7 @@ class Mind:
             # Store acknowledgment in history (SQLite)
             full_response = "".join(response_parts)
             self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
-            self.conversation.add_message(role="assistant", content=full_response, environment_id=env_id)
+            self.conversation.add_message(role="assistant", content=full_response, user_email=user_email, environment_id=env_id)
             
             self.memory.add_memory(
                 content=f"User requested task: {prompt}\nI started background task {task.task_id}",
@@ -1260,7 +1270,7 @@ class Mind:
 
         # Update history and create memory
         self.conversation.add_message(role="user", content=prompt, user_email=user_email, environment_id=env_id)
-        self.conversation.add_message(role="assistant", content=full_response, environment_id=env_id)
+        self.conversation.add_message(role="assistant", content=full_response, user_email=user_email, environment_id=env_id)
 
         self.memory.add_memory(
             content=f"User said: {prompt}\nI responded: {full_response}",
@@ -1714,6 +1724,7 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
             template=data["identity"]["template"],
             creator=data["identity"]["creator"],
             config=config,
+            gmid=data["identity"]["gmid"],
         )
 
         # Restore CORE state
@@ -1804,6 +1815,27 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
         except Exception as e:
             # Don't fail load if database registration fails
             print(f"   Warning: Could not register/update in metaverse database: {e}")
+
+        # Ensure spontaneous_conversation is properly initialized after loading
+        # (it may have failed during __init__ if proactive systems couldn't initialize)
+        # Import proactively so we don't reference a name before assignment (prevents UnboundLocalError)
+        try:
+            from genesis.core.spontaneous_conversation import SpontaneousConversationEngine
+        except Exception as e:
+            SpontaneousConversationEngine = None
+            print(f"[WARN] SpontaneousConversationEngine import failed: {e}")
+
+        if SpontaneousConversationEngine is not None:
+            if not hasattr(mind, 'spontaneous_conversation') or mind.spontaneous_conversation is None or not isinstance(mind.spontaneous_conversation, SpontaneousConversationEngine):
+                try:
+                    mind.spontaneous_conversation = SpontaneousConversationEngine(mind)
+                    print(f"[DEBUG] Re-initialized spontaneous_conversation for loaded mind {mind.identity.gmid}")
+                except Exception as e:
+                    print(f"[WARN] Could not initialize spontaneous_conversation for loaded mind: {e}")
+                    mind.spontaneous_conversation = None
+        else:
+            # If import failed earlier, ensure attribute exists but set to None
+            mind.spontaneous_conversation = None
 
         return mind
 

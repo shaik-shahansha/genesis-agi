@@ -145,15 +145,28 @@ async def get_current_user_from_token(
     credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
 ) -> Optional[User]:
     """Get current user from JWT token or Firebase ID token."""
+    print(f"DEBUG AUTH: get_current_user_from_token called")
+    print(f"DEBUG AUTH: credentials present: {credentials is not None}")
+    
     if not credentials:
+        print("DEBUG AUTH: No credentials provided")
         return None
 
     token = credentials.credentials
+    print(f"DEBUG AUTH: Token present: {token is not None}")
+    print(f"DEBUG AUTH: Token length: {len(token) if token else 0}")
+    print(f"DEBUG AUTH: Token starts with: {token[:50] if token and len(token) > 50 else token}")
 
     # First, try Firebase token verification if Firebase is enabled
-    if is_firebase_enabled():
+    print(f"DEBUG AUTH: Checking if Firebase is enabled...")
+    firebase_enabled = is_firebase_enabled()
+    print(f"DEBUG AUTH: Firebase enabled result: {firebase_enabled}")
+    if firebase_enabled:
+        print("DEBUG AUTH: Firebase is enabled, trying Firebase token verification")
         firebase_user = await verify_firebase_token(token)
+        print(f"DEBUG AUTH: Firebase user result: {firebase_user is not None}")
         if firebase_user:
+            print(f"DEBUG AUTH: Firebase user email: {firebase_user.get('email')}")
             # Create or get user from Firebase data
             email = firebase_user.get('email')
             uid = firebase_user.get('uid')
@@ -161,10 +174,12 @@ async def get_current_user_from_token(
             if email:
                 # Use Firebase UID as username (prefixed to avoid collisions)
                 username = f"firebase_{uid}"
+                print(f"DEBUG AUTH: Using username: {username}")
                 
                 # Check if user exists in local DB, create if not
                 _initialize_default_users()
                 if username not in USERS_DB:
+                    print(f"DEBUG AUTH: Creating new user: {username}")
                     # Auto-create user from Firebase
                     USERS_DB[username] = {
                         "username": username,

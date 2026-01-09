@@ -43,37 +43,66 @@ class ModelOrchestrator:
         if self.api_keys:
             print(f"[DEBUG orchestrator] Initializing with API keys for providers: {list(self.api_keys.keys())}")
 
-        # Initialize providers (prefer passed api_keys over settings)
-        # OpenRouter first (recommended for free models)
-        openrouter_key = self.api_keys.get('openrouter') or self.settings.openrouter_api_key
-        if openrouter_key:
-            try:
-                print(f"[DEBUG orchestrator] Initializing OpenRouter provider")
-                self.providers["openrouter"] = OpenRouterProvider(api_key=openrouter_key)
-                print(f"[DEBUG orchestrator] OpenRouter provider initialized successfully")
-            except ImportError as e:
-                print(f"[WARNING] OpenRouter provider unavailable: {e}")
-                print("Install openai package: pip install openai")
-            except Exception as e:
-                print(f"[ERROR] Failed to initialize OpenRouter provider: {e}")
-                import traceback
-                traceback.print_exc()
+        # Initialize providers
+        # If api_keys provided, only use those providers. Otherwise fall back to settings.
+        if self.api_keys:
+            # Only initialize providers explicitly requested in api_keys
+            if 'openrouter' in self.api_keys:
+                try:
+                    print(f"[DEBUG orchestrator] Initializing OpenRouter provider")
+                    self.providers["openrouter"] = OpenRouterProvider(api_key=self.api_keys['openrouter'])
+                    print(f"[DEBUG orchestrator] OpenRouter provider initialized successfully")
+                except ImportError as e:
+                    print(f"[WARNING] OpenRouter provider unavailable: {e}")
+                    print("Install openai package: pip install openai")
+                except Exception as e:
+                    print(f"[ERROR] Failed to initialize OpenRouter provider: {e}")
+                    import traceback
+                    traceback.print_exc()
 
-        openai_key = self.api_keys.get('openai') or self.settings.openai_api_key
-        if openai_key:
-            self.providers["openai"] = OpenAIProvider(api_key=openai_key)
+            if 'openai' in self.api_keys:
+                self.providers["openai"] = OpenAIProvider(api_key=self.api_keys['openai'])
 
-        anthropic_key = self.api_keys.get('anthropic') or self.settings.anthropic_api_key
-        if anthropic_key:
-            self.providers["anthropic"] = AnthropicProvider(api_key=anthropic_key)
+            if 'anthropic' in self.api_keys:
+                self.providers["anthropic"] = AnthropicProvider(api_key=self.api_keys['anthropic'])
 
-        gemini_key = self.api_keys.get('gemini') or self.settings.gemini_api_key
-        if gemini_key:
-            self.providers["gemini"] = GeminiProvider(api_key=gemini_key)
+            if 'gemini' in self.api_keys:
+                self.providers["gemini"] = GeminiProvider(api_key=self.api_keys['gemini'])
 
-        groq_key = self.api_keys.get('groq') or self.settings.groq_api_key
-        if groq_key:
-            self.providers["groq"] = GroqProvider(api_key=groq_key)
+            if 'groq' in self.api_keys:
+                self.providers["groq"] = GroqProvider(api_key=self.api_keys['groq'])
+        else:
+            # Fall back to settings/environment variables
+            # OpenRouter first (recommended for free models)
+            openrouter_key = self.settings.openrouter_api_key
+            if openrouter_key:
+                try:
+                    print(f"[DEBUG orchestrator] Initializing OpenRouter provider")
+                    self.providers["openrouter"] = OpenRouterProvider(api_key=openrouter_key)
+                    print(f"[DEBUG orchestrator] OpenRouter provider initialized successfully")
+                except ImportError as e:
+                    print(f"[WARNING] OpenRouter provider unavailable: {e}")
+                    print("Install openai package: pip install openai")
+                except Exception as e:
+                    print(f"[ERROR] Failed to initialize OpenRouter provider: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+            openai_key = self.settings.openai_api_key
+            if openai_key:
+                self.providers["openai"] = OpenAIProvider(api_key=openai_key)
+
+            anthropic_key = self.settings.anthropic_api_key
+            if anthropic_key:
+                self.providers["anthropic"] = AnthropicProvider(api_key=anthropic_key)
+
+            gemini_key = self.settings.gemini_api_key
+            if gemini_key:
+                self.providers["gemini"] = GeminiProvider(api_key=gemini_key)
+
+            groq_key = self.settings.groq_api_key
+            if groq_key:
+                self.providers["groq"] = GroqProvider(api_key=groq_key)
 
         # Pollinations AI - always available, no API key required!
         self.providers["pollinations"] = PollinationsProvider(

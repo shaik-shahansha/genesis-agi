@@ -78,6 +78,11 @@ Create `.env.local`:
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
+**Authentication (Firebase)**
+
+The Web Playground supports Firebase Authentication (Google Sign-In and Email/Password). See `web-playground/FIREBASE_AUTH.md` for step-by-step setup and required `NEXT_PUBLIC_FIREBASE_*` variables. Remember: client-side Firebase configuration is safe to include in `.env.local`, but keep any server-side API keys out of public repositories.
+
+
 ### Run Development Server
 
 ```bash

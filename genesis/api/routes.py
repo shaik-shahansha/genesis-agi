@@ -493,7 +493,7 @@ async def create_mind(
 
 
 @minds_router.get("", response_model=List[MindResponse])
-async def list_minds():
+async def list_minds(current_user: User = Depends(get_current_active_user)):
     """List all Minds with optimized lightweight loading."""
     import json
     from datetime import datetime
@@ -591,7 +591,7 @@ async def list_minds():
 
 
 @minds_router.get("/{mind_id}", response_model=MindResponse)
-async def get_mind(mind_id: str):
+async def get_mind(mind_id: str, current_user: User = Depends(get_current_active_user)):
     """Get a specific Mind."""
     mind = await _load_mind(mind_id)
 
@@ -634,8 +634,18 @@ async def chat(
     current_user: User = Depends(get_current_active_user),
 ):
     """Chat with a Mind (requires authentication)."""
+    print(f"DEBUG CHAT: Chat endpoint called for mind {mind_id}")
+    print(f"DEBUG CHAT: Current user: {current_user.username if current_user else 'None'}")
+    print(f"DEBUG CHAT: User email: {current_user.email if current_user else 'None'}")
+    print(f"DEBUG CHAT: Request message: {request.message}")
+    print(f"DEBUG CHAT: Request user_email: {request.user_email}")
+    
     # Use cached mind to persist background tasks!
     mind = await _get_cached_mind(mind_id)
+    print(f"[DEBUG CHAT] Loaded mind GMID: {mind.identity.gmid}")
+    print(f"[DEBUG CHAT] Mind name: {mind.identity.name}")
+    print(f"[DEBUG CHAT] URL mind_id: {mind_id}")
+    print(f"[DEBUG CHAT] Mind matches URL: {mind.identity.gmid == mind_id}")
     
     # SAFETY: Ensure mind is registered in database (for foreign key integrity)
     # This handles cases where minds were loaded before database registration was implemented
@@ -678,8 +688,8 @@ async def chat(
 
     try:
         # Generate response with user context
-        # Use user_email from request if provided, otherwise use authenticated user's email
-        user_identifier = request.user_email if request.user_email else current_user.email
+        # Use authenticated user's email, fallback to request.user_email if provided
+        user_identifier = current_user.email or request.user_email
         
         # If environment_id provided, enter the environment first
         if request.environment_id:
@@ -765,23 +775,52 @@ async def chat(
             memory_created=True,
         )
         
+        # Send response via WebSocket to update UI immediately
+        if hasattr(mind, 'notification_manager') and mind.notification_manager:
+            try:
+                websocket_message = {
+                    "type": "message",
+                    "content": response or "No response generated",
+                    "timestamp": datetime.now().isoformat(),
+                    "metadata": {
+                        "emotion": mind.current_emotion,
+                        "memory_created": True,
+                    }
+                }
+                success = await mind.notification_manager.send_to_websocket(
+                    user_email=user_identifier,
+                    message_type="message",
+                    data=websocket_message
+                )
+                print(f"[WEBSOCKET] Sent assistant response via WebSocket: {success}")
+            except Exception as ws_error:
+                print(f"[WEBSOCKET] Failed to send via WebSocket: {ws_error}")
+        
         # Background tasks (non-blocking)
         async def _background_tasks():
             try:
+                print(f"[DEBUG BACKGROUND] Processing for mind GMID: {mind.identity.gmid}")
+                print(f"[DEBUG BACKGROUND] Mind name: {mind.identity.name}")
+                
                 # Reward for response quality (async, with memory)
                 if hasattr(mind, 'gen_intelligence'):
+                    print(f"[DEBUG BACKGROUND] Mind has gen_intelligence")
                     gen_earned = await mind.gen_intelligence.reward_for_response_quality_async(
                         user_message=request.message,
                         assistant_response=response
                     )
                     if gen_earned > 0:
                         print(f"[GEN] ✓ Earned {gen_earned:.1f} gens for quality response")
+                else:
+                    print(f"[DEBUG BACKGROUND] Mind does NOT have gen_intelligence")
                 
                 # Save state
                 mind.save()
                 print(f"[PERF] ✓ Mind state saved to disk")
             except Exception as e:
                 logger.error(f"Background tasks failed: {e}")
+                import traceback
+                traceback.print_exc()
         
         asyncio.create_task(_background_tasks())
         
@@ -1490,12 +1529,17 @@ async def get_memories(
 @minds_router.get("/{mind_id}/conversations")
 async def get_conversation_threads(
     mind_id: str,
-    user_email: Optional[str] = Query(None, description="Filter by user email")
+    user_email: Optional[str] = Query(None, description="Filter by user email"),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Get list of conversation threads (unique user+environment combinations).
     Returns threads with metadata for sidebar display.
+    Requires authentication.
     """
+    # Use authenticated user's email if no user_email provided
+    if not user_email:
+        user_email = current_user.email
     mind = await _load_mind(mind_id)
     
     if not hasattr(mind, 'conversation'):
@@ -1538,12 +1582,17 @@ async def get_conversation_messages(
     mind_id: str,
     user_email: Optional[str] = Query(None, description="User email"),
     environment_id: Optional[str] = Query(None, description="Environment ID"),
-    limit: int = Query(default=50, le=200, description="Maximum messages to return")
+    limit: int = Query(default=50, le=200, description="Maximum messages to return"),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Get messages for a specific conversation thread.
     Filter by user_email and/or environment_id to get specific conversation.
+    Requires authentication.
     """
+    # Use authenticated user's email if no user_email provided
+    if not user_email:
+        user_email = current_user.email
     mind = await _load_mind(mind_id)
     
     if not hasattr(mind, 'conversation'):
@@ -1565,12 +1614,38 @@ async def get_conversation_messages(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@minds_router.get("/{mind_id}/messages")
+async def get_messages(
+    mind_id: str,
+    user_email: Optional[str] = Query(None, description="User email"),
+    environment_id: Optional[str] = Query(None, description="Environment ID"),
+    limit: int = Query(default=50, le=200, description="Maximum messages to return"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Alias endpoint for get_conversation_messages.
+    Get messages for a specific conversation thread.
+    Filter by user_email and/or environment_id to get specific conversation.
+    Requires authentication.
+    """
+    # Use authenticated user's email if no user_email provided in query
+    if not user_email:
+        user_email = current_user.email
+    
+    return await get_conversation_messages(mind_id, user_email, environment_id, limit)
+
+
 @minds_router.get("/{mind_id}/thoughts")
-async def get_thoughts(mind_id: str, limit: int = Query(default=10, le=50)):
+async def get_thoughts(
+    mind_id: str, 
+    limit: int = Query(default=10, le=50),
+    current_user: User = Depends(get_current_active_user),
+):
     """
     Get Mind's recent thoughts from database.
     
     CRITICAL: Thoughts now stored in SQLite for scalability.
+    Requires authentication.
     """
     mind = await _load_mind(mind_id)
     
@@ -1599,8 +1674,9 @@ async def get_mind_logs(
     mind_id: str,
     limit: int = Query(default=100, le=1000),
     level: Optional[str] = Query(None, description="Filter by log level"),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Get Mind's activity logs (all consciousness activities, LLM calls, thoughts, etc.)."""
+    """Get Mind's activity logs (all consciousness activities, LLM calls, thoughts, etc.). Requires authentication."""
     mind = await _load_mind(mind_id)
     
     # Convert level string to LogLevel enum if provided
@@ -2418,7 +2494,7 @@ async def websocket_chat(websocket: WebSocket, mind_id: str):
 
 # System endpoints
 @system_router.get("/status")
-async def system_status():
+async def system_status(current_user: User = Depends(get_current_active_user)):
     """Get system status."""
     from genesis.models.orchestrator import ModelOrchestrator
 
@@ -2443,7 +2519,7 @@ async def system_status():
 
 
 @system_router.get("/providers")
-async def get_providers():
+async def get_providers(current_user: User = Depends(get_current_active_user)):
     """Get available model providers."""
     from genesis.models.orchestrator import ModelOrchestrator
 

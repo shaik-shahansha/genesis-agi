@@ -362,7 +362,10 @@ export default function ImmersiveChatPage() {
               
               <div className="flex items-center gap-3">
                 <div className="text-center">
-                  <h1 className="text-lg font-semibold">{mind.name}</h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-lg font-semibold">{mind.name}</h1>
+                    <span className="inline-block text-xs bg-yellow-400 text-black px-2 py-0.5 rounded">Work in progress</span>
+                  </div>
                   <p className="text-xs text-gray-400">
                     {videoEnabled ? '🟢 Video Call Active' : '⚪ Voice Only'}
                   </p>
