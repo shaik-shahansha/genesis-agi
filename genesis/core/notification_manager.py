@@ -429,6 +429,26 @@ class NotificationManager:
             
             logger.info(f"[PROACTIVE] ✓ Proactive message delivered as chat message")
             
+            # Persist the proactive message to conversation history so it survives reloads
+            try:
+                from genesis.storage.conversation import ConversationManager
+                conv = ConversationManager(self.mind_id)
+                # Store as assistant message; tie to recipient so it will be returned by user-scoped queries
+                conv.add_message(
+                    role="assistant",
+                    content=notification.message,
+                    user_email=notification.recipient,
+                    metadata={
+                        "is_proactive": True,
+                        "proactive_title": notification.title,
+                        **make_json_serializable(notification.metadata)
+                    },
+                    timestamp=notification.created_at
+                )
+                logger.debug(f"[PROACTIVE] ✓ Proactive message persisted to conversation for {notification.recipient}")
+            except Exception as e:
+                logger.error(f"[PROACTIVE] Could not persist proactive message: {e}")
+            
             return True
             
         except ConnectionResetError:

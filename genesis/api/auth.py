@@ -188,11 +188,29 @@ async def get_current_user_from_token(
                         "role": UserRole.USER,
                         "disabled": False,
                     }
-                
+
                 user_dict = USERS_DB[username]
                 # Update email in case it changed
                 user_dict["email"] = email
-                
+
+                # Persist to DB for admin visibility
+                try:
+                    from genesis.database.manager import MetaverseDB
+                    db = MetaverseDB()
+                    db.create_user_record(username=username, email=email, role=UserRole.USER)
+                except Exception:
+                    pass
+
+                # If email is a global admin in DB, elevate role
+                try:
+                    from genesis.database.manager import MetaverseDB
+                    db = MetaverseDB()
+                    if db.is_global_admin(email):
+                        user_dict = user_dict.copy()
+                        user_dict["role"] = UserRole.ADMIN
+                except Exception:
+                    pass
+
                 return User(**user_dict)
 
     # Fallback to JWT token verification
@@ -219,6 +237,15 @@ async def get_current_user_from_token(
         user_dict = user_dict.copy()
         user_dict["email"] = email
 
+        # If email is a global admin in DB, elevate role
+        try:
+            from genesis.database.manager import MetaverseDB
+            db = MetaverseDB()
+            if db.is_global_admin(email):
+                user_dict["role"] = UserRole.ADMIN
+        except Exception:
+            pass
+
     return User(**user_dict)
 
 
@@ -240,6 +267,17 @@ async def get_current_user_from_api_key(
     user_dict = USERS_DB.get(username)
     if not user_dict:
         return None
+
+    # If the user's email is a global admin in DB, elevate role
+    try:
+        from genesis.database.manager import MetaverseDB
+        db = MetaverseDB()
+        email = user_dict.get('email')
+        if email and db.is_global_admin(email):
+            user_dict = user_dict.copy()
+            user_dict['role'] = UserRole.ADMIN
+    except Exception:
+        pass
 
     return User(**user_dict)
 
@@ -309,7 +347,11 @@ def create_user(
     email: Optional[str] = None,
     role: UserRole = UserRole.USER,
 ) -> User:
-    """Create a new user."""
+    """Create a new user (in-memory and persistent record).
+
+    This keeps compatibility with the existing in-memory USERS_DB while creating
+    a persistent `UserRecord` for admin management.
+    """
     if username in USERS_DB:
         raise ValueError(f"User {username} already exists")
 
@@ -321,7 +363,18 @@ def create_user(
         "disabled": False,
     }
 
+    # Add to in-memory store
     USERS_DB[username] = user_dict
+
+    # Also persist to DB for admin panel
+    try:
+        from genesis.database.manager import MetaverseDB
+        db = MetaverseDB()
+        db.create_user_record(username=username, email=email, role=role)
+    except Exception:
+        # Non-fatal; in-memory users still work
+        pass
+
     return User(**user_dict)
 
 

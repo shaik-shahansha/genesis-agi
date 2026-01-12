@@ -316,7 +316,7 @@ class MindConfig:
         
         for plugin_config in plugin_configs:
             plugin_name = plugin_config.get("name")
-            plugin_version = plugin_config.get("version", "0.1.3")
+            plugin_version = plugin_config.get("version", "0.1.4")
             plugin_settings = plugin_config.get("config", {})
             
             try:

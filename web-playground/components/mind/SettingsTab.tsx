@@ -33,6 +33,10 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   // Currency
   const [currency, setCurrency] = useState(mind.gens || 100);
 
+  // Access
+  const [allowedUsers, setAllowedUsers] = useState<string[]>([]);
+  const [isPublic, setIsPublic] = useState<boolean>(mind.is_public || false);
+
   useEffect(() => {
     // Reset form when mind changes
     setName(mind.name || '');
@@ -45,6 +49,17 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
     setConsciousnessActive(mind.consciousness_active !== false);
     setDreamingEnabled(mind.dreaming_enabled !== false);
     setCurrency(mind.gens || 100);
+
+    // Fetch access info
+    (async () => {
+      try {
+        const res = await api.getMindAccess(mind.gmid);
+        setAllowedUsers(res.allowed_users || []);
+        setIsPublic(!!res.is_public);
+      } catch (e) {
+        setAllowedUsers([]);
+      }
+    })();
   }, [mind]);
 
   const handleSave = async () => {
@@ -165,6 +180,117 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
               rows={3}
               placeholder="Brief description of this Mind"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Access Control */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">🔒 Access</h2>
+        <p className="text-sm text-gray-600 mb-4">Control who can view and chat with this Mind. Only the creator can add users or make the Mind public.</p>
+
+        <div className="flex items-center gap-4 mb-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={async (e) => {
+                const val = e.target.checked;
+                setIsPublic(val);
+                try {
+                  setSaving(true);
+                  await api.setMindPublic(mind.gmid, val);
+                  onRefresh();
+                } catch (err: any) {
+                  setMessage(`Error: ${err.message}`);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              className="w-5 h-5"
+            />
+            <div>
+              <div className="font-medium text-gray-900">Public</div>
+              <div className="text-sm text-gray-600">If public, any authenticated user may see this Mind</div>
+            </div>
+          </label>
+        </div>
+
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Invite User by Email</label>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              placeholder="user@example.com"
+              className="input flex-1"
+              onKeyDown={async (e) => {
+                if (e.key === 'Enter') {
+                  const val = (e.target as HTMLInputElement).value.trim();
+                  if (!val) return;
+                  setSaving(true);
+                  try {
+                    await api.addMindUser(mind.gmid, val);
+                    setMessage('User added');
+                    onRefresh();
+                    (e.target as HTMLInputElement).value = '';
+                  } catch (err: any) {
+                    setMessage(`Error: ${err.message}`);
+                  } finally {
+                    setSaving(false);
+                  }
+                }
+              }}
+            />
+            <button
+              className="btn"
+              onClick={async () => {
+                const input = (document.querySelector('input[type="email"]') as HTMLInputElement);
+                const val = input?.value?.trim();
+                if (!val) return;
+                setSaving(true);
+                try {
+                  await api.addMindUser(mind.gmid, val);
+                  setMessage('User added');
+                  onRefresh();
+                  input.value = '';
+                } catch (err: any) {
+                  setMessage(`Error: ${err.message}`);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >Add</button>
+          </div>
+        </div>
+
+        {/* Allowed users list fetched from /access */}
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Allowed Users</label>
+          <div className="bg-gray-50 border border-gray-100 rounded p-3">
+            {(allowedUsers && allowedUsers.length > 0) ? (
+              allowedUsers.map((u: string) => (
+                <div key={u} className="flex items-center justify-between py-1">
+                  <div className="text-sm">{u}</div>
+                  <button
+                    className="text-sm text-red-600"
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        await api.removeMindUser(mind.gmid, u);
+                        setMessage('User removed');
+                        onRefresh();
+                      } catch (err: any) {
+                        setMessage(`Error: ${err.message}`);
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >Remove</button>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-gray-500">No invited users</div>
+            )}
           </div>
         </div>
       </div>

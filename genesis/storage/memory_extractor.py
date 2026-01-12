@@ -88,6 +88,7 @@ class MemoryExtractor:
                         content=memory_data["content"],
                         memory_type=MemoryType(memory_data["type"]),
                         user_email=user_id,
+                        relationship_context="personal",
                         emotion=memory_data.get("emotion"),
                         emotion_intensity=memory_data.get("emotion_intensity", 0.5),
                         importance=memory_data.get("importance", 0.5),

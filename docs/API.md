@@ -587,7 +587,7 @@ GET /system/status
 **Response**:
 ```json
 {
-  "version": "0.1.3",
+  "version": "0.1.4",
   "minds_count": 5,
   "providers": {
     "openai": true,

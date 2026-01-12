@@ -1,7 +1,7 @@
 // Genesis Playground - Clean Dashboard
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -21,11 +21,19 @@ function Home() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const isFetchingRef = useRef(false);
+
   useEffect(() => {
-    fetchMinds();
-    
+    const safeFetch = () => {
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
+      fetchMinds().finally(() => (isFetchingRef.current = false));
+    };
+
+    safeFetch();
+
     // Reload when window gains focus (e.g., after navigation back)
-    const handleFocus = () => fetchMinds();
+    const handleFocus = () => safeFetch();
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, []);

@@ -62,9 +62,52 @@ export class VoiceOutput {
   private currentAudio: HTMLAudioElement | null = null;
   private selectedVoice: string = 'nova'; // Default to nova (female)
   private isSpeakingFlag: boolean = false;
+  private audioUnlocked: boolean = false;
+  private audioContext: AudioContext | null = null;
+  private sinkId: string | null = null;
 
   constructor() {
-    // No initialization needed for Pollinations
+    // No initialization needed here, but we support explicit unlocking on first user gesture
+    this.audioUnlocked = false;
+  }
+
+  async unlockAudio() {
+    // Call this on a user gesture (e.g., when user clicks voice button) to unlock autoplay restrictions
+    try {
+      if (typeof window === 'undefined') return;
+      if (!this.audioContext) {
+        // @ts-ignore
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        this.audioContext = new AC();
+      }
+      await this.audioContext.resume();
+
+      // Play a tiny silent buffer to ensure browser considers audio unlocked
+      const buffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate);
+      const src = this.audioContext.createBufferSource();
+      src.buffer = buffer;
+      src.connect(this.audioContext.destination);
+      try { src.start(0); } catch (e) { /* ignore */ }
+
+      this.audioUnlocked = true;
+      console.log('🔓 Audio unlocked for TTS playback');
+    } catch (err) {
+      console.warn('Could not unlock audio context:', err);
+      this.audioUnlocked = false;
+    }
+  }
+
+  async setSinkId(sinkId: string) {
+    // Use this to route audio to a specific output device (if supported)
+    this.sinkId = sinkId;
+    if (this.currentAudio && (this.currentAudio as any).setSinkId) {
+      try {
+        await (this.currentAudio as any).setSinkId(sinkId);
+        console.log('Audio sink set to', sinkId);
+      } catch (err) {
+        console.warn('Failed to set sinkId:', err);
+      }
+    }
   }
 
   async speak(text: string, options?: { voice?: string; speed?: number }) {
@@ -81,9 +124,17 @@ export class VoiceOutput {
         .trim();
 
       const voice = options?.voice || this.selectedVoice;
-      
-      // Use a simpler, more reliable TTS approach
-      // Try ResponsiveVoice as fallback if available
+
+      // If we haven't been unlocked yet, try to resume audio context (best-effort)
+      if (!this.audioUnlocked) {
+        try {
+          await this.unlockAudio();
+        } catch (err) {
+          console.warn('unlockAudio failed:', err);
+        }
+      }
+
+      // ResponsiveVoice fallback
       if (typeof window !== 'undefined' && (window as any).responsiveVoice) {
         console.log('Using ResponsiveVoice for TTS:', cleanText.substring(0, 50));
         this.isSpeakingFlag = true;
@@ -100,46 +151,58 @@ export class VoiceOutput {
         return;
       }
 
-      // Fallback to Pollinations.AI TTS
       const encodedText = encodeURIComponent(cleanText);
-      // Use a more reliable format
       const audioUrl = `https://text.pollinations.ai/${encodedText}?model=openai&voice=${voice}`;
 
       console.log('Playing audio:', { text: cleanText.substring(0, 50), voice, url: audioUrl });
 
       this.isSpeakingFlag = true;
       this.currentAudio = new Audio();
-      
-      // Set up error handling before setting src
+      this.currentAudio.preload = 'auto';
+      this.currentAudio.crossOrigin = 'anonymous';
+      this.currentAudio.muted = false;
+      this.currentAudio.volume = 1.0;
+      this.currentAudio.src = audioUrl;
+
+      // Apply sinkId if set and supported
+      if (this.sinkId && (this.currentAudio as any).setSinkId) {
+        try {
+          await (this.currentAudio as any).setSinkId(this.sinkId);
+        } catch (err) {
+          console.warn('setSinkId failed:', err);
+        }
+      }
+
       this.currentAudio.onerror = (error) => {
         console.error('Audio playback error:', error);
         this.isSpeakingFlag = false;
         this.currentAudio = null;
-        
-        // Try browser's built-in speech synthesis as last resort
+        // Try browser's built-in TTS as fallback
         this.useBrowserTTS(cleanText);
       };
 
-      // Handle playback end
       this.currentAudio.onended = () => {
         console.log('Audio playback ended');
         this.isSpeakingFlag = false;
         this.currentAudio = null;
       };
 
-      // Ensure audio is NOT muted and volume is at 100%
-      this.currentAudio.muted = false;
-      this.currentAudio.volume = 1.0;
-      this.currentAudio.src = audioUrl;
-
-      // Load and play
-      await this.currentAudio.play();
-      console.log('Audio playback started');
+      // Play and handle any promise rejection (autoplay policies)
+      try {
+        const playPromise = this.currentAudio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+        }
+        console.log('Audio playback started');
+      } catch (err) {
+        console.warn('Audio.play() rejected, falling back to browser TTS', err);
+        this.isSpeakingFlag = false;
+        this.currentAudio = null;
+        this.useBrowserTTS(cleanText);
+      }
     } catch (error) {
       console.error('Speech synthesis failed:', error);
       this.isSpeakingFlag = false;
-      
-      // Fallback to browser TTS
       this.useBrowserTTS(text);
     }
   }
@@ -147,9 +210,10 @@ export class VoiceOutput {
   private useBrowserTTS(text: string) {
     console.log('Attempting browser built-in TTS as fallback...');
     try {
-      if ('speechSynthesis' in window) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        const voices = speechSynthesis.getVoices();
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.voice = speechSynthesis.getVoices().find(v => v.name.includes('Female')) || speechSynthesis.getVoices()[0];
+        utterance.voice = voices.find((v: any) => v.name && v.name.toLowerCase().includes('female')) || voices[0];
         utterance.onend = () => {
           this.isSpeakingFlag = false;
           console.log('Browser TTS ended');
@@ -169,23 +233,22 @@ export class VoiceOutput {
   }
 
   stop() {
-    // Stop audio element
     if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio.currentTime = 0;
+      try {
+        this.currentAudio.pause();
+        this.currentAudio.currentTime = 0;
+      } catch (err) {}
       this.currentAudio = null;
     }
-    
-    // Stop browser TTS
+
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      speechSynthesis.cancel();
+      try { speechSynthesis.cancel(); } catch (err) {}
     }
-    
-    // Stop ResponsiveVoice if available
+
     if (typeof window !== 'undefined' && (window as any).responsiveVoice) {
-      (window as any).responsiveVoice.cancel();
+      try { (window as any).responsiveVoice.cancel(); } catch (err) {}
     }
-    
+
     this.isSpeakingFlag = false;
   }
 
@@ -194,7 +257,6 @@ export class VoiceOutput {
   }
 
   getAvailableVoices() {
-    // Pollinations.AI supported voices
     return [
       { name: 'alloy', label: 'Alloy (Neutral)' },
       { name: 'echo', label: 'Echo (Male)' },

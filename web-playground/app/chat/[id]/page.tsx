@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { getFirebaseToken } from '@/lib/firebase';
 
 interface Message {
+  id?: number;
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
@@ -77,6 +78,9 @@ export default function ChatPage() {
   const [websocket, setWebsocket] = useState<WebSocket | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [feedbackSent, setFeedbackSent] = useState<Set<number>>(new Set());
 
@@ -291,23 +295,26 @@ export default function ChatPage() {
 
   const loadConversationMessages = async (envId: string | null) => {
     if (!userEmail) return;
-    
+    setLoading(true);
+    setLoadingMore(false);
+
     try {
       const params = new URLSearchParams({
         user_email: userEmail,
         limit: '50'
       });
-      
+
       if (envId) {
         params.append('environment_id', envId);
       }
-      
+
       const token = await getFirebaseToken();
       if (!token) {
         console.error('No authentication token available');
+        setLoading(false);
         return;
       }
-      
+
       const response = await fetch(
         `${API_URL}/api/v1/minds/${mindId}/conversations/messages?${params}`,
         {
@@ -316,35 +323,39 @@ export default function ChatPage() {
           },
         }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
-        
+
         console.log('📥 Loaded messages from API:', data.messages?.length || 0);
         console.log('📥 Message roles:', data.messages?.map((m: any) => m.role));
-        
-        // Convert messages to the format we need
+
+        // Convert messages to the format we need (keep id for pagination)
         const chatMessages: Message[] = data.messages
           .filter((msg: any) => msg.role !== 'system')
           .map((msg: any) => ({
+            id: msg.id,
             role: msg.role,
             content: msg.content,
             timestamp: msg.timestamp
           }));
-        
+
         console.log('✅ Filtered chat messages:', chatMessages.length);
         console.log('✅ Filtered roles:', chatMessages.map(m => m.role));
-        
+
         setMessages(chatMessages);
-        
+
         // Convert to allMessages format
         const formattedMessages = chatMessages.map((msg: Message) => ({
           type: 'chat' as const,
           data: msg
         }));
-        
+
         setAllMessages(formattedMessages);
-        
+
+        // Pagination metadata
+        setHasMore(Boolean(data.has_more));
+
         // Scroll to bottom after messages load
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -352,6 +363,82 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error('Error loading conversation messages:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadEarlierMessages = async () => {
+    if (!userEmail || loadingMore || !hasMore) return;
+    if (!messages || messages.length === 0) return;
+
+    setLoadingMore(true);
+
+    try {
+      const earliest = messages[0];
+      if (!earliest.id) {
+        setLoadingMore(false);
+        return;
+      }
+
+      const oldScrollTop = messagesContainerRef.current?.scrollTop ?? 0;
+      const oldScrollHeight = messagesContainerRef.current?.scrollHeight ?? 0;
+
+      const params = new URLSearchParams({
+        user_email: userEmail,
+        limit: '50',
+        before_id: String(earliest.id)
+      });
+
+      if (selectedEnvironment) {
+        params.append('environment_id', selectedEnvironment);
+      }
+
+      const token = await getFirebaseToken();
+      if (!token) {
+        console.error('No authentication token available');
+        setLoadingMore(false);
+        return;
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/v1/minds/${mindId}/conversations/messages?${params}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const olderMsgs: Message[] = data.messages
+          .filter((msg: any) => msg.role !== 'system')
+          .map((msg: any) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp
+          }));
+
+        if (olderMsgs.length > 0) {
+          setMessages(prev => [...olderMsgs, ...prev]);
+          setAllMessages(prev => [...olderMsgs.map(m => ({ type: 'chat' as const, data: m })), ...prev]);
+
+          // Adjust scroll to keep view stable
+          setTimeout(() => {
+            const newScrollHeight = messagesContainerRef.current?.scrollHeight ?? 0;
+            const delta = newScrollHeight - oldScrollHeight;
+            messagesContainerRef.current && (messagesContainerRef.current.scrollTop = oldScrollTop + delta + 10);
+          }, 50);
+        }
+
+        setHasMore(Boolean(data.has_more));
+      }
+    } catch (error) {
+      console.error('Error loading earlier messages:', error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -681,8 +768,21 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* Messages Area - This will be our existing messages component */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 messages-container bg-slate-900">
+          {/* Messages Area - this container handles infinite scroll upwards */}
+          <div
+            ref={messagesContainerRef}
+            onScroll={(e) => {
+              const target = e.currentTarget as HTMLDivElement;
+              if (target.scrollTop < 120 && hasMore && !loadingMore && !loading) {
+                loadEarlierMessages();
+              }
+            }}
+            className="flex-1 overflow-y-auto p-6 space-y-4 messages-container bg-slate-900"
+          >
+            {loadingMore && (
+              <div className="text-center py-2 text-sm text-gray-400">Loading earlier messages...</div>
+            )}
+
           {allMessages.length === 0 && (
             <div className="text-center py-12 text-gray-400">
               <p className="text-lg mb-2">👋 Start a conversation with {mind.name}</p>

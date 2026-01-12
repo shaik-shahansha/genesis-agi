@@ -126,6 +126,64 @@ class ConversationManager:
             
             # Convert to dict (reverse to chronological order)
             return [self._message_to_dict(msg) for msg in reversed(messages)]
+
+    def get_messages_before(
+        self,
+        before_id: int,
+        limit: int = 50,
+        user_email: Optional[str] = None,
+        environment_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get messages before a specific message id (cursor-based pagination).
+
+        Args:
+            before_id: Message id to page before (exclusive)
+            limit: Maximum number of messages to return
+            user_email: Filter by specific user
+            environment_id: Filter by environment
+
+        Returns:
+            List of message dictionaries (chronological order)
+        """
+        with get_session() as session:
+            before_msg = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid,
+                ConversationMessage.id == before_id
+            ).first()
+
+            if not before_msg:
+                return []
+
+            before_ts = before_msg.timestamp
+
+            # Build query for messages strictly earlier than the cursor
+            from sqlalchemy import and_, or_
+
+            query = session.query(ConversationMessage).filter(
+                ConversationMessage.mind_gmid == self.mind_gmid,
+                or_(
+                    ConversationMessage.timestamp < before_ts,
+                    and_(
+                        ConversationMessage.timestamp == before_ts,
+                        ConversationMessage.id < before_id
+                    )
+                )
+            )
+
+            # Apply filters
+            if user_email:
+                query = query.filter(ConversationMessage.user_email == user_email)
+            if environment_id:
+                query = query.filter(ConversationMessage.environment_id == environment_id)
+
+            # Order by newest first (descending), then reverse to chronological
+            messages = query.order_by(
+                ConversationMessage.timestamp.desc(),
+                ConversationMessage.id.desc()
+            ).limit(limit).all()
+
+            return [self._message_to_dict(msg) for msg in reversed(messages)]
     
     def get_messages_since(
         self,
@@ -347,6 +405,7 @@ class ConversationManager:
     def _message_to_dict(self, msg: ConversationMessage) -> Dict[str, Any]:
         """Convert database message to dictionary."""
         return {
+            "id": msg.id,
             "role": msg.role,
             "content": msg.content,
             "user_email": msg.user_email,

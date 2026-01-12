@@ -72,8 +72,11 @@ class MindIdentity(BaseModel):
     # Avatar
     avatar_url: Optional[str] = None  # Last generated avatar URL
 
+    # Visibility
+    is_public: bool = False  # Whether this mind is publicly visible
+
     # Genesis version
-    genesis_version: str = "0.1.3"
+    genesis_version: str = "0.1.4"
 
     def __init__(self, **data):
         super().__init__(**data)

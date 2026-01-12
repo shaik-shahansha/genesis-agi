@@ -2108,5 +2108,233 @@ def env_remove_mind(
         console.print(f"[yellow]Mind '{mind_name}' doesn't have access[/yellow]\n")
 
 
+# ---------------------------------------------------------------------------
+# Mind access management CLI
+# ---------------------------------------------------------------------------
+
+mind_app = typer.Typer(help="Manage Minds and their access controls")
+
+
+@mind_app.command("add-user")
+def mind_add_user(
+    mind_name: str = typer.Argument(..., help="Mind name or GMID"),
+    user_email: str = typer.Argument(..., help="User email to grant access"),
+):
+    """Grant a user email access to a Mind."""
+    from genesis.database.manager import MetaverseDB
+    import json
+
+    db = MetaverseDB()
+
+    mind_gmid = None
+    if '-' in mind_name:
+        mind_gmid = mind_name
+    else:
+        for path in settings.minds_dir.glob("*.json"):
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                if data["identity"]["name"] == mind_name:
+                    mind_gmid = data["identity"]["gmid"]
+                    break
+            except Exception:
+                continue
+
+    if not mind_gmid:
+        console.print(f"[red][FAILED] Mind '{mind_name}' not found.[/red]")
+        raise typer.Exit(1)
+
+    added = db.add_mind_user_access(mind_gmid, user_email, added_by="cli")
+    if not added:
+        console.print(f"[yellow]User '{user_email}' already has access to {mind_gmid}[/yellow]\n")
+        return
+
+    console.print(f"[green][SUCCESS] Granted access to {user_email} on Mind {mind_gmid}[/green]\n")
+
+
+@mind_app.command("remove-user")
+def mind_remove_user(
+    mind_name: str = typer.Argument(..., help="Mind name or GMID"),
+    user_email: str = typer.Argument(..., help="User email to revoke access"),
+):
+    """Revoke a user email's access from a Mind."""
+    from genesis.database.manager import MetaverseDB
+    import json
+
+    db = MetaverseDB()
+
+    mind_gmid = None
+    if '-' in mind_name:
+        mind_gmid = mind_name
+    else:
+        for path in settings.minds_dir.glob("*.json"):
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                if data["identity"]["name"] == mind_name:
+                    mind_gmid = data["identity"]["gmid"]
+                    break
+            except Exception:
+                continue
+
+    if not mind_gmid:
+        console.print(f"[red][FAILED] Mind '{mind_name}' not found.[/red]")
+        raise typer.Exit(1)
+
+    removed = db.remove_mind_user_access(mind_gmid, user_email)
+    if not removed:
+        console.print(f"[yellow]User '{user_email}' doesn't have access to {mind_gmid}[/yellow]\n")
+        return
+
+    console.print(f"[green][SUCCESS] Revoked access for {user_email} on Mind {mind_gmid}[/green]\n")
+
+
+@mind_app.command("list-users")
+def mind_list_users(
+    mind_name: str = typer.Argument(..., help="Mind name or GMID"),
+):
+    """List allowed user emails for a Mind."""
+    from genesis.database.manager import MetaverseDB
+    import json
+
+    db = MetaverseDB()
+
+    mind_gmid = None
+    if '-' in mind_name:
+        mind_gmid = mind_name
+    else:
+        for path in settings.minds_dir.glob("*.json"):
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                if data["identity"]["name"] == mind_name:
+                    mind_gmid = data["identity"]["gmid"]
+                    break
+            except Exception:
+                continue
+
+    if not mind_gmid:
+        console.print(f"[red][FAILED] Mind '{mind_name}' not found.[/red]")
+        raise typer.Exit(1)
+
+    users = db.get_mind_allowed_users(mind_gmid)
+    if not users:
+        console.print(f"[yellow]No allowed users for {mind_gmid}[/yellow]\n")
+        return
+
+    console.print(f"[bold]Allowed Users ({len(users)}) for {mind_gmid}:[/bold]")
+    for u in users:
+        console.print(f"  👤 {u}")
+    console.print()
+
+
+@mind_app.command("set-public")
+def mind_set_public(
+    mind_name: str = typer.Argument(..., help="Mind name or GMID"),
+    is_public: bool = typer.Argument(..., help="true to make public, false to make private"),
+):
+    """Set a Mind to be public or private."""
+    from genesis.database.manager import MetaverseDB
+    import json
+
+    db = MetaverseDB()
+
+    mind_gmid = None
+    if '-' in mind_name:
+        mind_gmid = mind_name
+    else:
+        for path in settings.minds_dir.glob("*.json"):
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                if data["identity"]["name"] == mind_name:
+                    mind_gmid = data["identity"]["gmid"]
+                    # Update identity JSON as well
+                    data_id = data
+                    break
+            except Exception:
+                continue
+
+    if not mind_gmid:
+        console.print(f"[red][FAILED] Mind '{mind_name}' not found.[/red]")
+        raise typer.Exit(1)
+
+    updated = db.set_mind_public(mind_gmid, is_public)
+    if not updated:
+        console.print(f"[red][FAILED] Could not update Mind {mind_gmid}[/red]\n")
+        raise typer.Exit(1)
+
+    # Also update JSON on disk if available
+    try:
+        for path in settings.minds_dir.glob("*.json"):
+            with open(path, 'r+', encoding='utf-8') as f:
+                data = json.load(f)
+                if data["identity"]["gmid"] == mind_gmid:
+                    data["identity"]["is_public"] = is_public
+                    f.seek(0)
+                    json.dump(data, f, indent=2)
+                    f.truncate()
+                    break
+    except Exception:
+        pass
+
+    console.print(f"[green][SUCCESS] Mind {mind_gmid} is_public set to {is_public}[/green]\n")
+
+
+# ---------------------------------------------------------------------------
+# End mind access management
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Global Admin CLI
+# ---------------------------------------------------------------------------
+
+admin_app = typer.Typer(help="Manage global admins")
+
+
+@admin_app.command("add")
+def admin_add(email: str = typer.Argument(..., help="Email address to add as global admin")):
+    """Add a global admin (stores in DB)"""
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    added = db.add_global_admin(email, added_by="cli")
+    if not added:
+        console.print(f"[yellow]{email} is already a global admin[/yellow]\n")
+        return
+    console.print(f"[green][SUCCESS] Added global admin: {email}[/green]\n")
+
+
+@admin_app.command("remove")
+def admin_remove(email: str = typer.Argument(..., help="Email to remove from global admins")):
+    """Remove a global admin"""
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    removed = db.remove_global_admin(email)
+    if not removed:
+        console.print(f"[yellow]{email} is not a global admin[/yellow]\n")
+        return
+    console.print(f"[green][SUCCESS] Removed global admin: {email}[/green]\n")
+
+
+@admin_app.command("list")
+def admin_list():
+    """List all global admins"""
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    admins = db.list_global_admins()
+    if not admins:
+        console.print("[yellow]No global admins configured[/yellow]\n")
+        return
+    console.print(f"[bold]Global Admins ({len(admins)}):[/bold]")
+    for a in admins:
+        console.print(f"  👑 {a}")
+    console.print()
+
+
+app.add_typer(admin_app, name="admin")
+app.add_typer(mind_app, name="mind")
+
+
 if __name__ == "__main__":
     app()

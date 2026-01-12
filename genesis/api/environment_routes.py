@@ -3,7 +3,7 @@ Environment API routes - WebSocket-based real-time environments.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends, Query
 from pydantic import BaseModel, Field
 
@@ -15,7 +15,7 @@ from genesis.environments.templates import (
     get_template_info,
 )
 from genesis.database.manager import MetaverseDB
-from genesis.api.auth import get_current_user, User
+from genesis.api.auth import get_current_active_user, get_current_user, User, UserRole
 
 
 router = APIRouter()
@@ -510,6 +510,65 @@ async def remove_user_from_environment(
         "message": f"Removed user {user_email} from environment",
         "allowed_users": allowed_users
     }
+
+
+@router.post("/{environment_id}/set-public")
+async def set_environment_public(environment_id: str, body: Dict[str, bool], current_user: User = Depends(get_current_user)):
+    """Set environment public or private (owner, creator, or admin only)."""
+    if 'is_public' not in body:
+        raise HTTPException(status_code=400, detail="'is_public' is required")
+
+    is_public_val = bool(body.get('is_public'))
+    user_identifier = current_user.email if current_user.email else current_user.username
+
+    from genesis.database.base import get_session
+    from genesis.database.models import EnvironmentRecord
+    from genesis.database.manager import MetaverseDB
+
+    with get_session() as session:
+        env = session.query(EnvironmentRecord).filter_by(env_id=environment_id).first()
+        if not env:
+            raise HTTPException(status_code=404, detail="Environment not found")
+
+        creator_user = env.extra_metadata.get('user_creator') if env.extra_metadata else None
+        is_owner = (env.owner_gmid == user_identifier) or (creator_user == user_identifier)
+        is_admin = getattr(current_user, 'role', None) == UserRole.ADMIN or getattr(current_user, 'role', None) == 'admin'
+
+    if not (is_owner or is_admin):
+        raise HTTPException(status_code=403, detail="Only owner, creator, or admin can manage access")
+
+    db = MetaverseDB()
+    updated = db.set_environment_public(environment_id, is_public_val)
+
+    # Also persist any in-memory update if needed
+    return {"success": True, "message": "Updated is_public", "is_public": is_public_val}
+
+
+@router.get("/{environment_id}/access")
+async def get_environment_access(environment_id: str, current_user: User = Depends(get_current_active_user)):
+    """Return an Environment's access list (owner or admin)."""
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+
+    # Determine identifier
+    user_identifier = current_user.email if current_user.email else current_user.username
+
+    is_owner = False
+    try:
+        env = db.get_environment(environment_id)
+        if env:
+            is_owner = (env.owner_gmid == user_identifier)
+    except Exception:
+        pass
+
+    is_admin = getattr(current_user, 'role', None) == UserRole.ADMIN or getattr(current_user, 'role', None) == 'admin'
+
+    if not (is_owner or is_admin):
+        raise HTTPException(status_code=403, detail="Only owner or admin can view access list")
+
+    allowed_users = db.get_environment_allowed_users(environment_id)
+    is_public = bool(getattr(db.get_environment(environment_id), 'is_public', False))
+    return {"is_public": is_public, "allowed_users": allowed_users}
 
 
 @router.post("/{environment_id}/add-mind")

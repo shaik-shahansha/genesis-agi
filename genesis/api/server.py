@@ -53,7 +53,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Genesis AGI API",
         description="API for creating and interacting with digital beings",
-        version="0.1.3",
+        version="0.1.4",
         lifespan=lifespan,
     )
 
@@ -88,7 +88,8 @@ def create_app() -> FastAPI:
     app.include_router(routes.settings_router, prefix="/api/v1/settings", tags=["Settings"])
     app.include_router(marketplace_routes.router, prefix="/api/v1/marketplace", tags=["Marketplace"])
     app.include_router(environment_routes.router, prefix="/api/v1/environments", tags=["Environments"])
-    
+    # Admin endpoints (global admin management and admin-only actions)
+    app.include_router(routes.admin_router, prefix="/api/v1/admin", tags=["Admin"])    
     # Include multimodal routes only if enabled
     if not DISABLE_MULTIMODAL and multimodal_routes:
         app.include_router(multimodal_routes.router, prefix="/api/v1/multimodal", tags=["Multimodal"])
@@ -98,7 +99,7 @@ def create_app() -> FastAPI:
     async def root(request: Request):
         return {
             "name": "Genesis AGI API",
-            "version": "0.1.3",
+            "version": "0.1.4",
             "status": "running",
             "documentation": "/docs",
             "authentication": "/api/v1/auth/token",

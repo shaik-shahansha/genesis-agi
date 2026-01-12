@@ -203,7 +203,7 @@ Make sure dependencies are correctly listed in `pyproject.toml` under `dependenc
 Current package info (from `pyproject.toml`):
 
 - **Name**: `genesis-minds`
-- **Current Version**: `0.1.3`
+- **Current Version**: `0.1.4`
 - **Python**: `>=3.11`
 - **License**: MIT
 - **PyPI**: https://pypi.org/project/genesis-minds/

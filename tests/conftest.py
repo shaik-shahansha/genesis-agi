@@ -60,7 +60,6 @@ def basic_mind_config() -> MindConfig:
 def mock_intelligence() -> Intelligence:
     """Create a mock intelligence configuration."""
     return Intelligence(
-        intelligence = Intelligence(
         reasoning_model="groq/openai/gpt-oss-120b",
         fast_model="groq/llama-3.1-8b-instant",
     )

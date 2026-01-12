@@ -7,6 +7,10 @@ import { usePathname } from 'next/navigation';
 import AuthButton from '@/components/AuthButton';
 import NotificationBell from '@/components/NotificationBell';
 import { AuthProvider } from '@/lib/auth-context';
+import dynamic from 'next/dynamic';
+
+// Dynamically import AdminLink to avoid using hooks directly in layout's top-level
+const AdminLink = dynamic(() => import('@/components/AdminLink').then(mod => mod.AdminLink), { ssr: false });
 
 // Use system fonts instead of Google Fonts to avoid SSL certificate issues
 const fontClassName = 'font-sans';
@@ -46,6 +50,8 @@ export default function RootLayout({
                       <Link href="/settings" className="btn-ghost">
                         Settings
                       </Link>
+                      {/* Admin link shown only to global admins */}
+                      <AdminLink />
                       <a 
                         href="https://github.com/shaik-shahansha/genesis-agi" 
                         target="_blank"
@@ -71,7 +77,7 @@ export default function RootLayout({
           {!isLoginPage && (
             <footer className="border-t border-slate-700 mt-20 py-8 bg-slate-800">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-300 text-sm">
-                <p>Genesis AGI Framework v0.1.3</p>
+                <p>Genesis AGI Framework v0.1.4</p>
               </div>
             </footer>
           )}

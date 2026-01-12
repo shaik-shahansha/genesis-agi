@@ -161,7 +161,9 @@ class MemoryManager:
     def add_memory(
         self,
         content: str,
-        memory_type: MemoryType,
+        memory_type: MemoryType = None,
+        # Backwards compatibility: accept `type` key from older code/tests
+        type: Optional[MemoryType] = None,
         emotion: Optional[str] = None,
         emotion_intensity: Optional[float] = None,
         importance: float = 0.5,
@@ -172,6 +174,15 @@ class MemoryManager:
         environment_id: Optional[str] = None,
         environment_name: Optional[str] = None,
     ) -> Memory:
+        """
+        Add a new memory.
+
+        Supports both `memory_type` and legacy `type` parameter names for compatibility.
+        """
+        # Support legacy `type` param name
+        if memory_type is None and type is not None:
+            memory_type = type
+
         """
         Add a new memory.
 
@@ -213,6 +224,11 @@ class MemoryManager:
             "importance": float(importance),
             "timestamp": memory.timestamp.isoformat(),
             "tags": ",".join(tags) if tags else "",
+            # User and environment context for access control and scoping
+            "user_email": user_email or "",
+            "relationship_context": relationship_context or "generic",
+            "environment_id": environment_id or "",
+            "environment_name": environment_name or "",
         }
         
         # Only add emotion if it's not None
@@ -291,13 +307,12 @@ class MemoryManager:
             if memory:
                 # Filter by user_email only if explicitly specified
                 if user_email:
-                    # When user_email is provided, include:
-                    # 1. Memories without user_email (generic, from before user tracking)
-                    # 2. Memories with matching user_email
-                    # 3. Memories with different user_email BUT generic/shared context
+                    # If the requesting user is specified, strictly enforce user scoping.
+                    # Memories tied to another user's email are only visible if marked as 'shared'.
                     if memory.user_email and memory.user_email != user_email:
-                        # Skip only if it's a personal memory from another user
-                        if getattr(memory, 'relationship_context', 'generic') == "personal":
+                        rel = getattr(memory, 'relationship_context', None)
+                        # Treat missing relationship_context as personal (deny access) - only 'shared' allows cross-user visibility
+                        if rel != "shared":
                             continue
                     # Include all other memories (no user_email, matching user, or generic)
                 # If user_email is None, retrieve all relevant memories (no filtering)
@@ -331,6 +346,10 @@ class MemoryManager:
                             importance=float(metadata.get("importance", 0.5)),
                             tags=metadata.get("tags", "").split(",") if metadata.get("tags") else [],
                             metadata=metadata,
+                            user_email=metadata.get("user_email") or None,
+                            relationship_context=metadata.get("relationship_context") or None,
+                            environment_id=metadata.get("environment_id") or None,
+                            environment_name=metadata.get("environment_name") or None,
                         )
                         self.memories[memory.id] = memory
                     except Exception as e:
@@ -555,6 +574,10 @@ class MemoryManager:
                     "importance": existing.importance,
                     "timestamp": existing.timestamp.isoformat(),
                     "tags": ",".join(existing.tags),
+                    "user_email": existing.user_email or "",
+                    "relationship_context": existing.relationship_context or "generic",
+                    "environment_id": existing.environment_id or "",
+                    "environment_name": existing.environment_name or "",
                 }
             )
             

@@ -34,6 +34,7 @@ export default function ImmersiveChatPage() {
   const [videoEnabled, setVideoEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [lastSpokenAt, setLastSpokenAt] = useState<string | null>(null);
   const [currentEmotion, setCurrentEmotion] = useState<any>(null);
   const [mindAvatarUrl, setMindAvatarUrl] = useState<string>('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -75,11 +76,18 @@ export default function ImmersiveChatPage() {
   }, [messages]);
 
   useEffect(() => {
-    if (voiceEnabled && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'assistant' && !isSpeaking) {
-        speakMessage(lastMessage.content);
+    if (!voiceEnabled || messages.length === 0) return;
+
+    const lastMessage = messages[messages.length - 1];
+    // Only speak assistant messages and only if we haven't already spoken that timestamp
+    if (lastMessage.role === 'assistant' && lastMessage.timestamp && lastMessage.timestamp !== lastSpokenAt) {
+      // Avoid overlapping speech
+      if (voiceOutputRef.current?.isSpeaking()) {
+        voiceOutputRef.current.stop();
       }
+
+      setLastSpokenAt(lastMessage.timestamp);
+      speakMessage(lastMessage.content);
     }
   }, [messages, voiceEnabled]);
 
@@ -107,9 +115,9 @@ export default function ImmersiveChatPage() {
       const mindPurpose = mind.purpose || mind.personality || 'AI assistant';
       const mindNameHash = mind.name ? Math.abs(mind.name.split('').reduce((a: number, b: string) => ((a << 5) - a) + b.charCodeAt(0), 0)) : 12345;
       
-      // Create detailed prompt for better avatar generation (remove special chars for URL)
+      // Create detailed prompt for better avatar generation (robot/emoji/character style)
       const cleanExpression = expression.replace(/[^a-z0-9]/gi, '_');
-      const basePrompt = `professional portrait of ${mind.name}, ${mindPurpose}, ${expression} expression, photorealistic, soft studio lighting, neutral background, high quality`;
+      const basePrompt = `${mind.name} as a friendly AI character / robot emoji, ${mindPurpose}, ${expression} expression, clear facial features, expressive eyes, simple geometric shapes, bold colors, high contrast, vector-style character, slight shadow, smiling mouth (when happy), eyebrows and eyes expressive, minimal background, high quality, optimized for avatars`;
       const prompt = encodeURIComponent(basePrompt);
       
       // Use time-based seed variation for expression changes, but consistent base
@@ -175,6 +183,9 @@ export default function ImmersiveChatPage() {
 
   const startVoiceInput = () => {
     if (!voiceInputRef.current) return;
+
+    // Unlock audio on user gesture so replies can play later
+    voiceOutputRef.current?.unlockAudio();
 
     setIsListening(true);
     voiceInputRef.current.start(
@@ -309,6 +320,8 @@ export default function ImmersiveChatPage() {
       setVoiceEnabled(true);
       console.log('🔊 Voice output enabled for call');
     }
+    // Unlock audio so TTS can play while in the call
+    voiceOutputRef.current?.unlockAudio();
     console.log('📞 Starting audio call...');
   };
 
@@ -319,12 +332,16 @@ export default function ImmersiveChatPage() {
       setVoiceEnabled(true);
       console.log('🔊 Voice output enabled for call');
     }
+    // Unlock audio for video calls as well
+    voiceOutputRef.current?.unlockAudio();
     console.log('📹 Starting video call...');
   };
 
   const handleCloseCall = () => {
     setIsCallModalOpen(false);
-    console.log('✖️ Call ended by user');
+    // Stop any TTS playback when call closes
+    voiceOutputRef.current?.stop();
+    console.log('✖️ Call ended by user, TTS stopped');
   };
 
   const handleVoiceInputFromCall = (text: string) => {
@@ -375,7 +392,17 @@ export default function ImmersiveChatPage() {
               <div className="flex items-center gap-2">
                 {/* Voice Toggle */}
                 <button
-                  onClick={() => setVoiceEnabled(!voiceEnabled)}
+                  onClick={() => {
+                    const next = !voiceEnabled;
+                    setVoiceEnabled(next);
+                    if (next) {
+                      voiceOutputRef.current?.unlockAudio();
+                      console.log('🔊 Voice enabled and audio unlocked');
+                    } else {
+                      voiceOutputRef.current?.stop();
+                      console.log('🔇 Voice disabled');
+                    }
+                  }}
                   className={`p-3 rounded-xl transition-all ${
                     voiceEnabled 
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50' 

@@ -102,6 +102,10 @@ class MindRecord(Base):
     tasks = relationship("TaskRecord", back_populates="mind")
     transactions = relationship("GenTransaction", back_populates="mind")
 
+    # Access control
+    is_public = Column(Boolean, default=False, index=True)
+    access_list = relationship("MindAccess", back_populates="mind", cascade="all, delete-orphan")
+
     # Indexes
     __table_args__ = (
         Index("ix_minds_status", "status"),
@@ -326,7 +330,7 @@ class MetaverseState(Base):
     total_interactions_today = Column(Integer, default=0)
 
     # Metadata
-    metaverse_version = Column(String(20), default="0.1.3")
+    metaverse_version = Column(String(20), default="0.1.4")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -470,6 +474,60 @@ class MindFile(Base):
         Index("ix_files_owner", "owner_gmid"),
         Index("ix_files_type", "file_type"),
     )
+
+
+class MindAccess(Base):
+    """
+    Access control entries for Minds. Stores explicit user emails who are allowed to access a Mind.
+    """
+
+    __tablename__ = "mind_access"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    mind_gmid = Column(String(50), ForeignKey("minds.gmid"), nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    added_by = Column(String(255), nullable=True)
+    added_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    # Relationship back to Mind
+    mind = relationship("MindRecord", back_populates="access_list")
+
+
+class GlobalAdmin(Base):
+    """
+    Stores emails that are global admins across the system.
+    """
+
+    __tablename__ = "global_admins"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    added_by = Column(String(255), nullable=True)
+    added_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class UserRecord(Base):
+    """
+    Persistent user records for admin management and auditing.
+    """
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(100), nullable=False, unique=True, index=True)
+    email = Column(String(255), nullable=True, unique=True, index=True)
+    role = Column(String(20), nullable=False, default="user")
+    disabled = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_updated = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self) -> dict:
+        return {
+            "username": self.username,
+            "email": self.email,
+            "role": self.role,
+            "disabled": self.disabled,
+        }
 
 
 class GenesisCore(Base):

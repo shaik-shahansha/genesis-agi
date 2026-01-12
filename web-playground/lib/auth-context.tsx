@@ -21,6 +21,7 @@ import { api } from './api';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  genesisUser?: any | null;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
@@ -44,6 +45,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [genesisUser, setGenesisUser] = useState<any | null>(null);
 
   useEffect(() => {
     // Listen to auth state changes
@@ -57,6 +59,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Store token for Genesis API
         localStorage.setItem('genesis_firebase_token', idToken);
         localStorage.setItem('genesis_user_email', firebaseUser.email || '');
+        // Backwards compatibility for other components
+        localStorage.setItem('user_email', firebaseUser.email || '');
+        // Fetch Genesis user details (role, etc.)
+        try {
+          const res = await api.getCurrentUser();
+          setGenesisUser(res);
+        } catch (e) {
+          // ignore
+        }
         
         // Optional: You can exchange the Firebase token with your backend
         // to get a Genesis-specific JWT token
@@ -76,6 +87,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Clear stored tokens
         localStorage.removeItem('genesis_firebase_token');
         localStorage.removeItem('genesis_user_email');
+        localStorage.removeItem('user_email');
         api.clearToken();
       }
       
@@ -129,6 +141,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value = {
     user,
     loading,
+    genesisUser,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,

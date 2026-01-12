@@ -16,7 +16,7 @@ export class GenesisAPI {
   private baseURL: string;
   private token: string | null = null;
   private requestCache: Map<string, CacheEntry> = new Map();
-  private readonly CACHE_TTL = 1000; // 1 second deduplication window
+  private readonly CACHE_TTL = 2000; // 2 second deduplication window (reduce duplicate GETs)
 
   constructor() {
     this.baseURL = API_URL;
@@ -134,6 +134,59 @@ export class GenesisAPI {
     return this.request('/api/v1/auth/me');
   }
 
+  // Admin API
+  async listGlobalAdmins() {
+    return this.request('/api/v1/admin/global-admins');
+  }
+
+  async addGlobalAdmin(email: string) {
+    return this.request('/api/v1/admin/global-admins', { method: 'POST', body: JSON.stringify({ email }) });
+  }
+
+  async removeGlobalAdmin(email: string) {
+    return this.request(`/api/v1/admin/global-admins?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+  }
+
+  async adminListUsers() {
+    return this.request('/api/v1/admin/users');
+  }
+
+  async adminCreateUser(username: string, password: string, email?: string, role?: string) {
+    return this.request('/api/v1/admin/users', { method: 'POST', body: JSON.stringify({ username, password, email, role }) });
+  }
+
+  async adminUpdateUser(username: string, updates: any) {
+    return this.request(`/api/v1/admin/users/${username}`, { method: 'PATCH', body: JSON.stringify(updates) });
+  }
+
+  async adminDeleteUser(username: string) {
+    return this.request(`/api/v1/admin/users/${username}`, { method: 'DELETE' });
+  }
+
+  async adminListMinds() {
+    return this.request('/api/v1/admin/minds');
+  }
+
+  async adminListEnvs() {
+    return this.request('/api/v1/admin/envs');
+  }
+
+  async adminGrantMindUser(gmid: string, email: string) {
+    return this.request(`/api/v1/admin/minds/${gmid}/grant-user`, { method: 'POST', body: JSON.stringify({ email }) });
+  }
+
+  async adminRevokeMindUser(gmid: string, email: string) {
+    return this.request(`/api/v1/admin/minds/${gmid}/revoke-user?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+  }
+
+  async adminGrantEnvUser(envId: string, email: string) {
+    return this.request(`/api/v1/admin/envs/${envId}/grant-user`, { method: 'POST', body: JSON.stringify({ email }) });
+  }
+
+  async adminRevokeEnvUser(envId: string, email: string) {
+    return this.request(`/api/v1/admin/envs/${envId}/revoke-user?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+  }
+
   logout() {
     this.clearToken();
   }
@@ -157,6 +210,51 @@ export class GenesisAPI {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  async addMindUser(mindId: string, email: string) {
+    return this.request(`/api/v1/minds/${mindId}/add-user`, {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async removeMindUser(mindId: string, email: string) {
+    return this.request(`/api/v1/minds/${mindId}/remove-user?email=${encodeURIComponent(email)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async setMindPublic(mindId: string, isPublic: boolean) {
+    return this.request(`/api/v1/minds/${mindId}/set-public`, {
+      method: 'POST',
+      body: JSON.stringify({ is_public: isPublic }),
+    });
+  }
+
+  async getMindAllowedUsers(mindId: string) {
+    return this.request(`/api/v1/minds/${mindId}/access`);
+  }
+
+  async getMindAccess(mindId: string) {
+    return this.request(`/api/v1/minds/${mindId}/access`);
+  }
+
+  // Environments: owner-managed access and public toggle
+  async addEnvUser(environmentId: string, email: string) {
+    return this.request(`/api/v1/environments/${environmentId}/add-user?user_email=${encodeURIComponent(email)}`, { method: 'POST' });
+  }
+
+  async removeEnvUser(environmentId: string, email: string) {
+    return this.request(`/api/v1/environments/${environmentId}/remove-user?user_email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+  }
+
+  async setEnvPublic(environmentId: string, isPublic: boolean) {
+    return this.request(`/api/v1/environments/${environmentId}/set-public`, { method: 'POST', body: JSON.stringify({ is_public: isPublic }) });
+  }
+
+  async getEnvAccess(environmentId: string) {
+    return this.request(`/api/v1/environments/${environmentId}/access`);
   }
 
   async chat(mindId: string, message: string) {

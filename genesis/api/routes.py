@@ -43,6 +43,8 @@ minds_router = APIRouter()
 system_router = APIRouter()
 metaverse_router = APIRouter()
 auth_router = APIRouter()
+admin_router = APIRouter()
+
 
 # Global Mind cache to persist instances across requests
 # This keeps background tasks alive!
@@ -149,6 +151,7 @@ class MindResponse(BaseModel):
     llm_model: Optional[str] = None
     max_tokens: Optional[int] = None
     autonomy_level: Optional[int] = None
+    is_public: bool = False
     created_at: Optional[str] = None
 
 
@@ -327,6 +330,192 @@ async def create_new_user(request: CreateUserRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# -----------------------------------------------------------------------------
+# ADMIN API - protected by require_admin
+# -----------------------------------------------------------------------------
+
+@admin_router.post("/global-admins", dependencies=[Depends(require_admin)])
+async def add_global_admin(request: Dict[str, str]):
+    """Add a global admin by email (admin only)"""
+    email = request.get('email')
+    if not email:
+        raise HTTPException(status_code=400, detail="'email' is required")
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    added = db.add_global_admin(email, added_by='api')
+    if not added:
+        return {"success": True, "message": "Already a global admin", "email": email}
+    return {"success": True, "message": "Added global admin", "email": email}
+
+
+@admin_router.delete("/global-admins", dependencies=[Depends(require_admin)])
+async def remove_global_admin(email: str = Query(...)):
+    """Remove a global admin (admin only)"""
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    removed = db.remove_global_admin(email)
+    if not removed:
+        return {"success": True, "message": "Not found", "email": email}
+    return {"success": True, "message": "Removed global admin", "email": email}
+
+
+@admin_router.get("/global-admins", dependencies=[Depends(require_admin)])
+async def list_global_admins():
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    return {"admins": db.list_global_admins()}
+
+
+@admin_router.get("/users", dependencies=[Depends(require_admin)])
+async def admin_list_users():
+    """List all users (admin-only)."""
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    users = db.get_all_users()
+    return {"users": users}
+
+
+@admin_router.post("/users", dependencies=[Depends(require_admin)])
+async def admin_create_user(body: Dict[str, str]):
+    username = body.get('username')
+    password = body.get('password')
+    email = body.get('email')
+    role = body.get('role', 'user')
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="'username' and 'password' are required")
+
+    from genesis.api.auth import create_user
+    try:
+        user = create_user(username, password, email=email, role=role)
+        return {"success": True, "username": user.username, "email": user.email, "role": user.role}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@admin_router.patch("/users/{username}", dependencies=[Depends(require_admin)])
+async def admin_update_user(username: str, body: Dict[str, Any]):
+    role = body.get('role')
+    disabled = body.get('disabled')
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    updated = db.update_user_record(username, role=role, disabled=disabled)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"success": True, "username": username}
+
+
+@admin_router.delete("/users/{username}", dependencies=[Depends(require_admin)])
+async def admin_delete_user(username: str):
+    from genesis.api.auth import delete_user
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    db.delete_user_record(username)
+    ok = delete_user(username)
+    return {"success": ok, "username": username}
+
+@admin_router.delete("/users/{username}", dependencies=[Depends(require_admin)])
+async def admin_delete_user(username: str):
+    from genesis.api.auth import delete_user
+    ok = delete_user(username)
+    return {"success": ok, "username": username}
+
+
+@admin_router.get("/minds", dependencies=[Depends(require_admin)])
+async def admin_list_minds():
+    """List all minds with safe serialization (admin-only)."""
+    from genesis.database.base import get_session
+    from genesis.database.models import MindRecord
+
+    with get_session() as session:
+        rows = session.query(MindRecord).order_by(MindRecord.last_active.desc()).all()
+        minds = []
+        for m in rows:
+            minds.append({
+                "gmid": m.gmid,
+                "name": m.name,
+                "creator": m.creator,
+                "is_public": getattr(m, 'is_public', False),
+                "status": m.status,
+                "last_active": m.last_active.isoformat() if m.last_active else None,
+            })
+    return {"minds": minds}
+
+
+@admin_router.get("/envs", dependencies=[Depends(require_admin)])
+async def admin_list_envs():
+    """List all environments with safe serialization (admin-only)."""
+    from genesis.database.base import get_session
+    from genesis.database.models import EnvironmentRecord
+
+    with get_session() as session:
+        rows = session.query(EnvironmentRecord).order_by(EnvironmentRecord.last_accessed.desc()).all()
+        envs = []
+        for e in rows:
+            envs.append({
+                "env_id": e.env_id,
+                "name": e.name,
+                "owner_gmid": e.owner_gmid,
+                "is_public": bool(e.is_public),
+                "last_accessed": e.last_accessed.isoformat() if e.last_accessed else None,
+            })
+    return {"environments": envs}
+
+
+@admin_router.post("/minds/{gmid}/grant-user", dependencies=[Depends(require_admin)])
+async def admin_grant_mind_user_access(gmid: str, body: Dict[str, str], current_user: User = Depends(get_current_user)):
+    email = body.get('email')
+    if not email:
+        raise HTTPException(status_code=400, detail="'email' is required")
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    # Ensure user exists as a persistent user record
+    username = body.get('username') or f"u_{email.split('@')[0]}"
+    db.create_user_record(username=username, email=email, role=body.get('role', 'user'))
+    added = db.add_mind_user_access(gmid, email, added_by=current_user.email or current_user.username)
+    return {"success": added, "gmid": gmid, "email": email}
+
+
+@admin_router.delete("/minds/{gmid}/revoke-user", dependencies=[Depends(require_admin)])
+async def admin_revoke_mind_user_access(gmid: str, email: str = Query(..., description="User email to revoke")):
+    """Revoke a user's access to a Mind (admin-only)."""
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+
+    removed = db.remove_mind_user_access(gmid, email)
+
+    if not removed:
+        return {"success": True, "message": f"User {email} did not have access", "gmid": gmid, "email": email}
+
+    return {"success": True, "message": f"User {email} removed", "gmid": gmid, "email": email}
+
+
+@admin_router.post("/envs/{env_id}/grant-user", dependencies=[Depends(require_admin)])
+async def admin_grant_env_user_access(env_id: str, body: Dict[str, str], current_user: User = Depends(get_current_user)):
+    email = body.get('email')
+    if not email:
+        raise HTTPException(status_code=400, detail="'email' is required")
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    username = body.get('username') or f"u_{email.split('@')[0]}"
+    db.create_user_record(username=username, email=email, role=body.get('role', 'user'))
+    added = db.add_environment_user_access(env_id, email, added_by=current_user.email or current_user.username)
+    return {"success": added, "env_id": env_id, "email": email}
+
+
+@admin_router.delete("/envs/{env_id}/revoke-user", dependencies=[Depends(require_admin)])
+async def admin_revoke_env_user_access(env_id: str, email: str = Query(..., description="User email to revoke")):
+    """Revoke a user's access to an Environment (admin-only)."""
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+
+    removed = db.remove_environment_user_access(env_id, email)
+
+    if not removed:
+        return {"success": True, "message": f"User {email} did not have access", "env_id": env_id, "email": email}
+
+    return {"success": True, "message": f"User {email} removed", "env_id": env_id, "email": email}
+
+
 @auth_router.post("/api-keys")
 async def create_new_api_key(
     request: CreateAPIKeyRequest,
@@ -450,6 +639,21 @@ async def create_mind(
         # Save
         mind.save()
 
+        # Register mind in database for access control
+        try:
+            from genesis.database.manager import MetaverseDB
+            db = MetaverseDB()
+            db.register_mind(
+                gmid=mind.identity.gmid,
+                name=mind.identity.name,
+                creator=mind.identity.creator,
+                template=mind.identity.template,
+                primary_role=None,  # Will be set later if roles are configured
+            )
+            print(f"[INFO] Registered mind {mind.identity.gmid} in database")
+        except Exception as reg_error:
+            print(f"[WARNING] Could not register mind in database: {reg_error}")
+
         # Create default personal environment for the Mind
         try:
             from genesis.database.manager import MetaverseDB
@@ -495,9 +699,20 @@ async def create_mind(
 @minds_router.get("", response_model=List[MindResponse])
 async def list_minds(current_user: User = Depends(get_current_active_user)):
     """List all Minds with optimized lightweight loading."""
+    # Note: Admin users will see all Minds due to DB-level admin check in MetaverseDB.is_user_allowed_for_mind
     import json
     from datetime import datetime
     minds = []
+
+    # Initialize database connection once outside the loop
+    db = None
+    try:
+        from genesis.database.manager import MetaverseDB
+        db = MetaverseDB()
+    except Exception as db_error:
+        print(f"[WARNING] Could not initialize database connection: {db_error}")
+
+    user_identifier = current_user.email if current_user.email else current_user.username
 
     for path in settings.minds_dir.glob("*.json"):
         try:
@@ -557,10 +772,74 @@ async def list_minds(current_user: User = Depends(get_current_active_user)):
                 if gen_plugin_data and 'gen' in gen_plugin_data:
                     gen_data = gen_plugin_data['gen']
                     if 'balance' in gen_data:
-                        gens = gen_data['balance'].get('current_balance', 100)
+                        # Safely coerce to int in case stored value is float-like (e.g., 230.5)
+                        try:
+                            gens_val = gen_data['balance'].get('current_balance', 100)
+                            gens = int(float(gens_val))
+                        except Exception:
+                            gens = int(gen_data['balance'].get('current_balance', 100) or 100)
             except Exception:
                 pass
-            
+
+            # Access control: check DB for mind access or fallback to identity
+            include_mind = False
+            gmid_val = identity.get('gmid', '')
+
+            if db:
+                try:
+                    # Ensure mind is registered in database
+                    existing_mind = db.get_mind(gmid_val)
+                    if not existing_mind:
+                        # Register mind that exists in JSON but not in database
+                        try:
+                            db.register_mind(
+                                gmid=gmid_val,
+                                name=identity.get('name', 'Unknown'),
+                                creator=identity.get('creator', 'unknown'),
+                                template=identity.get('template', 'base/curious_explorer'),
+                                primary_role=None,
+                            )
+                            print(f"[INFO] Registered missing mind {gmid_val} in database")
+                        except Exception as reg_error:
+                            print(f"[WARNING] Could not register mind {gmid_val}: {reg_error}")
+                    
+                    # Sync is_public from database to identity for consistency
+                    db_is_public = db.get_mind_is_public(gmid_val)
+                    if db_is_public is not None:
+                        identity['is_public'] = db_is_public
+                    
+                    allowed = db.is_user_allowed_for_mind(gmid_val, user_identifier)
+                    print(f"[DEBUG] Mind {gmid_val}: allowed={allowed}, user={user_identifier}, db_is_public={db_is_public}")
+                    if allowed:
+                        include_mind = True
+                    else:
+                        # Fallback: check identity-level flags
+                        if identity.get('is_public'):
+                            include_mind = True
+                            print(f"[DEBUG] Mind {gmid_val} included via identity is_public")
+                        elif identity.get('creator_email') and identity.get('creator_email') == user_identifier:
+                            include_mind = True
+                            print(f"[DEBUG] Mind {gmid_val} included via creator match")
+                except Exception as access_error:
+                    print(f"[WARNING] Database access check failed for {gmid_val}: {access_error}")
+                    # Fallback to identity-based access
+                    if identity.get('is_public') or (identity.get('creator_email') and identity.get('creator_email') == user_identifier):
+                        include_mind = True
+                        print(f"[DEBUG] Mind {gmid_val} included via fallback")
+            else:
+                print(f"[WARNING] No database connection for mind {gmid_val}")
+                # No database available, fallback to identity-based access
+                if identity.get('is_public') or (identity.get('creator_email') and identity.get('creator_email') == user_identifier):
+                    include_mind = True
+                    print(f"[DEBUG] Mind {gmid_val} included via no-db fallback")
+
+            if not include_mind:
+                print(f"[DEBUG] Mind {gmid_val} NOT included")
+                continue
+
+            if not include_mind:
+                continue
+
             minds.append(
                 MindResponse(
                     gmid=identity.get('gmid', ''),
@@ -581,6 +860,7 @@ async def list_minds(current_user: User = Depends(get_current_active_user)):
                     llm_model=_extract_model(data.get('intelligence', {})),
                     max_tokens=data.get('intelligence', {}).get('max_tokens', 8000),
                     autonomy_level=data.get('autonomy', {}).get('level', 5),
+                    is_public=bool(identity.get('is_public', False)),
                     created_at=identity.get('birth_timestamp'),
                 )
             )
@@ -597,12 +877,33 @@ async def get_mind(mind_id: str, current_user: User = Depends(get_current_active
 
     # Extract provider and model from Intelligence configuration
     intelligence_dict = json.loads(mind.intelligence.model_dump_json())
-    
+
+    # Access check: ensure current_user is allowed to view this Mind
+    from genesis.database.manager import MetaverseDB
+    user_identifier = current_user.email if current_user.email else current_user.username
+    try:
+        db = MetaverseDB()
+        if not db.is_user_allowed_for_mind(mind.identity.gmid, user_identifier):
+            raise HTTPException(status_code=403, detail="Access denied to this Mind")
+    except HTTPException:
+        raise
+    except Exception:
+        # Fallback to identity-level flags
+        if not (getattr(mind.identity, 'is_public', False) or getattr(mind.identity, 'creator_email', None) == user_identifier):
+            raise HTTPException(status_code=403, detail="Access denied to this Mind")
+
     # Get actual gen balance from gen manager
     gens = 100  # Default
     if hasattr(mind, 'gen') and mind.gen:
         balance_summary = mind.gen.get_balance_summary()
-        gens = balance_summary['current_balance']
+        # Coerce to int safely in case provider returns a float like 230.5
+        try:
+            gens = int(float(balance_summary.get('current_balance', 0) if isinstance(balance_summary, dict) else balance_summary))
+        except Exception:
+            try:
+                gens = int(balance_summary)
+            except Exception:
+                gens = 100
     
     return MindResponse(
         gmid=mind.identity.gmid,
@@ -1188,6 +1489,161 @@ async def update_mind_settings(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@minds_router.post("/{mind_id}/add-user")
+async def add_user_to_mind(
+    mind_id: str,
+    body: Dict[str, str],
+    current_user: User = Depends(get_current_active_user),
+):
+    """Add a user email to a Mind's allowed list (creator only)."""
+    email = body.get('email')
+    if not email:
+        raise HTTPException(status_code=400, detail="'email' is required")
+
+    # Determine user identifier
+    user_identifier = current_user.email if current_user.email else current_user.username
+
+    # Load mind object
+    mind = await _load_mind(mind_id)
+
+    # Check ownership: creator email or creator string
+    is_creator = (
+        getattr(mind.identity, 'creator_email', None) == user_identifier
+        or getattr(mind.identity, 'creator', None) == user_identifier
+    )
+
+    if not is_creator:
+        raise HTTPException(status_code=403, detail="Only creator can manage access")
+
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    added = db.add_mind_user_access(mind.identity.gmid, email, added_by=user_identifier)
+
+    if not added:
+        return {"success": True, "message": f"User {email} already has access", "allowed_users": db.get_mind_allowed_users(mind.identity.gmid)}
+
+    return {"success": True, "message": f"User {email} added", "allowed_users": db.get_mind_allowed_users(mind.identity.gmid)}
+
+
+@minds_router.get("/{mind_id}/access")
+async def get_mind_access(mind_id: str, current_user: User = Depends(get_current_active_user)):
+    """Return a Mind's access list (creator or admin)."""
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+
+    # Verify permissions: creator or admin
+    user_identifier = current_user.email if current_user.email else current_user.username
+    is_creator = False
+    try:
+        mind = db.get_mind(mind_id)
+        if mind:
+            is_creator = (mind.creator == user_identifier)
+    except Exception:
+        pass
+
+    is_admin = getattr(current_user, 'role', None) == UserRole.ADMIN or getattr(current_user, 'role', None) == 'admin'
+
+    if not (is_creator or is_admin):
+        raise HTTPException(status_code=403, detail="Only creator or admin can view access list")
+
+    allowed_users = db.get_mind_allowed_users(mind_id)
+    is_public = getattr(db.get_mind(mind_id), 'is_public', False)
+    return {"is_public": is_public, "allowed_users": allowed_users}
+
+
+@minds_router.delete("/{mind_id}/remove-user")
+async def remove_user_from_mind(
+    mind_id: str,
+    email: str = Query(..., description="User email to remove"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Remove a user's access from a Mind (creator only)."""
+    user_identifier = current_user.email if current_user.email else current_user.username
+
+    mind = await _load_mind(mind_id)
+
+    is_creator = (
+        getattr(mind.identity, 'creator_email', None) == user_identifier
+        or getattr(mind.identity, 'creator', None) == user_identifier
+    )
+
+    if not is_creator:
+        raise HTTPException(status_code=403, detail="Only creator can manage access")
+
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    removed = db.remove_mind_user_access(mind.identity.gmid, email)
+
+    if not removed:
+        return {"success": True, "message": f"User {email} doesn't have access", "allowed_users": db.get_mind_allowed_users(mind.identity.gmid)}
+
+    return {"success": True, "message": f"User {email} removed", "allowed_users": db.get_mind_allowed_users(mind.identity.gmid)}
+
+
+@minds_router.post("/{mind_id}/set-public")
+async def set_mind_public(
+    mind_id: str,
+    body: Dict[str, bool],
+    current_user: User = Depends(get_current_active_user),
+):
+    """Set or unset a Mind's public visibility (creator or admin only)."""
+    if 'is_public' not in body:
+        raise HTTPException(status_code=400, detail="'is_public' is required")
+
+    is_public_val = bool(body.get('is_public'))
+    user_identifier = current_user.email if current_user.email else current_user.username
+
+    mind = await _load_mind(mind_id)
+
+    is_creator = (
+        getattr(mind.identity, 'creator_email', None) == user_identifier
+        or getattr(mind.identity, 'creator', None) == user_identifier
+    )
+
+    is_admin = getattr(current_user, 'role', None) == UserRole.ADMIN or getattr(current_user, 'role', None) == 'admin'
+
+    if not (is_creator or is_admin):
+        raise HTTPException(status_code=403, detail="Only creator or admin can manage access")
+
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+    updated = db.set_mind_public(mind.identity.gmid, is_public_val)
+
+    # Also persist into Mind JSON identity for compatibility
+    mind.identity.is_public = is_public_val
+    try:
+        mind.save()
+        print(f"[INFO] Saved mind {mind.identity.gmid} with is_public={is_public_val}")
+    except Exception as save_error:
+        print(f"[WARNING] Failed to save mind {mind.identity.gmid} to JSON: {save_error}")
+        # Don't fail the request if JSON save fails - database is the source of truth
+
+    return {"success": True, "message": "Updated is_public", "is_public": is_public_val}
+
+
+@minds_router.get("/{mind_id}/access")
+async def get_mind_access(mind_id: str, current_user: User = Depends(get_current_active_user)):
+    """Get Mind access info: is_public and allowed user emails."""
+    mind = await _load_mind(mind_id)
+
+    from genesis.database.manager import MetaverseDB
+    db = MetaverseDB()
+
+    is_public = getattr(mind.identity, 'is_public', False)
+    try:
+        # DB may be authoritative source
+        mind_record = db.get_mind(mind.identity.gmid)
+        if mind_record:
+            is_public = bool(getattr(mind_record, 'is_public', is_public))
+            allowed_users = db.get_mind_allowed_users(mind.identity.gmid)
+        else:
+            allowed_users = []
+    except Exception:
+        allowed_users = []
+
+    return {"is_public": is_public, "allowed_users": allowed_users}
+
+
 @minds_router.post("/{mind_id}/workspace/upload")
 async def upload_workspace_file(
     mind_id: str,
@@ -1582,11 +2038,13 @@ async def get_conversation_messages(
     mind_id: str,
     user_email: Optional[str] = Query(None, description="User email"),
     environment_id: Optional[str] = Query(None, description="Environment ID"),
+    before_id: Optional[int] = Query(None, description="Message id cursor (return messages before this id)"),
     limit: int = Query(default=50, le=200, description="Maximum messages to return"),
     current_user: User = Depends(get_current_active_user),
 ):
     """
     Get messages for a specific conversation thread.
+    Support cursor-based pagination via `before_id` (return messages older than the cursor).
     Filter by user_email and/or environment_id to get specific conversation.
     Requires authentication.
     """
@@ -1596,18 +2054,31 @@ async def get_conversation_messages(
     mind = await _load_mind(mind_id)
     
     if not hasattr(mind, 'conversation'):
-        return {"messages": [], "count": 0}
+        return {"messages": [], "count": 0, "has_more": False}
     
     try:
-        messages = mind.conversation.get_recent_messages(
-            limit=limit,
-            user_email=user_email,
-            environment_id=environment_id
-        )
+        if before_id is not None:
+            messages = mind.conversation.get_messages_before(
+                before_id=before_id,
+                limit=limit,
+                user_email=user_email,
+                environment_id=environment_id
+            )
+        else:
+            messages = mind.conversation.get_recent_messages(
+                limit=limit,
+                user_email=user_email,
+                environment_id=environment_id
+            )
+
+        has_more = len(messages) == limit
+        next_before_id = messages[0]['id'] if messages else None
         
         return {
             "messages": messages,
-            "count": len(messages)
+            "count": len(messages),
+            "has_more": has_more,
+            "next_before_id": next_before_id
         }
     except Exception as e:
         logger.error(f"Error getting conversation messages: {e}")
@@ -1927,6 +2398,12 @@ async def delete_mind(
 # DAEMON ENDPOINTS
 # =============================================================================
 
+# Mount admin router onto auth router path '/admin' for convenience
+# Admin router also registered at top-level '/api/v1/admin' in server
+auth_router.include_router(admin_router, prefix="/admin")
+
+
+
 @minds_router.get("/{mind_id}/daemon/status")
 async def get_daemon_status(mind_id: str):
     """Get daemon status for a specific Mind."""
@@ -2182,7 +2659,7 @@ async def get_plugins(mind_id: str):
         plugins_data.append(
             PluginResponse(
                 name=plugin_name,
-                version=plugin_config.get('version', '0.1.3'),
+                version=plugin_config.get('version', '0.1.4'),
                 description=plugin_descriptions.get(plugin_name, 'Plugin'),
                 enabled=True,
                 config=plugin_config.get('config', {}),
@@ -2400,8 +2877,28 @@ async def websocket_chat(websocket: WebSocket, mind_id: str):
     """
     await websocket.accept()
     
-    # Extract user email from query params or use default
-    user_email = websocket.query_params.get("user_email", "web_user@genesis.local")
+    # Extract user email from query params or try to infer from Authorization header
+    user_email = websocket.query_params.get("user_email")
+    if not user_email:
+        # Try to extract email from a Bearer token (Firebase ID token, etc.)
+        try:
+            from genesis.api.firebase_auth import get_firebase_user_email
+            auth_header = websocket.headers.get('authorization')
+            if auth_header and auth_header.lower().startswith('bearer '):
+                token = auth_header.split(' ', 1)[1]
+                try:
+                    email = get_firebase_user_email(token)
+                    if email:
+                        user_email = email
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    if not user_email:
+        user_email = "web_user@genesis.local"
+        logger.warning("WebSocket connected without user_email; defaulting to web_user@genesis.local")
+
     mind = None  # Initialize to None to avoid UnboundLocalError
 
     try:
@@ -2630,12 +3127,32 @@ async def cleanup_stale_connections():
 @minds_router.get("/{mind_id}/notifications")
 async def get_pending_notifications(
     mind_id: str,
-    user_email: str = Query("web_user@genesis.local", description="User email to get notifications for")
+    user_email: Optional[str] = Query(None, description="User email to get notifications for"),
+    request: Request = None
 ):
     """Get pending notifications for a user."""
     try:
         mind = await _load_mind(mind_id)
         
+        # If user_email not provided, try to infer from Authorization header
+        if not user_email and request is not None:
+            try:
+                from genesis.api.firebase_auth import get_firebase_user_email
+                auth_header = request.headers.get('authorization')
+                if auth_header and auth_header.lower().startswith('bearer '):
+                    token = auth_header.split(' ', 1)[1]
+                    try:
+                        firebase_email = get_firebase_user_email(token)
+                        if firebase_email:
+                            user_email = firebase_email
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        if not user_email:
+            return {"notifications": []}
+
         from genesis.config.settings import get_settings
         import json
         from pathlib import Path
@@ -2671,18 +3188,36 @@ async def get_pending_notifications(
 
 @system_router.get("/notifications/all")
 async def get_all_notifications(
-    user_email: str = Query("web_user@genesis.local", description="User email to get notifications for")
+    user_email: Optional[str] = Query(None, description="User email to get notifications for"),
+    request: Request = None
 ):
     """Get all pending notifications for a user across all minds."""
     try:
         from genesis.config.settings import get_settings
         import json
+        from genesis.api.firebase_auth import get_firebase_user_email
         
+        # If no explicit user_email provided, try to infer it from Authorization header (Firebase ID token or other bearer token)
+        if not user_email and request is not None:
+            auth_header = request.headers.get("authorization")
+            if auth_header and auth_header.lower().startswith("bearer "):
+                token = auth_header.split(" ", 1)[1]
+                try:
+                    firebase_email = get_firebase_user_email(token)
+                    if firebase_email:
+                        user_email = firebase_email
+                except Exception:
+                    pass
+
+        # If still no user_email, return empty response (avoid defaulting to test user)
+        if not user_email:
+            return {"notifications": [], "count": 0}
+
         settings = get_settings()
         notif_base_dir = settings.data_dir / "notifications"
         
         if not notif_base_dir.exists():
-            return {"notifications": []}
+            return {"notifications": [], "count": 0}
         
         all_notifications = []
         
@@ -2738,6 +3273,27 @@ async def mark_notification_delivered(mind_id: str, notification_id: str):
             
             with open(notif_file, 'w', encoding='utf-8') as f:
                 json.dump(notif_data, f, indent=2, ensure_ascii=False)
+            
+            # Persist the notification as a conversation message so it appears in chat history
+            try:
+                from genesis.storage.conversation import ConversationManager
+                conv = ConversationManager(mind_id)
+                # Use the stored metadata if available
+                metadata = notif_data.get("metadata", {}) or {}
+                # Save as assistant message tied to the recipient so it will be visible in their conversation
+                conv.add_message(
+                    role="assistant",
+                    content=notif_data.get("message", ""),
+                    user_email=notif_data.get("recipient"),
+                    metadata={
+                        "is_proactive": True,
+                        "proactive_title": notif_data.get("title"),
+                        **metadata
+                    },
+                    timestamp=datetime.fromisoformat(notif_data.get("created_at")) if notif_data.get("created_at") else None
+                )
+            except Exception as e:
+                logger.error(f"Error persisting delivered notification to conversation: {e}")
             
             return {"success": True}
         else:
@@ -2995,13 +3551,30 @@ async def delete_context(
 
 @system_router.post("/notifications/mark-all-read")
 async def mark_all_notifications_read(
-    user_email: str = Query("web_user@genesis.local", description="User email to mark notifications for")
+    user_email: Optional[str] = Query(None, description="User email to mark notifications for"),
+    request: Request = None
 ):
     """Mark all notifications for a user as delivered/read."""
     try:
         from genesis.config.settings import get_settings
         import json
+        from genesis.api.firebase_auth import get_firebase_user_email
         
+        # If not provided, try to infer from Authorization header
+        if not user_email and request is not None:
+            auth_header = request.headers.get("authorization")
+            if auth_header and auth_header.lower().startswith("bearer "):
+                token = auth_header.split(" ", 1)[1]
+                try:
+                    firebase_email = get_firebase_user_email(token)
+                    if firebase_email:
+                        user_email = firebase_email
+                except Exception:
+                    pass
+
+        if not user_email:
+            return {"success": True, "count": 0}
+
         settings = get_settings()
         notif_base_dir = settings.data_dir / "notifications"
         
@@ -3184,6 +3757,15 @@ async def _load_mind(mind_id: str) -> Mind:
                         print(f"[INFO] ✓ Registered mind {loaded_mind.identity.gmid} in database")
                     else:
                         print(f"[DEBUG] Mind already registered in database")
+                        
+                        # Sync is_public from database to mind identity
+                        try:
+                            db_is_public = metaverse_db.get_mind_is_public(loaded_mind.identity.gmid)
+                            if db_is_public is not None:
+                                loaded_mind.identity.is_public = db_is_public
+                                print(f"[DEBUG] Synced is_public from database: {db_is_public}")
+                        except Exception as sync_error:
+                            print(f"[WARNING] Could not sync is_public from database: {sync_error}")
                 except Exception as reg_error:
                     print(f"[ERROR] Could not register mind in database: {reg_error}")
                     import traceback

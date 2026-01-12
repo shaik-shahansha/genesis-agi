@@ -56,6 +56,13 @@ class MetaverseDB:
     ) -> MindRecord:
         """Register a new Mind in the metaverse."""
         with get_session() as session:
+            # If mind already exists, return existing one
+            existing = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if existing:
+                session.refresh(existing)
+                session.expunge(existing)
+                return existing
+
             mind = MindRecord(
                 gmid=gmid,
                 name=name,
@@ -74,12 +81,19 @@ class MetaverseDB:
             self._update_metaverse_stats(session)
 
             session.refresh(mind)
+            session.expunge(mind)
             return mind
 
     def get_mind(self, gmid: str) -> Optional[MindRecord]:
         """Get Mind by GMID."""
         with get_session() as session:
-            return session.query(MindRecord).filter_by(gmid=gmid).first()
+            mind = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if not mind:
+                return None
+            # Ensure scalar attributes are loaded before detaching from session
+            session.refresh(mind)
+            session.expunge(mind)
+            return mind
 
     def update_mind_activity(self, gmid: str) -> None:
         """Update Mind's last active timestamp."""
@@ -107,6 +121,90 @@ class MetaverseDB:
                 if consciousness_level is not None:
                     mind.consciousness_level = consciousness_level
                 session.commit()
+
+    # =========================================================================
+    # MIND ACCESS CONTROL
+    # =========================================================================
+
+    def add_mind_user_access(self, gmid: str, email: str, added_by: Optional[str] = None) -> bool:
+        """Grant a user email access to a Mind. Returns True if added, False if already existed."""
+        from genesis.database.models import MindAccess
+        with get_session() as session:
+            # Ensure Mind exists
+            mind = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if not mind:
+                return False
+
+            existing = (
+                session.query(MindAccess)
+                .filter_by(mind_gmid=gmid, email=email)
+                .first()
+            )
+            if existing:
+                return False
+
+            entry = MindAccess(mind_gmid=gmid, email=email, added_by=added_by)
+            session.add(entry)
+            session.commit()
+            return True
+
+    def remove_mind_user_access(self, gmid: str, email: str) -> bool:
+        """Revoke a user's access. Returns True if removed, False if not found."""
+        from genesis.database.models import MindAccess
+        with get_session() as session:
+            entry = (
+                session.query(MindAccess)
+                .filter_by(mind_gmid=gmid, email=email)
+                .first()
+            )
+            if not entry:
+                return False
+            session.delete(entry)
+            session.commit()
+            return True
+
+    def get_mind_allowed_users(self, gmid: str) -> list[str]:
+        """Return list of allowed user emails for a Mind."""
+        from genesis.database.models import MindAccess
+        with get_session() as session:
+            entries = session.query(MindAccess).filter_by(mind_gmid=gmid).all()
+            return [e.email for e in entries]
+
+    def get_mind_is_public(self, gmid: str) -> Optional[bool]:
+        """Get Mind's public status by GMID."""
+        with get_session() as session:
+            mind = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if not mind:
+                return None
+            return mind.is_public
+
+    def is_user_allowed_for_mind(self, gmid: str, user_identifier: str) -> bool:
+        """Check whether a user identifier (email or username) can access a given Mind."""
+        from genesis.database.models import MindAccess, GlobalAdmin
+        with get_session() as session:
+            mind = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if not mind:
+                return False
+
+            # Global admin bypass
+            if user_identifier and session.query(GlobalAdmin).filter_by(email=user_identifier).first():
+                return True
+
+            # Creator match
+            if mind.creator == user_identifier:
+                return True
+
+            # Public flag
+            if getattr(mind, 'is_public', False):
+                return True
+
+            # Explicit user access
+            access = (
+                session.query(MindAccess)
+                .filter_by(mind_gmid=gmid, email=user_identifier)
+                .first()
+            )
+            return access is not None
 
     def get_all_minds(self, status: Optional[str] = None) -> List[MindRecord]:
         """Get all Minds, optionally filtered by status."""
@@ -220,6 +318,185 @@ class MetaverseDB:
                 if invited_minds is not None:
                     env.invited_minds = invited_minds
                 session.commit()
+
+    # =========================================================================
+    # ENVIRONMENT ACCESS CONTROL
+    # =========================================================================
+
+    def add_environment_user_access(self, env_id: str, email: str, added_by: Optional[str] = None) -> bool:
+        """Grant a user email access to an environment."""
+        with get_session() as session:
+            env = session.query(EnvironmentRecord).filter_by(env_id=env_id).first()
+            if not env:
+                return False
+            if not env.allowed_users:
+                env.allowed_users = []
+            if email in env.allowed_users:
+                return False
+            env.allowed_users.append(email)
+            session.commit()
+            return True
+
+    def remove_environment_user_access(self, env_id: str, email: str) -> bool:
+        """Revoke a user's access to an environment."""
+        with get_session() as session:
+            env = session.query(EnvironmentRecord).filter_by(env_id=env_id).first()
+            if not env or not env.allowed_users:
+                return False
+            if email not in env.allowed_users:
+                return False
+            env.allowed_users.remove(email)
+            session.commit()
+            return True
+
+    def set_environment_public(self, env_id: str, is_public: bool) -> bool:
+        """Set environment's public flag. Returns True if updated, False if missing."""
+        with get_session() as session:
+            env = session.query(EnvironmentRecord).filter_by(env_id=env_id).first()
+            if not env:
+                return False
+            env.is_public = bool(is_public)
+            session.commit()
+            return True
+
+    def get_environment_allowed_users(self, env_id: str) -> list[str]:
+        """Return list of allowed user emails for an environment."""
+        with get_session() as session:
+            env = session.query(EnvironmentRecord).filter_by(env_id=env_id).first()
+            if not env:
+                return []
+            return env.allowed_users or []
+
+    def remove_environment_user_access(self, env_id: str, email: str) -> bool:
+        """Revoke a user's access to an environment."""
+        with get_session() as session:
+            env = session.query(EnvironmentRecord).filter_by(env_id=env_id).first()
+            if not env or not env.allowed_users:
+                return False
+            if email not in env.allowed_users:
+                return False
+            # Replace list explicitly to avoid JSON mutable-in-place issues
+            env.allowed_users = [u for u in env.allowed_users if u != email]
+            session.commit()
+            session.refresh(env)
+            return True
+
+    def remove_environment_user_access(self, env_id: str, email: str) -> bool:
+        """Revoke a user's access to an environment."""
+        with get_session() as session:
+            env = session.query(EnvironmentRecord).filter_by(env_id=env_id).first()
+            if not env or not env.allowed_users:
+                return False
+            if email not in env.allowed_users:
+                return False
+            env.allowed_users.remove(email)
+            session.commit()
+            return True
+
+    def get_environment_allowed_users(self, env_id: str) -> list[str]:
+        """Return list of allowed user emails for an environment."""
+        with get_session() as session:
+            env = session.query(EnvironmentRecord).filter_by(env_id=env_id).first()
+            if not env:
+                return []
+            return env.allowed_users or []
+
+    # =========================================================================
+    # GLOBAL ADMIN MANAGEMENT
+    # =========================================================================
+
+    def add_global_admin(self, email: str, added_by: Optional[str] = None) -> bool:
+        """Add a global admin by email."""
+        from genesis.database.models import GlobalAdmin
+        with get_session() as session:
+            if session.query(GlobalAdmin).filter_by(email=email).first():
+                return False
+            entry = GlobalAdmin(email=email, added_by=added_by)
+            session.add(entry)
+            session.commit()
+            return True
+
+    def remove_global_admin(self, email: str) -> bool:
+        """Remove a global admin by email."""
+        from genesis.database.models import GlobalAdmin
+        with get_session() as session:
+            entry = session.query(GlobalAdmin).filter_by(email=email).first()
+            if not entry:
+                return False
+            session.delete(entry)
+            session.commit()
+            return True
+
+    def list_global_admins(self) -> list[str]:
+        """List all global admin emails."""
+        from genesis.database.models import GlobalAdmin
+        with get_session() as session:
+            entries = session.query(GlobalAdmin).all()
+            return [e.email for e in entries]
+
+    # =========================================================================
+    # USER RECORDS
+    # =========================================================================
+
+    def create_user_record(self, username: str, password_hash: Optional[str] = None, email: Optional[str] = None, role: str = "user") -> 'UserRecord':
+        """Create a persistent UserRecord. Returns the created record or existing one."""
+        from genesis.database.models import UserRecord
+        with get_session() as session:
+            existing = None
+            if username:
+                existing = session.query(UserRecord).filter_by(username=username).first()
+            if not existing and email:
+                existing = session.query(UserRecord).filter_by(email=email).first()
+            if existing:
+                return existing
+            user = UserRecord(username=username, email=email, role=role)
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            return user
+
+    def get_all_users(self) -> list[dict]:
+        """Return list of all users as dicts."""
+        from genesis.database.models import UserRecord
+        with get_session() as session:
+            users = session.query(UserRecord).order_by(UserRecord.username).all()
+            return [u.to_dict() for u in users]
+
+    def get_user_by_email(self, email: str) -> Optional[dict]:
+        from genesis.database.models import UserRecord
+        with get_session() as session:
+            u = session.query(UserRecord).filter_by(email=email).first()
+            return u.to_dict() if u else None
+
+    def update_user_record(self, username: str, **kwargs) -> bool:
+        from genesis.database.models import UserRecord
+        with get_session() as session:
+            u = session.query(UserRecord).filter_by(username=username).first()
+            if not u:
+                return False
+            for k, v in kwargs.items():
+                if hasattr(u, k):
+                    setattr(u, k, v)
+            session.commit()
+            return True
+
+    def delete_user_record(self, username: str) -> bool:
+        from genesis.database.models import UserRecord
+        with get_session() as session:
+            u = session.query(UserRecord).filter_by(username=username).first()
+            if not u:
+                return False
+            session.delete(u)
+            session.commit()
+            return True
+
+    def is_global_admin(self, email: Optional[str]) -> bool:
+        """Check if an email is a global admin."""
+        from genesis.database.models import GlobalAdmin
+        if not email:
+            return False
+        with get_session() as session:
+            return session.query(GlobalAdmin).filter_by(email=email).first() is not None
 
     # =========================================================================
     # VISIT TRACKING
