@@ -788,13 +788,13 @@ class Mind:
 
         # Generate response with optional function calling
         model_name = self.intelligence.get_model_for_task("reasoning")
-        system_msg_str = system_msg if isinstance(system_msg, str) else str(system_msg)
+        system_msg_str = system_msg if isinstance(system_msg, str) else (str(system_msg) if system_msg else "")
         
         # Log LLM call
         self.logger.llm_call(
             purpose="conversation",
             model=model_name or "default",
-            prompt_length=len(system_msg_str) + len(prompt),
+            prompt_length=len(system_msg_str or "") + len(prompt or ""),
             response_length=0,  # Will update after response
             temperature=self.intelligence.default_temperature,
         )
@@ -980,8 +980,8 @@ class Mind:
         self.logger.llm_call(
             purpose="conversation",
             model=model_name or "default",
-            prompt_length=len(system_msg_str) + len(prompt),
-            response_length=len(response.content),
+            prompt_length=len(system_msg_str or "") + len(prompt or ""),
+            response_length=len(response.content or ""),
             temperature=self.intelligence.default_temperature,
         )
 
