@@ -59,6 +59,46 @@ interface ConversationThread {
   last_message_role: string;
 }
 
+// Helper function to detect if user wants to generate an image
+const detectImageGenerationRequest = (message: string): string | null => {
+  const lowerMessage = message.toLowerCase();
+  const imageKeywords = [
+    'generate image',
+    'create image',
+    'generate picture',
+    'create picture',
+    'generate a picture',
+    'create a picture',
+    'generate an image',
+    'create an image',
+    'make an image',
+    'make a picture',
+    'draw an image',
+    'draw a picture',
+    'show me an image',
+    'show me a picture'
+  ];
+  
+  for (const keyword of imageKeywords) {
+    if (lowerMessage.includes(keyword)) {
+      // Extract the prompt after the keyword
+      const parts = message.split(new RegExp(keyword, 'i'));
+      if (parts.length > 1) {
+        const prompt = parts[1].trim().replace(/^(of |for |:)/i, '').trim();
+        return prompt || null;
+      }
+    }
+  }
+  
+  return null;
+};
+
+// Generate Pollinations AI image URL
+const generatePollinationsImageUrl = (prompt: string): string => {
+  const encodedPrompt = encodeURIComponent(prompt);
+  return `https://image.pollinations.ai/prompt/${encodedPrompt}?nologo=true`;
+};
+
 export default function ChatPage() {
   const params = useParams();
   const mindId = params.id as string;
@@ -521,6 +561,30 @@ export default function ChatPage() {
       setMessages(prev => [...prev, userMessage]);
       setAllMessages(prev => [...prev, { type: 'chat', data: userMessage }]);
 
+      // Check if this is an image generation request
+      const imagePrompt = detectImageGenerationRequest(currentInput);
+      
+      if (imagePrompt) {
+        // Generate image using Pollinations AI
+        const imageUrl = generatePollinationsImageUrl(imagePrompt);
+        
+        const imageMessage: Message = {
+          role: 'assistant',
+          content: `I've generated an image for: "${imagePrompt}"`,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            image_url: imageUrl,
+            image_prompt: imagePrompt,
+            is_generated_image: true
+          }
+        };
+        
+        setMessages(prev => [...prev, imageMessage]);
+        setAllMessages(prev => [...prev, { type: 'chat', data: imageMessage }]);
+        setLoading(false);
+        return;
+      }
+
       // Send message with context about uploaded files
       const data = await api.chatWithEnvironment(
         mindId, 
@@ -840,6 +904,29 @@ export default function ChatPage() {
                           <MarkdownRenderer content={message.content} />
                         ) : (
                           <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                        )}
+                        
+                        {/* Display generated image with download button */}
+                        {message.role === 'assistant' && message.metadata?.is_generated_image && message.metadata?.image_url && (
+                          <div className="mt-4 pt-4 border-t border-slate-700/50">
+                            <div className="text-xs text-gray-400 mb-3">🎨 Generated Image:</div>
+                            <div className="space-y-3">
+                              <img 
+                                src={message.metadata.image_url} 
+                                alt={message.metadata.image_prompt || 'Generated image'}
+                                className="rounded-lg w-full max-w-md border border-slate-600"
+                                loading="lazy"
+                              />
+                              <a
+                                href={message.metadata.image_url}
+                                download={`generated-${message.metadata.image_prompt?.substring(0, 30).replace(/[^a-z0-9]/gi, '-') || 'image'}.png`}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                              >
+                                <span>⬇️</span>
+                                <span>Download Image</span>
+                              </a>
+                            </div>
+                          </div>
                         )}
                         
                         {/* Download buttons for artifacts (from task completion) */}
