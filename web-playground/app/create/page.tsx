@@ -183,9 +183,16 @@ export default function CreateMindPage() {
     },
     // Other Free Options
     { 
+      value: 'groq/openai/gpt-oss-20b', 
+      label: '⚡ Groq OpenAI GPT-OSS-20B',
+      description: 'FREE • RECOMMENDED • Best quality & cheapest • Optimal for Groq',
+      cost: 'Free',
+      speed: 'Very Fast'
+    },
+    { 
       value: 'groq/openai/gpt-oss-120b', 
       label: 'Groq OpenAI GPT-OSS-120B',
-      description: 'Free • Best quality • Recommended for Groq',
+      description: 'Free • Larger model • Good quality',
       cost: 'Free',
       speed: 'Fast'
     },

@@ -157,8 +157,8 @@ def _interactive_model_selection() -> Intelligence:
                 os.environ["GROQ_API_KEY"] = api_key
                 api_keys['groq'] = api_key
 
-            # Set BOTH models to ensure consistency
-            selected_model = "groq/openai/gpt-oss-120b"
+            # Set BOTH models to ensure consistency - using gpt-oss-20b (best and cheapest)
+            selected_model = "groq/openai/gpt-oss-20b"
             reasoning_model = selected_model
             fast_model = selected_model
             console.print(f"\n[green][SUCCESS] Using Groq {selected_model} for both reasoning and fast responses[/green]\n")
