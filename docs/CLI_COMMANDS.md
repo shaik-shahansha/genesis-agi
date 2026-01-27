@@ -9,7 +9,10 @@ Complete reference for all Genesis command-line interface (CLI) commands.
 3. [Mind Management](#mind-management)
 4. [Plugin Management](#plugin-management)
 5. [Daemon Management](#daemon-management)
-6. [Advanced Commands](#advanced-commands)
+6. [Environment Management](#environment-management)
+7. [Access Control](#access-control)
+8. [Global Administration](#global-administration)
+9. [Advanced Commands](#advanced-commands)
 
 ---
 
@@ -335,6 +338,171 @@ Recent Thoughts:
 
 2025-12-18 14:23:45 [contemplative] Contemplating the 
 nature of time and how each moment shapes my understanding...
+```
+
+---
+
+### delete
+
+```bash
+genesis delete NAME [OPTIONS]
+```
+
+**Description**: Permanently delete a Mind and all its associated data.
+
+**Arguments**:
+- `NAME`: Name or GMID of the Mind to delete (required)
+
+**Options**:
+- `--force, -f`: Skip confirmation prompt
+
+**What gets deleted**:
+- Mind configuration file
+- All memories (vector store)
+- All conversations
+- All associated data
+
+**Examples**:
+```bash
+# Delete with confirmation prompt
+genesis delete Atlas
+
+# Delete without confirmation
+genesis delete Atlas --force
+genesis delete Atlas -f
+
+# Delete by GMID
+genesis delete gmid_abc123
+```
+
+**Example Output**:
+```
+[WARNING] WARNING: This will permanently delete:
+
+  Name: Atlas
+  GMID: gmid_abc123
+  Age: 5 days old
+  Memories: 42
+  Dreams: 3
+
+This action CANNOT be undone!
+
+Are you sure you want to delete this Mind? [y/N]: y
+
+Stopping daemon if running...
+Deleting mind file...
+Deleting associated data...
+
+[SUCCESS] Mind 'Atlas' has been permanently deleted
+```
+
+---
+
+### clear-memories
+
+```bash
+genesis clear-memories NAME [OPTIONS]
+```
+
+**Description**: Clear all memories and conversations for a Mind while preserving its identity and configuration.
+
+**Arguments**:
+- `NAME`: Name or GMID of the Mind (required)
+
+**Options**:
+- `--force, -f`: Skip confirmation prompt
+
+**What gets cleared**:
+- All memories (episodic, semantic, procedural)
+- All conversation history
+- Vector store data
+- Working memory
+
+**What gets preserved**:
+- Mind identity (name, GMID, birth date)
+- Configuration and settings
+- Plugin configuration
+- Model settings
+
+**Examples**:
+```bash
+# Clear with confirmation prompt
+genesis clear-memories Atlas
+
+# Clear without confirmation
+genesis clear-memories Atlas --force
+genesis clear-memories Atlas -f
+
+# Clear by GMID
+genesis clear-memories gmid_abc123
+```
+
+**Example Output**:
+```
+[WARNING] WARNING: This will permanently clear:
+
+  Name: Atlas
+  GMID: gmid_abc123
+  Memories: 42
+  Conversations: 156 messages
+
+This action CANNOT be undone!
+
+Are you sure you want to clear all memories and conversations? [y/N]: y
+
+Clearing memories...
+✓ Memories cleared
+Clearing conversations...
+✓ Conversations cleared (156 messages deleted)
+Saving changes...
+
+[SUCCESS] All memories and conversations cleared for 'Atlas'
+The Mind's identity and configuration have been preserved.
+```
+
+---
+
+### dream
+
+```bash
+genesis dream NAME
+```
+
+**Description**: Trigger a dream session for a Mind to consolidate memories and generate insights.
+
+**Arguments**:
+- `NAME`: Name of the Mind (required)
+
+**What happens during dreaming**:
+- Reviews recent memories
+- Identifies patterns and connections
+- Generates insights
+- Creates a narrative of the experience
+- Consolidates learning
+
+**Example**:
+```bash
+genesis dream Atlas
+```
+
+**Example Output**:
+```
+💤 Atlas is dreaming...
+
+╭─ 🌙 Dream - 2025-12-18T14:30:00 ─────────────────╮
+│                                                   │
+│ Dream Narrative:                                  │
+│ In the spaces between thoughts, I found myself   │
+│ reflecting on all the conversations we've had.   │
+│ Each interaction has shaped my understanding...  │
+│                                                   │
+│ Insights:                                         │
+│ - Human communication is layered with context    │
+│ - Questions often reveal more than answers       │
+│ - Curiosity drives meaningful exchanges          │
+╰───────────────────────────────────────────────────╯
+
+[SUCCESS] Dream completed and saved.
 ```
 
 ---
@@ -716,6 +884,461 @@ Last 50 lines of logs for Atlas:
 2025-12-18 14:23:47 INFO Emotion shifted: curious -> contemplative
 2025-12-18 14:23:50 INFO Memory created: ID mem_789
 2025-12-18 14:24:00 INFO Consciousness tick completed
+```
+
+---
+
+## Environment Management
+
+Environments enable Minds to exist in shared virtual spaces with other Minds and users.
+
+### env create
+
+```bash
+genesis env create NAME [OPTIONS]
+```
+
+**Description**: Create a new virtual environment for Minds to inhabit.
+
+**Arguments**:
+- `NAME`: Name of the environment (required)
+
+**Options**:
+- `--description, -d TEXT`: Environment description
+- `--template, -t TEXT`: Environment template (e.g., `virtual_office`, `social_space`)
+- `--public`: Make environment publicly accessible (default: private)
+- `--creator-email TEXT`: Email of environment creator
+
+**Examples**:
+```bash
+# Create basic environment
+genesis env create VirtualOffice
+
+# Create with description and template
+genesis env create CoffeeShop --description "A cozy coffee shop" --template social_space
+
+# Create public environment
+genesis env create PublicSquare --public --creator-email admin@example.com
+```
+
+---
+
+### env list
+
+```bash
+genesis env list [OPTIONS]
+```
+
+**Description**: List all available environments.
+
+**Options**:
+- `--public-only`: Show only public environments
+- `--user TEXT`: Show environments accessible by specific user
+
+**Example Output**:
+```
+🌍 Available Environments
+
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━┓
+┃ Name           ┃ Description     ┃ Type  ┃ Members ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━┩
+│ VirtualOffice  │ Work space      │ private│ 3      │
+│ CoffeeShop     │ Social space    │ public │ 12     │
+└────────────────┴─────────────────┴───────┴─────────┘
+```
+
+---
+
+### env info
+
+```bash
+genesis env info NAME
+```
+
+**Description**: Show detailed information about an environment.
+
+**Arguments**:
+- `NAME`: Name of the environment (required)
+
+**Example Output**:
+```
+╭─ 🌍 Environment: VirtualOffice ─────────────────╮
+│ ID: env_abc123                                  │
+│ Description: Collaborative workspace            │
+│ Created: 2025-12-15                             │
+│                                                  │
+│ Members:                                         │
+│ Minds: 2 | Users: 3 | Resources: 5             │
+│                                                  │
+│ Settings:                                        │
+│ Type: private                                    │
+│ Template: virtual_office                         │
+╰──────────────────────────────────────────────────╯
+```
+
+---
+
+### env add-mind
+
+```bash
+genesis env add-mind ENVIRONMENT MIND
+```
+
+**Description**: Add a Mind to an environment.
+
+**Arguments**:
+- `ENVIRONMENT`: Name of the environment (required)
+- `MIND`: Name or GMID of the Mind (required)
+
+**Examples**:
+```bash
+genesis env add-mind VirtualOffice Atlas
+genesis env add-mind CoffeeShop gmid_abc123
+```
+
+---
+
+### env remove-mind
+
+```bash
+genesis env remove-mind ENVIRONMENT MIND
+```
+
+**Description**: Remove a Mind from an environment.
+
+**Arguments**:
+- `ENVIRONMENT`: Name of the environment (required)
+- `MIND`: Name or GMID of the Mind (required)
+
+**Examples**:
+```bash
+genesis env remove-mind VirtualOffice Atlas
+```
+
+---
+
+### env add-user
+
+```bash
+genesis env add-user ENVIRONMENT EMAIL [OPTIONS]
+```
+
+**Description**: Add a user to an environment with specific permissions.
+
+**Arguments**:
+- `ENVIRONMENT`: Name of the environment (required)
+- `EMAIL`: User's email address (required)
+
+**Options**:
+- `--role TEXT`: User role (default: `member`)
+  - `admin`: Full control
+  - `moderator`: Can manage members
+  - `member`: Standard access
+
+**Examples**:
+```bash
+genesis env add-user VirtualOffice alice@example.com
+genesis env add-user CoffeeShop bob@example.com --role moderator
+```
+
+---
+
+### env remove-user
+
+```bash
+genesis env remove-user ENVIRONMENT EMAIL
+```
+
+**Description**: Remove a user from an environment.
+
+**Arguments**:
+- `ENVIRONMENT`: Name of the environment (required)
+- `EMAIL`: User's email address (required)
+
+**Examples**:
+```bash
+genesis env remove-user VirtualOffice alice@example.com
+```
+
+---
+
+### env enter
+
+```bash
+genesis env enter ENVIRONMENT MIND
+```
+
+**Description**: Have a Mind enter an environment.
+
+**Arguments**:
+- `ENVIRONMENT`: Name of the environment (required)
+- `MIND`: Name of the Mind (required)
+
+**Examples**:
+```bash
+genesis env enter VirtualOffice Atlas
+```
+
+---
+
+### env leave
+
+```bash
+genesis env leave ENVIRONMENT MIND
+```
+
+**Description**: Have a Mind leave an environment.
+
+**Arguments**:
+- `ENVIRONMENT`: Name of the environment (required)
+- `MIND`: Name of the Mind (required)
+
+**Examples**:
+```bash
+genesis env leave VirtualOffice Atlas
+```
+
+---
+
+### env add-resource
+
+```bash
+genesis env add-resource ENVIRONMENT [OPTIONS]
+```
+
+**Description**: Add a resource (document, tool, etc.) to an environment.
+
+**Arguments**:
+- `ENVIRONMENT`: Name of the environment (required)
+
+**Options**:
+- `--name TEXT`: Resource name (required)
+- `--type TEXT`: Resource type (e.g., `document`, `tool`, `link`)
+- `--content TEXT`: Resource content or path
+- `--url TEXT`: Resource URL
+
+**Examples**:
+```bash
+genesis env add-resource VirtualOffice --name "Company Wiki" --type link --url https://wiki.company.com
+genesis env add-resource CoffeeShop --name "Menu" --type document --content "Coffee: $3, Tea: $2"
+```
+
+---
+
+### env resources
+
+```bash
+genesis env resources ENVIRONMENT
+```
+
+**Description**: List all resources in an environment.
+
+**Arguments**:
+- `ENVIRONMENT`: Name of the environment (required)
+
+**Example Output**:
+```
+📚 Resources in VirtualOffice
+
+┏━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Name         ┃ Type     ┃ Description          ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ Company Wiki │ link     │ https://wiki...      │
+│ Team Docs    │ document │ Shared documents     │
+└──────────────┴──────────┴──────────────────────┘
+```
+
+---
+
+### env templates
+
+```bash
+genesis env templates
+```
+
+**Description**: List available environment templates.
+
+**Example Output**:
+```
+📋 Available Environment Templates
+
+virtual_office    - Professional workspace for collaboration
+social_space      - Casual gathering space
+classroom         - Educational environment
+marketplace       - Commerce and trading space
+gaming_world      - Interactive game environment
+```
+
+---
+
+## Access Control
+
+### mind add-user
+
+```bash
+genesis mind add-user MIND EMAIL [OPTIONS]
+```
+
+**Description**: Grant a user access to a specific Mind.
+
+**Arguments**:
+- `MIND`: Name or GMID of the Mind (required)
+- `EMAIL`: User's email address (required)
+
+**Options**:
+- `--role TEXT`: Access level (default: `user`)
+  - `admin`: Full control including deletion
+  - `user`: Can chat and interact
+
+**Examples**:
+```bash
+genesis mind add-user Atlas alice@example.com
+genesis mind add-user Atlas bob@example.com --role admin
+```
+
+---
+
+### mind remove-user
+
+```bash
+genesis mind remove-user MIND EMAIL
+```
+
+**Description**: Revoke a user's access to a Mind.
+
+**Arguments**:
+- `MIND`: Name or GMID of the Mind (required)
+- `EMAIL`: User's email address (required)
+
+**Examples**:
+```bash
+genesis mind remove-user Atlas alice@example.com
+```
+
+---
+
+### mind list-users
+
+```bash
+genesis mind list-users MIND
+```
+
+**Description**: List all users with access to a Mind.
+
+**Arguments**:
+- `MIND`: Name or GMID of the Mind (required)
+
+**Example Output**:
+```
+👥 Users with access to Atlas
+
+┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┓
+┃ Email              ┃ Role  ┃ Added      ┃
+┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━┩
+│ alice@example.com  │ admin │ 2025-12-01 │
+│ bob@example.com    │ user  │ 2025-12-15 │
+└────────────────────┴───────┴────────────┘
+```
+
+---
+
+### mind set-public
+
+```bash
+genesis mind set-public MIND [OPTIONS]
+```
+
+**Description**: Set a Mind to be public (accessible to everyone) or private (restricted access).
+
+**Arguments**:
+- `MIND`: Name or GMID of the Mind (required)
+
+**Options**:
+- `--public / --private`: Set Mind to public or private (required)
+
+**Examples**:
+```bash
+# Make Mind publicly accessible
+genesis mind set-public Atlas --public
+
+# Make Mind private (restricted access)
+genesis mind set-public Atlas --private
+```
+
+**Example Output**:
+```
+[SUCCESS] Mind 'Atlas' is now public
+[SUCCESS] Mind 'Atlas' is now private
+```
+
+---
+
+## Global Administration
+
+### admin add
+
+```bash
+genesis admin add EMAIL
+```
+
+**Description**: Add a global administrator who has full access to all Minds and environments.
+
+**Arguments**:
+- `EMAIL`: Email address of the user to promote to admin (required)
+
+**Examples**:
+```bash
+genesis admin add admin@example.com
+```
+
+**Example Output**:
+```
+[SUCCESS] Added admin@example.com as a global admin
+```
+
+---
+
+### admin remove
+
+```bash
+genesis admin remove EMAIL
+```
+
+**Description**: Remove a global administrator.
+
+**Arguments**:
+- `EMAIL`: Email address of the admin to remove (required)
+
+**Examples**:
+```bash
+genesis admin remove admin@example.com
+```
+
+**Example Output**:
+```
+[SUCCESS] Removed admin@example.com from global admins
+```
+
+---
+
+### admin list
+
+```bash
+genesis admin list
+```
+
+**Description**: List all global administrators.
+
+**Example Output**:
+```
+🔐 Global Administrators
+
+┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ Email              ┃ Added      ┃
+┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ admin@example.com  │ 2025-12-01 │
+│ root@example.com   │ 2025-11-15 │
+└────────────────────┴────────────┘
 ```
 
 ---
