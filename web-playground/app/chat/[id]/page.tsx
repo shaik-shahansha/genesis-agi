@@ -429,7 +429,7 @@ export default function ChatPage() {
         // Scroll to bottom after messages load
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 300);
+        }, 1000);
       } else {
         console.error('Failed to load messages:', response.status, response.statusText);
       }
@@ -564,28 +564,7 @@ export default function ChatPage() {
       // Check if this is an image generation request
       const imagePrompt = detectImageGenerationRequest(currentInput);
       
-      if (imagePrompt) {
-        // Generate image using Pollinations AI
-        const imageUrl = generatePollinationsImageUrl(imagePrompt);
-        
-        const imageMessage: Message = {
-          role: 'assistant',
-          content: `I've generated an image for: "${imagePrompt}"`,
-          timestamp: new Date().toISOString(),
-          metadata: {
-            image_url: imageUrl,
-            image_prompt: imagePrompt,
-            is_generated_image: true
-          }
-        };
-        
-        setMessages(prev => [...prev, imageMessage]);
-        setAllMessages(prev => [...prev, { type: 'chat', data: imageMessage }]);
-        setLoading(false);
-        return;
-      }
-
-      // Send message with context about uploaded files
+      // Send message with context about uploaded files (always call API to save conversation)
       const data = await api.chatWithEnvironment(
         mindId, 
         messageContent, 
@@ -593,11 +572,30 @@ export default function ChatPage() {
         selectedEnvironment || undefined
       );
 
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: data.response || data.message || 'No response',
-        timestamp: new Date().toISOString()
-      };
+      let assistantMessage: Message;
+      
+      if (imagePrompt) {
+        // Generate image using Pollinations AI and add to response
+        const imageUrl = generatePollinationsImageUrl(imagePrompt);
+        
+        assistantMessage = {
+          role: 'assistant',
+          content: `I've generated an image for: "${imagePrompt}"\n\n${data.response || data.message || ''}`,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            image_url: imageUrl,
+            image_prompt: imagePrompt,
+            is_generated_image: true
+          }
+        };
+      } else {
+        assistantMessage = {
+          role: 'assistant',
+          content: data.response || data.message || 'No response',
+          timestamp: new Date().toISOString()
+        };
+      }
+      
       setMessages(prev => [...prev, assistantMessage]);
       setAllMessages(prev => [...prev, { type: 'chat', data: assistantMessage }]);
       
@@ -920,6 +918,8 @@ export default function ChatPage() {
                               <a
                                 href={message.metadata.image_url}
                                 download={`generated-${message.metadata.image_prompt?.substring(0, 30).replace(/[^a-z0-9]/gi, '-') || 'image'}.png`}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                               >
                                 <span>⬇️</span>
