@@ -466,7 +466,7 @@ export default function ChatPage() {
         // Scroll to bottom after messages load
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 1000);
+        }, 3000);
       } else {
         console.error('Failed to load messages:', response.status, response.statusText);
       }

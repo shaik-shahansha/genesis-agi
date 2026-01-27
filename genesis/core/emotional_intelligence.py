@@ -312,13 +312,22 @@ class EmotionalIntelligence:
                 emotion_str = memory.emotion
                 intensity = getattr(memory, 'emotion_intensity', 0.5)
                 
+                # Skip if intensity is None
+                if intensity is None:
+                    intensity = 0.5
+                
                 if emotion_str not in memory_emotions:
                     memory_emotions[emotion_str] = []
                 memory_emotions[emotion_str].append(intensity)
         
         # Create triggers from memory emotions
         for emotion_str, intensities in memory_emotions.items():
-            avg_intensity = sum(intensities) / len(intensities)
+            # Filter out any None values before summing
+            valid_intensities = [i for i in intensities if i is not None]
+            if not valid_intensities:
+                continue
+                
+            avg_intensity = sum(valid_intensities) / len(valid_intensities)
             
             # Memories trigger weaker emotions than direct conversation
             adjusted_intensity = avg_intensity * 0.6
