@@ -564,23 +564,13 @@ export default function ChatPage() {
       // Check if this is an image generation request
       const imagePrompt = detectImageGenerationRequest(currentInput);
       
-      // Send message with context about uploaded files (always call API to save conversation)
-      const data = await api.chatWithEnvironment(
-        mindId, 
-        messageContent, 
-        userEmail || undefined,
-        selectedEnvironment || undefined
-      );
-
-      let assistantMessage: Message;
-      
       if (imagePrompt) {
-        // Generate image using Pollinations AI and add to response
+        // For image generation, handle it entirely on frontend (no backend call needed)
         const imageUrl = generatePollinationsImageUrl(imagePrompt);
         
-        assistantMessage = {
+        const assistantMessage: Message = {
           role: 'assistant',
-          content: `I've generated an image for: "${imagePrompt}"\n\n${data.response || data.message || ''}`,
+          content: `I've generated an image for: "${imagePrompt}"`,
           timestamp: new Date().toISOString(),
           metadata: {
             image_url: imageUrl,
@@ -588,16 +578,27 @@ export default function ChatPage() {
             is_generated_image: true
           }
         };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        setAllMessages(prev => [...prev, { type: 'chat', data: assistantMessage }]);
       } else {
-        assistantMessage = {
+        // Send message with context about uploaded files to backend
+        const data = await api.chatWithEnvironment(
+          mindId, 
+          messageContent, 
+          userEmail || undefined,
+          selectedEnvironment || undefined
+        );
+
+        const assistantMessage: Message = {
           role: 'assistant',
           content: data.response || data.message || 'No response',
           timestamp: new Date().toISOString()
         };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        setAllMessages(prev => [...prev, { type: 'chat', data: assistantMessage }]);
       }
-      
-      setMessages(prev => [...prev, assistantMessage]);
-      setAllMessages(prev => [...prev, { type: 'chat', data: assistantMessage }]);
       
       // Refresh conversation threads after sending message
       fetchConversationThreads();
