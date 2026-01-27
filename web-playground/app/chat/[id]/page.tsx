@@ -112,16 +112,21 @@ export default function ChatPage() {
   }, [loading]);
 
   useEffect(() => {
+    console.log('🔄 Initial page load effect triggered for mind:', mindId);
     fetchMind();
     // Check if user email is stored in localStorage
     const storedEmail = localStorage.getItem('genesis_user_email');
+    console.log('📧 Stored email from localStorage:', storedEmail);
     if (storedEmail) {
       setUserEmail(storedEmail);
       setShowEmailPrompt(false);
       // Load conversation immediately when email is available from localStorage
       // This ensures conversations load on direct URL access or page refresh
+      console.log('🚀 Initiating conversation load...');
       loadConversationMessages(null, storedEmail);
       fetchConversationThreads(storedEmail);
+    } else {
+      console.log('⚠️ No stored email found, showing email prompt');
     }
   }, [mindId]);
 
@@ -282,9 +287,13 @@ export default function ChatPage() {
     try {
       const token = await getFirebaseToken();
       if (!token) {
-        console.error('No authentication token available');
+        console.warn('No auth token available yet for fetching threads, retrying...');
+        // Retry after a short delay
+        setTimeout(() => fetchConversationThreads(emailOverride), 500);
         return;
       }
+      
+      console.log('🔄 Fetching conversation threads for:', email);
       
       const response = await fetch(
         `${API_URL}/api/v1/minds/${mindId}/conversations?user_email=${encodeURIComponent(email)}`,
@@ -298,6 +307,9 @@ export default function ChatPage() {
       if (response.ok) {
         const data = await response.json();
         setConversationThreads(data.threads || []);
+        console.log('✅ Loaded conversation threads:', data.threads?.length || 0);
+      } else {
+        console.error('Failed to load threads:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error fetching conversation threads:', error);
@@ -322,11 +334,15 @@ export default function ChatPage() {
 
       const token = await getFirebaseToken();
       if (!token) {
-        console.error('No authentication token available');
+        console.warn('No auth token available yet for loading messages, retrying...');
         setLoading(false);
+        // Retry after a short delay
+        setTimeout(() => loadConversationMessages(envId, emailOverride), 500);
         return;
       }
 
+      console.log('🔄 Loading conversation messages for:', email, 'env:', envId);
+      
       const response = await fetch(
         `${API_URL}/api/v1/minds/${mindId}/conversations/messages?${params}`,
         {
@@ -372,6 +388,8 @@ export default function ChatPage() {
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
         }, 200);
+      } else {
+        console.error('Failed to load messages:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error loading conversation messages:', error);
