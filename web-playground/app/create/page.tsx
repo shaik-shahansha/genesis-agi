@@ -414,7 +414,7 @@ export default function CreateMindPage() {
                     <Card
                       key={model.value}
                       hover
-                      onClick={() => setFormData({ ...formData, reasoning_model: model.value })}
+                      onClick={() => setFormData({ ...formData, reasoning_model: model.value, fast_model: model.value })}
                       className={`cursor-pointer transition ${
                         formData.reasoning_model === model.value
                           ? 'border-purple-500 bg-purple-500/10'
