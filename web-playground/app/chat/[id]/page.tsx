@@ -14,6 +14,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  metadata?: any;  // For artifacts and other metadata
 }
 
 interface Mind {
@@ -808,6 +809,36 @@ export default function ChatPage() {
                         ) : (
                           <div className="text-sm whitespace-pre-wrap">{message.content}</div>
                         )}
+                        
+                        {/* Download buttons for artifacts (from task completion) */}
+                        {message.role === 'assistant' && message.metadata?.artifacts && message.metadata.artifacts.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-slate-700/50">
+                            <div className="text-xs text-gray-400 mb-2">📎 Attachments:</div>
+                            <div className="flex flex-col gap-2">
+                              {message.metadata.artifacts.map((artifact: any, idx: number) => {
+                                const artifactName = artifact.filename || artifact.name || `artifact-${idx}`;
+                                const artifactType = artifact.type || 'file';
+                                const downloadUrl = `${API_URL}/api/v1/minds/${mindId}/artifacts/download?filename=${encodeURIComponent(artifactName)}`;
+                                
+                                return (
+                                  <a
+                                    key={idx}
+                                    href={downloadUrl}
+                                    download={artifactName}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 rounded-lg text-sm text-blue-300 transition-colors"
+                                  >
+                                    <span>📥</span>
+                                    <span className="font-medium">{artifactName}</span>
+                                    <span className="text-xs text-gray-400">({artifactType})</span>
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        
                         <div className="message-timestamp">
                           <span>{timestamp}</span>
                           {message.role === 'user' && (

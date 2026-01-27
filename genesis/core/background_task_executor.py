@@ -336,18 +336,7 @@ class BackgroundTaskExecutor:
                     # 1. Add to conversation history so it shows when user next visits
                     # 2. Queue persistent notification for when user reconnects
                     
-                    # Add to conversation history as backup (use correct method)
-                    self.mind.conversation.add_message(
-                        role="assistant",
-                        content=result_message,
-                        user_email=user_email
-                    )
-                    print(f"[DEBUG BG_EXEC] ✓ Added to conversation history")
-                    
-                    # Queue persistent notification for when user reconnects
-                    result_summary = self._format_result_summary(result)
-                    # Convert any Path objects to strings for JSON serialization
-                    # Only send filename, not full path, for security/UX
+                    # Prepare artifacts for metadata
                     artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
                     serializable_artifacts = []
                     for artifact in artifacts:
@@ -362,6 +351,22 @@ class BackgroundTaskExecutor:
                             serializable_artifacts.append(serializable_artifact)
                         else:
                             serializable_artifacts.append(artifact)
+                    
+                    # Add to conversation history as backup (WITH ARTIFACTS METADATA!)
+                    self.mind.conversation.add_message(
+                        role="assistant",
+                        content=result_message,
+                        user_email=user_email,
+                        metadata={
+                            "task_id": task.task_id,
+                            "artifacts": serializable_artifacts,
+                            "is_task_completion": True
+                        }
+                    )
+                    print(f"[DEBUG BG_EXEC] ✓ Added to conversation history with {len(serializable_artifacts)} artifacts")
+                    
+                    # Queue persistent notification for when user reconnects
+                    result_summary = self._format_result_summary(result)
                     
                     await self.mind.notification_manager.send_notification(
                         recipient=user_email,
