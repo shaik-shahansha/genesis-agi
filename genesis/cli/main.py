@@ -454,6 +454,79 @@ def delete(
 
 
 @app.command()
+def clear_memories(
+    name: str = typer.Argument(..., help="Name or GMID of the Mind to clear memories for"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
+):
+    """Clear all memories and conversations for a Mind."""
+    # Find the Mind
+    mind_path = None
+    for path in settings.minds_dir.glob("*.json"):
+        try:
+            mind = Mind.load(path)
+            if mind.identity.name == name or mind.identity.gmid == name:
+                mind_path = path
+                break
+        except Exception:
+            continue
+    
+    if not mind_path:
+        console.print(f"[red][FAILED] Mind '{name}' not found[/red]")
+        raise typer.Exit(1)
+    
+    # Load mind for info
+    mind = Mind.load(mind_path)
+    
+    # Confirmation
+    if not force:
+        console.print(f"\n[bold red][WARNING]  WARNING: This will permanently clear:[/bold red]\n")
+        console.print(f"  Name: [cyan]{mind.identity.name}[/cyan]")
+        console.print(f"  GMID: [yellow]{mind.identity.gmid}[/yellow]")
+        console.print(f"  Memories: {len(mind.memory.memories)}")
+        
+        # Get conversation stats
+        try:
+            conv_stats = mind.conversation.get_stats()
+            console.print(f"  Conversations: {conv_stats.get('total_messages', 0)} messages")
+        except Exception:
+            console.print(f"  Conversations: Unable to determine count")
+        
+        console.print(f"\n[red]This action CANNOT be undone![/red]\n")
+        
+        if not typer.confirm("Are you sure you want to clear all memories and conversations?"):
+            console.print("[yellow]Operation cancelled[/yellow]")
+            raise typer.Exit(0)
+    
+    # Clear memories
+    console.print(f"\n[yellow]Clearing memories...[/yellow]")
+    try:
+        # Clear the in-memory dict
+        mind.memory.memories.clear()
+        # Clear the vector store (ChromaDB)
+        mind.memory.vector_store.clear()
+        # Clear working memory
+        mind.memory.working_memory.clear()
+        console.print(f"[green]✓ Memories cleared[/green]")
+    except Exception as e:
+        console.print(f"[red]✗ Error clearing memories: {e}[/red]")
+    
+    # Clear conversations
+    console.print(f"[yellow]Clearing conversations...[/yellow]")
+    try:
+        deleted_count = mind.conversation.clear_all()
+        console.print(f"[green]✓ Conversations cleared ({deleted_count} messages deleted)[/green]")
+    except Exception as e:
+        console.print(f"[red]✗ Error clearing conversations: {e}[/red]")
+    
+    # Save the mind with cleared memories
+    console.print(f"[yellow]Saving changes...[/yellow]")
+    mind.save(mind_path)
+    
+    console.print(f"\n[green][SUCCESS] All memories and conversations cleared for '{mind.identity.name}'[/green]")
+    console.print(f"[dim]The Mind's identity and configuration have been preserved.[/dim]")
+
+
+@app.command()
 def chat(
     name: str = typer.Argument(..., help="Name of the Mind to chat with"),
     stream: bool = typer.Option(True, "--stream/--no-stream", help="Stream responses"),
