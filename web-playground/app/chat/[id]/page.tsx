@@ -148,7 +148,10 @@ export default function ChatPage() {
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
-        console.log('[WebSocket] Connected successfully with email:', userEmail);
+        console.log('[WebSocket] ✅ Connected successfully');
+        console.log('[WebSocket] User:', userEmail);
+        console.log('[WebSocket] Mind:', mindId);
+        console.log('[WebSocket] URL:', wsUrl);
         setWebsocket(ws);
       };
       
@@ -248,7 +251,10 @@ export default function ChatPage() {
       };
       
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('[WebSocket] ❌ Connection error:', error);
+        console.error('[WebSocket] URL:', wsUrl);
+        console.error('[WebSocket] This may be due to CORS, auth, or network issues');
+        console.error('[WebSocket] Check if backend WebSocket endpoint is accessible');
       };
       
       return () => {
@@ -259,6 +265,14 @@ export default function ChatPage() {
 
   const fetchMind = async () => {
     try {
+      // Wait for auth token to be available
+      const token = await getFirebaseToken();
+      if (!token) {
+        console.warn('No auth token available yet, retrying...');
+        // Retry after a short delay
+        setTimeout(fetchMind, 500);
+        return;
+      }
       const data = await api.getMind(mindId);
       setMind(data);
     } catch (error) {
