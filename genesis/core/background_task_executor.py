@@ -286,14 +286,7 @@ class BackgroundTaskExecutor:
                 print(f"[DEBUG BG_EXEC]   user_email={user_email}")
                 print(f"[DEBUG BG_EXEC]   has_notification_manager={hasattr(self.mind, 'notification_manager')}")
                 
-                # Send completion notification via WebSocket (IMMEDIATE delivery)
-                if notify_on_complete and user_email and hasattr(self.mind, 'notification_manager'):
-                    logger.info(f"[TASK {task.task_id[:8]}] Sending completion notification...")
-                    print(f"[DEBUG BG_EXEC] Sending WebSocket notification...")
-                    
-                    # Send via WebSocket for immediate delivery
-                # Convert any Path objects to strings for JSON serialization
-                # Only send filename, not full path, for security/UX
+                # Prepare artifacts for metadata (used by both WebSocket and conversation history)
                 artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
                 serializable_artifacts = []
                 for artifact in artifacts:
@@ -309,76 +302,61 @@ class BackgroundTaskExecutor:
                     else:
                         serializable_artifacts.append(artifact)
                 
-                websocket_sent = await self.mind.notification_manager.send_to_websocket(
+                # ALWAYS save to conversation history (for persistence across sessions)
+                print(f"[DEBUG BG_EXEC] Saving completion message to conversation history...")
+                self.mind.conversation.add_message(
+                    role="assistant",
+                    content=result_message,
                     user_email=user_email,
-                    message_type="task_complete",
-                    data={
+                    metadata={
                         "task_id": task.task_id,
-                        "user_request": user_request,
-                        "status": "completed",
-                        "message": result_message,
                         "artifacts": serializable_artifacts,
-                        "timestamp": task.completed_at.isoformat()
+                        "is_task_completion": True
                     }
                 )
+                print(f"[DEBUG BG_EXEC] ✓ Saved to conversation history with {len(serializable_artifacts)} artifacts")
                 
-                print(f"[DEBUG BG_EXEC] WebSocket sent status: {websocket_sent}")
-                
-                if websocket_sent:
-                    logger.info(f"[TASK {task.task_id[:8]}] ✓ Sent completion via WebSocket")
-                    print(f"[DEBUG BG_EXEC] ✓ Notification delivered via WebSocket!")
-                else:
-                    logger.info(f"[TASK {task.task_id[:8]}] WebSocket not available, using fallback notification")
-                    print(f"[DEBUG BG_EXEC] WebSocket not connected, using fallback notification")
-                    print(f"[DEBUG BG_EXEC] Adding to conversation history as backup...")
+                # Send completion notification via WebSocket (IMMEDIATE delivery)
+                if notify_on_complete and user_email and hasattr(self.mind, 'notification_manager'):
+                    logger.info(f"[TASK {task.task_id[:8]}] Sending completion notification...")
+                    print(f"[DEBUG BG_EXEC] Sending WebSocket notification...")
                     
-                    # FALLBACK STRATEGY:
-                    # 1. Add to conversation history so it shows when user next visits
-                    # 2. Queue persistent notification for when user reconnects
-                    
-                    # Prepare artifacts for metadata
-                    artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
-                    serializable_artifacts = []
-                    for artifact in artifacts:
-                        if isinstance(artifact, dict):
-                            serializable_artifact = artifact.copy()
-                            if "path" in serializable_artifact:
-                                # Extract just the filename from the path
-                                full_path = Path(str(serializable_artifact["path"]))
-                                serializable_artifact["filename"] = full_path.name
-                                # Remove the full path for security
-                                del serializable_artifact["path"]
-                            serializable_artifacts.append(serializable_artifact)
-                        else:
-                            serializable_artifacts.append(artifact)
-                    
-                    # Add to conversation history as backup (WITH ARTIFACTS METADATA!)
-                    self.mind.conversation.add_message(
-                        role="assistant",
-                        content=result_message,
+                    websocket_sent = await self.mind.notification_manager.send_to_websocket(
                         user_email=user_email,
-                        metadata={
+                        message_type="task_complete",
+                        data={
                             "task_id": task.task_id,
+                            "user_request": user_request,
+                            "status": "completed",
+                            "message": result_message,
                             "artifacts": serializable_artifacts,
-                            "is_task_completion": True
+                            "timestamp": task.completed_at.isoformat()
                         }
                     )
-                    print(f"[DEBUG BG_EXEC] ✓ Added to conversation history with {len(serializable_artifacts)} artifacts")
                     
-                    # Queue persistent notification for when user reconnects
-                    result_summary = self._format_result_summary(result)
+                    print(f"[DEBUG BG_EXEC] WebSocket sent status: {websocket_sent}")
                     
-                    await self.mind.notification_manager.send_notification(
-                        recipient=user_email,
-                        title="Task Completed ✓",
-                        message=f"I've completed: {user_request}\n\n{result_summary}",
-                        priority="normal",
-                        channel="web",
-                        metadata={
-                            "task_id": task.task_id,
-                            "artifacts": serializable_artifacts
-                        }
-                    )
+                    if websocket_sent:
+                        logger.info(f"[TASK {task.task_id[:8]}] ✓ Sent completion via WebSocket")
+                        print(f"[DEBUG BG_EXEC] ✓ Notification delivered via WebSocket!")
+                    else:
+                        logger.info(f"[TASK {task.task_id[:8]}] WebSocket not available, using fallback notification")
+                        print(f"[DEBUG BG_EXEC] WebSocket not connected, queuing fallback notification")
+                        
+                        # Queue persistent notification for when user reconnects
+                        result_summary = self._format_result_summary(result)
+                        
+                        await self.mind.notification_manager.send_notification(
+                            recipient=user_email,
+                            title="Task Completed ✓",
+                            message=f"I've completed: {user_request}\n\n{result_summary}",
+                            priority="normal",
+                            channel="web",
+                            metadata={
+                                "task_id": task.task_id,
+                                "artifacts": serializable_artifacts
+                            }
+                        )
                 
                 break  # Success, exit retry loop
                 

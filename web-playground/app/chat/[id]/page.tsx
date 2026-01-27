@@ -118,17 +118,12 @@ export default function ChatPage() {
     if (storedEmail) {
       setUserEmail(storedEmail);
       setShowEmailPrompt(false);
+      // Load conversation immediately when email is available from localStorage
+      // This ensures conversations load on direct URL access or page refresh
+      loadConversationMessages(null, storedEmail);
+      fetchConversationThreads(storedEmail);
     }
   }, [mindId]);
-
-  // Fetch conversation threads when user email is available
-  useEffect(() => {
-    if (userEmail) {
-      fetchConversationThreads();
-      // Also load messages for the current context (environment or general)
-      loadConversationMessages(selectedEnvironment);
-    }
-  }, [userEmail, mindId]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -280,8 +275,9 @@ export default function ChatPage() {
     }
   };
 
-  const fetchConversationThreads = async () => {
-    if (!userEmail) return;
+  const fetchConversationThreads = async (emailOverride?: string) => {
+    const email = emailOverride || userEmail;
+    if (!email) return;
     
     try {
       const token = await getFirebaseToken();
@@ -291,7 +287,7 @@ export default function ChatPage() {
       }
       
       const response = await fetch(
-        `${API_URL}/api/v1/minds/${mindId}/conversations?user_email=${encodeURIComponent(userEmail)}`,
+        `${API_URL}/api/v1/minds/${mindId}/conversations?user_email=${encodeURIComponent(email)}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -308,14 +304,15 @@ export default function ChatPage() {
     }
   };
 
-  const loadConversationMessages = async (envId: string | null) => {
-    if (!userEmail) return;
+  const loadConversationMessages = async (envId: string | null, emailOverride?: string) => {
+    const email = emailOverride || userEmail;
+    if (!email) return;
     setLoading(true);
     setLoadingMore(false);
 
     try {
       const params = new URLSearchParams({
-        user_email: userEmail,
+        user_email: email,
         limit: '50'
       });
 
