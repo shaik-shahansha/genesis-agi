@@ -132,10 +132,10 @@ export default function ChatPage() {
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    // Use setTimeout to ensure DOM is updated
+    // Use setTimeout to ensure DOM is fully updated (including images/markdown)
     const timer = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 200);
     return () => clearTimeout(timer);
   }, [allMessages]);
 
@@ -358,18 +358,20 @@ export default function ChatPage() {
         console.log('📥 Loaded messages from API:', data.messages?.length || 0);
         console.log('📥 Message roles:', data.messages?.map((m: any) => m.role));
 
-        // Convert messages to the format we need (keep id for pagination)
+        // Convert messages to the format we need (keep id, metadata for pagination and artifacts)
         const chatMessages: Message[] = data.messages
           .filter((msg: any) => msg.role !== 'system')
           .map((msg: any) => ({
             id: msg.id,
             role: msg.role,
             content: msg.content,
-            timestamp: msg.timestamp
+            timestamp: msg.timestamp,
+            metadata: msg.metadata  // Include metadata for artifacts and other data
           }));
 
         console.log('✅ Filtered chat messages:', chatMessages.length);
         console.log('✅ Filtered roles:', chatMessages.map(m => m.role));
+        console.log('📦 Messages with artifacts:', chatMessages.filter(m => m.metadata?.artifacts?.length > 0).length);
 
         setMessages(chatMessages);
 
@@ -386,8 +388,8 @@ export default function ChatPage() {
 
         // Scroll to bottom after messages load
         setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-        }, 200);
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
       } else {
         console.error('Failed to load messages:', response.status, response.statusText);
       }
@@ -448,7 +450,8 @@ export default function ChatPage() {
             id: msg.id,
             role: msg.role,
             content: msg.content,
-            timestamp: msg.timestamp
+            timestamp: msg.timestamp,
+            metadata: msg.metadata  // Include metadata for artifacts
           }));
 
         if (olderMsgs.length > 0) {
