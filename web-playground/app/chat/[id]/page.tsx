@@ -124,6 +124,7 @@ export default function ChatPage() {
   const [hasMore, setHasMore] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [feedbackSent, setFeedbackSent] = useState<Set<number>>(new Set());
+  const [frontendHandledImage, setFrontendHandledImage] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -203,6 +204,18 @@ export default function ChatPage() {
           
           // Handle proactive messages sent as regular chat messages
           if (data.type === 'message' && data.metadata?.is_proactive) {
+            // Skip if this looks like an image generation task response (frontend already handled it)
+            const lowerContent = data.content.toLowerCase();
+            const isImageTask = lowerContent.includes('image') && 
+                               (lowerContent.includes('pollinations') || 
+                                lowerContent.includes('create') || 
+                                lowerContent.includes('generate'));
+            
+            if (isImageTask) {
+              console.log('🚫 Suppressing backend image generation response (frontend handled)');
+              return;
+            }
+            
             // This is a proactive message appearing as natural chat
             const chatMsg: Message = {
               role: 'assistant',
@@ -231,6 +244,18 @@ export default function ChatPage() {
             }, 100);
           } 
           else if (data.type === 'task_progress') {
+            // Skip if this is an image generation task (frontend handles those)
+            const lowerMessage = data.message?.toLowerCase() || '';
+            const isImageTask = lowerMessage.includes('image') && 
+                               (lowerMessage.includes('generate') || 
+                                lowerMessage.includes('create') || 
+                                lowerMessage.includes('pollinations'));
+            
+            if (isImageTask) {
+              console.log('🚫 Suppressing image generation task progress');
+              return;
+            }
+            
             // Task progress update - show in UI
             console.log(`[Task ${data.task_id}] Progress: ${(data.progress * 100).toFixed(0)}% - ${data.message}`);
             
@@ -255,6 +280,18 @@ export default function ChatPage() {
             }, 100);
           }
           else if (data.type === 'task_complete') {
+            // Skip if this is an image generation task (frontend handles those)
+            const lowerMessage = data.message?.toLowerCase() || '';
+            const isImageTask = lowerMessage.includes('image') && 
+                               (lowerMessage.includes('generate') || 
+                                lowerMessage.includes('create') || 
+                                lowerMessage.includes('pollinations'));
+            
+            if (isImageTask) {
+              console.log('🚫 Suppressing image generation task completion');
+              return;
+            }
+            
             // Task completed - show result
             console.log(`[Task ${data.task_id}] Completed!`, data);
             
