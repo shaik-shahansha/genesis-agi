@@ -303,7 +303,33 @@ class MemoryManager:
         # Convert to Memory objects and filter by user if specified
         memories = []
         for result in results:
+            # Try to get from cache first
             memory = self.memories.get(result["id"])
+            
+            # If not in cache, reconstruct from vector store result
+            if not memory:
+                try:
+                    metadata = result.get("metadata", {})
+                    memory = Memory(
+                        id=result["id"],
+                        type=MemoryType(metadata.get("type", "episodic")),
+                        content=result["content"],
+                        timestamp=datetime.fromisoformat(metadata.get("timestamp", datetime.now().isoformat())),
+                        emotion=metadata.get("emotion"),
+                        importance=float(metadata.get("importance", 0.5)),
+                        tags=metadata.get("tags", "").split(",") if metadata.get("tags") else [],
+                        metadata=metadata,
+                        user_email=metadata.get("user_email") or None,
+                        relationship_context=metadata.get("relationship_context") or None,
+                        environment_id=metadata.get("environment_id") or None,
+                        environment_name=metadata.get("environment_name") or None,
+                    )
+                    # Add to cache for future use
+                    self.memories[memory.id] = memory
+                except Exception as e:
+                    # Skip invalid memories
+                    continue
+            
             if memory:
                 # Filter by user_email only if explicitly specified
                 if user_email:
