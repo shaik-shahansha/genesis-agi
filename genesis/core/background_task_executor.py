@@ -176,7 +176,7 @@ class BackgroundTaskExecutor:
         notify_on_complete: bool
     ):
         """Execute task asynchronously with retry logic and progress updates."""
-        while task.retry_count <= task.max_retries:
+        while task.retry_count < task.max_retries:
             try:
                 # Update status
                 task.status = TaskStatus.RUNNING
@@ -336,8 +336,12 @@ class BackgroundTaskExecutor:
                     # 1. Add to conversation history so it shows when user next visits
                     # 2. Queue persistent notification for when user reconnects
                     
-                    # Add to conversation history as backup
-                    self.mind.conversation.add_assistant_message(result_message)
+                    # Add to conversation history as backup (use correct method)
+                    self.mind.conversation.add_message(
+                        role="assistant",
+                        content=result_message,
+                        user_email=user_email
+                    )
                     print(f"[DEBUG BG_EXEC] ✓ Added to conversation history")
                     
                     # Queue persistent notification for when user reconnects
@@ -389,8 +393,8 @@ class BackgroundTaskExecutor:
                     f"Task {task.task_id} failed (attempt {task.retry_count}): {str(e)}"
                 )
                 
-                # Retry or fail
-                if task.retry_count <= task.max_retries:
+                # Check if we should retry or fail permanently
+                if task.retry_count < task.max_retries:
                     task.status = TaskStatus.RETRYING
                     task.progress = 0.0
                     self._save_task(task)  # Persist retry state
