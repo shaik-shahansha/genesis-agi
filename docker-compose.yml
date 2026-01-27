@@ -13,6 +13,8 @@ services:
     networks:
       - genesis-net
     command: redis-server --appendonly yes
+    env_file:
+      - .env
 
   # Genesis API Server
   genesis-api:
@@ -31,6 +33,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - ENABLE_LLM_CACHE=true
       - DISABLE_MULTIMODAL=true
+      - FIREBASE_ENABLED=true
       - CORS_ORIGINS=https://*.genesisagi.in,https://*.shahansha.com,https://playground-genesis-agi.vercel.app,http://localhost:*,http://127.0.0.1:*
     volumes:
       - genesis-data:/data
