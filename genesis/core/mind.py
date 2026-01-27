@@ -706,10 +706,6 @@ class Mind:
         # For identity questions, also search for declarations/introductions
         search_queries = [prompt]
         
-        # Get current environment for filtering
-        current_env = self.environments.get_current_environment()
-        env_id = current_env.env_id if current_env else None
-        
         # If asking "who am i", also search for identity declarations
         if any(phrase in prompt.lower() for phrase in ["who am i", "who i am", "do you know me", "remember me"]):
             if user_email:
@@ -722,7 +718,7 @@ class Mind:
         seen_ids = set()
         
         for query in search_queries:
-            memories = self.memory.search_memories(query=query, limit=3, user_email=user_email, environment_id=env_id)
+            memories = self.memory.search_memories(query=query, limit=3, user_email=user_email)
             for mem in memories:
                 if mem.id not in seen_ids:
                     all_memories.append(mem)
@@ -1257,14 +1253,16 @@ class Mind:
             return
         
         # NOT A TASK - Regular conversation flow
-        # Get relevant memories (filter by user and environment)
-        current_env = self.environments.get_current_environment()
-        env_id = current_env.env_id if current_env else None
-        relevant_memories = self.memory.search_memories(query=prompt, limit=5, user_email=user_email, environment_id=env_id)
+        # Get relevant memories (filter by user)
+        relevant_memories = self.memory.search_memories(query=prompt, limit=5, user_email=user_email)
 
         messages = []
         system_msg = self._build_system_message(relevant_memories)
         messages.append({"role": "system", "content": system_msg})
+        
+        # Get current environment for conversation context
+        current_env = self.environments.get_current_environment()
+        env_id = current_env.env_id if current_env else None
         messages.extend(self.conversation.get_conversation_context(max_messages=10, user_email=user_email, environment_id=env_id))
         messages.append({"role": "user", "content": prompt})
 
