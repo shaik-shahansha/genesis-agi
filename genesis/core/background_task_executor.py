@@ -328,10 +328,19 @@ class BackgroundTaskExecutor:
                     logger.info(f"[TASK {task.task_id[:8]}] ✓ Sent completion via WebSocket")
                     print(f"[DEBUG BG_EXEC] ✓ Notification delivered via WebSocket!")
                 else:
-                    logger.info(f"[TASK {task.task_id[:8]}] WebSocket not available, queuing persistent notification")
+                    logger.info(f"[TASK {task.task_id[:8]}] WebSocket not available, using fallback notification")
                     print(f"[DEBUG BG_EXEC] WebSocket not connected, using fallback notification")
+                    print(f"[DEBUG BG_EXEC] Adding to conversation history as backup...")
                     
-                    # Fallback: Queue persistent notification for when user reconnects
+                    # FALLBACK STRATEGY:
+                    # 1. Add to conversation history so it shows when user next visits
+                    # 2. Queue persistent notification for when user reconnects
+                    
+                    # Add to conversation history as backup
+                    self.mind.conversation.add_assistant_message(result_message)
+                    print(f"[DEBUG BG_EXEC] ✓ Added to conversation history")
+                    
+                    # Queue persistent notification for when user reconnects
                     result_summary = self._format_result_summary(result)
                     # Convert any Path objects to strings for JSON serialization
                     # Only send filename, not full path, for security/UX

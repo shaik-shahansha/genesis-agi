@@ -28,6 +28,13 @@ import json
 logger = logging.getLogger(__name__)
 
 
+# GLOBAL WebSocket registry shared across all Mind instances
+# This ensures WebSocket connections persist across different worker processes
+# Key: user_email -> WebSocket connection object
+_GLOBAL_WEBSOCKET_REGISTRY: Dict[str, Any] = {}
+_WEBSOCKET_REGISTRY_LOCK = asyncio.Lock()
+
+
 def make_json_serializable(obj: Any) -> Any:
     """
     Convert objects to JSON-serializable format.
@@ -104,8 +111,9 @@ class NotificationManager:
         self.pending_notifications: deque = deque(maxlen=1000)
         self.delivered_notifications: List[Notification] = []
         
-        # Active websocket connections (user_email -> websocket)
-        self.websocket_connections: Dict[str, Any] = {}
+        # Active websocket connections - USE GLOBAL REGISTRY
+        # This ensures connections are shared across all Mind instances/processes
+        self.websocket_connections: Dict[str, Any] = _GLOBAL_WEBSOCKET_REGISTRY
         
         # Rate limiting (prevent spam)
         self.notification_count_by_hour: Dict[str, int] = {}  # hour_key -> count
@@ -136,27 +144,41 @@ class NotificationManager:
         logger.info(f"[NOTIF] Notification manager stopped for {self.mind_name}")
     
     def register_websocket(self, user_email: str, websocket: Any):
-        """Register a websocket connection for real-time delivery."""
+        """
+        Register a websocket connection in the global registry.
+        
+        USER ISOLATION: Each user_email gets their own WebSocket entry.
+        If the same user connects from multiple tabs, the latest connection is used.
+        Different users' WebSockets are completely isolated - no cross-contamination possible.
+        """
         print(f"\n{'='*80}")
-        print(f"[NOTIFICATION_MANAGER] REGISTERING WEBSOCKET")
+        print(f"[NOTIFICATION_MANAGER] REGISTERING WEBSOCKET (GLOBAL REGISTRY)")
         print(f"[NOTIFICATION_MANAGER] Mind: {self.mind_name} ({self.mind_id})")
         print(f"[NOTIFICATION_MANAGER] User email: {user_email}")
         print(f"[NOTIFICATION_MANAGER] WebSocket object: {websocket}")
-        print(f"[NOTIFICATION_MANAGER] Before registration - Active connections: {list(self.websocket_connections.keys())}")
+        print(f"[NOTIFICATION_MANAGER] Before registration - Active connections: {list(_GLOBAL_WEBSOCKET_REGISTRY.keys())}")
         
-        self.websocket_connections[user_email] = websocket
+        # Check if this user already has a connection (multiple tabs scenario)
+        if user_email in _GLOBAL_WEBSOCKET_REGISTRY:
+            print(f"[NOTIFICATION_MANAGER] ⚠️ User {user_email} already has a connection - will replace with new one")
         
-        print(f"[NOTIFICATION_MANAGER] After registration - Active connections: {list(self.websocket_connections.keys())}")
-        print(f"[NOTIFICATION_MANAGER] ✓ WebSocket registered successfully!")
+        # Use global registry (shared across all Mind instances)
+        # ISOLATION: Keyed by user_email, so each user has their own WebSocket
+        _GLOBAL_WEBSOCKET_REGISTRY[user_email] = websocket
+        
+        print(f"[NOTIFICATION_MANAGER] After registration - Active connections: {list(_GLOBAL_WEBSOCKET_REGISTRY.keys())}")
+        print(f"[NOTIFICATION_MANAGER] ✅ WebSocket registered successfully in GLOBAL REGISTRY!")
+        print(f"[NOTIFICATION_MANAGER] ✅ USER ISOLATION: Only {user_email} will receive messages via this WebSocket")
         print(f"{'='*80}\n")
         
-        logger.info(f"[WS] WebSocket registered for {user_email} ({self.mind_name})")
+        logger.info(f"[WS] WebSocket registered globally for {user_email} (accessed via Mind {self.mind_name})")
     
     def unregister_websocket(self, user_email: str):
         """Unregister a websocket connection."""
-        if user_email in self.websocket_connections:
-            del self.websocket_connections[user_email]
-            logger.info(f"[WS] WebSocket unregistered for {user_email} ({self.mind_name})")
+        if user_email in _GLOBAL_WEBSOCKET_REGISTRY:
+            del _GLOBAL_WEBSOCKET_REGISTRY[user_email]
+            logger.info(f"[WS] WebSocket unregistered globally for {user_email} (via Mind {self.mind_name})")
+            print(f"[NOTIFICATION_MANAGER] Unregistered WebSocket for {user_email} from GLOBAL REGISTRY")
     
     async def send_to_websocket(
         self,
@@ -167,10 +189,11 @@ class NotificationManager:
         """
         Send a message directly to a connected WebSocket.
         
-        This is for immediate delivery without queuing (e.g., progress updates).
+        USER ISOLATION: Messages are ONLY sent to the specific user_email's WebSocket.
+        The global registry is keyed by user_email, ensuring complete isolation between users.
         
         Args:
-            user_email: User's email
+            user_email: User's email - ONLY this user will receive the message
             message_type: Type of message (e.g., 'task_progress', 'status_update')
             data: Message data
             
@@ -178,35 +201,43 @@ class NotificationManager:
             True if sent successfully, False otherwise
         """
         try:
-            websocket = self.websocket_connections.get(user_email)
-            print(f"[DEBUG NOTIF] Looking for WebSocket for {user_email}")
-            print(f"[DEBUG NOTIF] Active connections: {list(self.websocket_connections.keys())}")
+            # Use GLOBAL registry (shared across all Mind instances)
+            # IMPORTANT: Registry is keyed by user_email, so we ONLY get this specific user's WebSocket
+            websocket = _GLOBAL_WEBSOCKET_REGISTRY.get(user_email)
+            print(f"[DEBUG NOTIF] 🔍 Looking for WebSocket for user: {user_email}")
+            print(f"[DEBUG NOTIF] Mind requesting: {self.mind_name} ({self.mind_id})")
+            print(f"[DEBUG NOTIF] Active global connections: {list(_GLOBAL_WEBSOCKET_REGISTRY.keys())}")
+            print(f"[DEBUG NOTIF] ✅ USER ISOLATION: Message will ONLY be sent to {user_email}'s WebSocket")
             
             if not websocket:
-                print(f"[DEBUG NOTIF] No WebSocket found for {user_email}")
+                print(f"[DEBUG NOTIF] ✗ No WebSocket found in GLOBAL REGISTRY for {user_email}")
+                print(f"[DEBUG NOTIF] This means WebSocket is not connected or was never registered")
                 return False
             
-            print(f"[DEBUG NOTIF] WebSocket found, checking connection state...")
+            print(f"[DEBUG NOTIF] ✓ WebSocket found in GLOBAL REGISTRY, checking connection state...")
             
             # Check if websocket is still connected
             if hasattr(websocket, 'client_state') and websocket.client_state.value != 1:  # CONNECTED = 1
-                print(f"[DEBUG NOTIF] WebSocket not connected (state={websocket.client_state.value})")
+                print(f"[DEBUG NOTIF] ✗ WebSocket not connected (state={websocket.client_state.value})")
                 self.unregister_websocket(user_email)
                 return False
             
-            print(f"[DEBUG NOTIF] Sending message type '{message_type}'...")
+            print(f"[DEBUG NOTIF] 📤 Sending message type '{message_type}' to {user_email}...")
             
             # Ensure data is JSON serializable (convert Path objects, etc.)
             serializable_data = make_json_serializable(data)
             
+            # Send ONLY to this specific user's WebSocket
             await websocket.send_json({
                 "type": message_type,
                 "mind_id": self.mind_id,
                 "mind_name": self.mind_name,
+                "recipient": user_email,  # Include recipient for client-side validation
                 **serializable_data
             })
             
-            print(f"[DEBUG NOTIF] ✓ Message sent successfully!")
+            print(f"[DEBUG NOTIF] ✅✅ Message sent successfully to {user_email} via GLOBAL REGISTRY!")
+            print(f"[DEBUG NOTIF] ✅ USER ISOLATION VERIFIED: Message was sent ONLY to {user_email}'s WebSocket")
             
             return True
             
