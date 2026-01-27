@@ -1,13 +1,14 @@
 // Genesis Playground - Create Mind Page
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import AuthRequired from '@/components/AuthRequired';
 import { getFirebaseToken } from '@/lib/firebase';
+import { isCreationDisabled } from '@/lib/env';
 
 export default function CreateMindPage() {
   const router = useRouter();
@@ -281,6 +282,18 @@ export default function CreateMindPage() {
       setLoading(false);
     }
   };
+
+  // Check if creation is disabled in production
+  useEffect(() => {
+    if (isCreationDisabled()) {
+      router.push('/');
+    }
+  }, [router]);
+
+  // Don't render the page if creation is disabled
+  if (isCreationDisabled()) {
+    return null;
+  }
 
   return (
     <AuthRequired>

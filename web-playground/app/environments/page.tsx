@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import AuthRequired from '@/components/AuthRequired';
+import { isCreationDisabled } from '@/lib/env';
 
 interface Environment {
   id: string;
@@ -123,9 +124,11 @@ function EnvironmentsPage() {
           <h1 className="text-3xl font-semibold text-white">Environments - Work in Progress</h1>
           <p className="text-gray-300 mt-1">{environments.length} total</p>
         </div>
-        <button onClick={() => setShowCreateModal(true)} className="btn-primary">
-          New Environment
-        </button>
+        {!isCreationDisabled() && (
+          <button onClick={() => setShowCreateModal(true)} className="btn-primary">
+            New Environment
+          </button>
+        )}
       </div>
 
       {/* Active Environments */}
@@ -158,9 +161,11 @@ function EnvironmentsPage() {
         {environments.length === 0 ? (
           <div className="clean-card p-6 text-center">
             <p className="text-gray-300 mb-4">No environments yet</p>
-            <button onClick={() => setShowCreateModal(true)} className="btn-primary">
-              Create First Environment
-            </button>
+            {!isCreationDisabled() && (
+              <button onClick={() => setShowCreateModal(true)} className="btn-primary">
+                Create First Environment
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid gap-4">
@@ -202,10 +207,12 @@ function EnvironmentsPage() {
             {templates.map((template) => (
               <div
                 key={template.name}
-                className="clean-card p-4 cursor-pointer hover:border-purple-500 transition"
+                className={`clean-card p-4 ${!isCreationDisabled() ? 'cursor-pointer hover:border-purple-500' : 'opacity-50 cursor-not-allowed'} transition`}
                 onClick={() => {
-                  setNewEnv({ ...newEnv, template: template.name });
-                  setShowCreateModal(true);
+                  if (!isCreationDisabled()) {
+                    setNewEnv({ ...newEnv, template: template.name });
+                    setShowCreateModal(true);
+                  }
                 }}
               >
                 <h3 className="font-semibold text-white mb-2">{template.name}</h3>
@@ -217,7 +224,7 @@ function EnvironmentsPage() {
       )}
 
       {/* Create Modal */}
-      {showCreateModal && (
+      {showCreateModal && !isCreationDisabled() && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowCreateModal(false)}>
           <div className="clean-card p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold text-white mb-4">Create Environment</h2>

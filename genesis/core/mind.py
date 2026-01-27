@@ -706,6 +706,10 @@ class Mind:
         # For identity questions, also search for declarations/introductions
         search_queries = [prompt]
         
+        # Get current environment for filtering
+        current_env = self.environments.get_current_environment()
+        env_id = current_env.env_id if current_env else None
+        
         # If asking "who am i", also search for identity declarations
         if any(phrase in prompt.lower() for phrase in ["who am i", "who i am", "do you know me", "remember me"]):
             if user_email:
@@ -718,7 +722,7 @@ class Mind:
         seen_ids = set()
         
         for query in search_queries:
-            memories = self.memory.search_memories(query=query, limit=3, user_email=user_email)
+            memories = self.memory.search_memories(query=query, limit=3, user_email=user_email, environment_id=env_id)
             for mem in memories:
                 if mem.id not in seen_ids:
                     all_memories.append(mem)
@@ -778,8 +782,10 @@ class Mind:
         
         messages.append({"role": "system", "content": system_msg})
 
-        # Add recent conversation history
-        messages.extend(self.conversation.get_conversation_context(max_messages=10))
+        # Add recent conversation history (filtered by user_email and environment for privacy)
+        current_env = self.environments.get_current_environment()
+        env_id = current_env.env_id if current_env else None
+        messages.extend(self.conversation.get_conversation_context(max_messages=10, user_email=user_email, environment_id=env_id))
 
         # Add current prompt
         messages.append({"role": "user", "content": prompt})
@@ -1099,12 +1105,17 @@ class Mind:
                 print(f"[PERF] ✓ Concern analysis completed")
                 
                 # Create episodic memory of this interaction
+                # Get current environment
+                current_env = self.environments.get_current_environment()
+                env_id = current_env.env_id if current_env else None
+                
                 self.memory.add_memory(
                     content=memory_content,
                     memory_type=MemoryType.EPISODIC,
                     emotion=self.emotional_state.get_emotion_value(),
                     emotion_intensity=self.emotional_state.intensity,
                     user_email=user_email or "system",
+                    environment_id=env_id,
                     metadata={"context": environment_context} if environment_context else None
                 )
                 print(f"[PERF] ✓ Memory created")
@@ -1235,6 +1246,7 @@ class Mind:
                 memory_type=MemoryType.EPISODIC,
                 emotion=self.emotional_state.get_emotion_value(),
                 user_email=user_email,
+                environment_id=env_id,
                 emotion_intensity=self.emotional_state.intensity,
                 importance=0.8,
                 tags=["task", "background", detection["task_type"]],
@@ -1245,13 +1257,15 @@ class Mind:
             return
         
         # NOT A TASK - Regular conversation flow
-        # Get relevant memories (filter by user if provided)
-        relevant_memories = self.memory.search_memories(query=prompt, limit=5, user_email=user_email)
+        # Get relevant memories (filter by user and environment)
+        current_env = self.environments.get_current_environment()
+        env_id = current_env.env_id if current_env else None
+        relevant_memories = self.memory.search_memories(query=prompt, limit=5, user_email=user_email, environment_id=env_id)
 
         messages = []
         system_msg = self._build_system_message(relevant_memories)
         messages.append({"role": "system", "content": system_msg})
-        messages.extend(self.conversation.get_conversation_context(max_messages=10))
+        messages.extend(self.conversation.get_conversation_context(max_messages=10, user_email=user_email, environment_id=env_id))
         messages.append({"role": "user", "content": prompt})
 
         full_response = ""
@@ -1277,6 +1291,7 @@ class Mind:
             memory_type=MemoryType.EPISODIC,
             emotion=self.emotional_state.get_emotion_value(),
             user_email=user_email,
+            environment_id=env_id,
             emotion_intensity=self.emotional_state.intensity,
             importance=0.6,
             tags=["conversation"],

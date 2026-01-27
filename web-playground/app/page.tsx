@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import AuthRequired from '@/components/AuthRequired';
+import { isCreationDisabled } from '@/lib/env';
 
 interface Mind {
   gmid: string;
@@ -72,18 +73,22 @@ function Home() {
           <h1 className="text-3xl font-semibold text-white">Minds</h1>
           <p className="text-gray-300 mt-1">{minds.length} total</p>
         </div>
-        <Link href="/create" className="btn-primary">
-          New Mind
-        </Link>
+        {!isCreationDisabled() && (
+          <Link href="/create" className="btn-primary">
+            New Mind
+          </Link>
+        )}
       </div>
 
       {/* Minds List */}
       {minds.length === 0 ? (
         <div className="text-center py-12 bg-slate-800 border border-slate-700 rounded-lg">
           <p className="text-gray-300 mb-4">No minds yet</p>
-          <Link href="/create" className="btn-primary">
-            Create Your First Mind
-          </Link>
+          {!isCreationDisabled() && (
+            <Link href="/create" className="btn-primary">
+              Create Your First Mind
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid gap-4">

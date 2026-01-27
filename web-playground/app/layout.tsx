@@ -8,6 +8,7 @@ import AuthButton from '@/components/AuthButton';
 import NotificationBell from '@/components/NotificationBell';
 import { AuthProvider } from '@/lib/auth-context';
 import dynamic from 'next/dynamic';
+import { isCreationDisabled } from '@/lib/env';
 
 // Dynamically import AdminLink to avoid using hooks directly in layout's top-level
 const AdminLink = dynamic(() => import('@/components/AdminLink').then(mod => mod.AdminLink), { ssr: false });
@@ -22,6 +23,7 @@ export default function RootLayout({
 }) {
   const pathname = usePathname();
   const isLoginPage = pathname === '/login' || pathname?.startsWith('/login/');
+  const creationDisabled = isCreationDisabled();
 
   return (
     <html lang="en">
@@ -41,15 +43,19 @@ export default function RootLayout({
                       <Link href="/" className="btn-ghost">
                         Dashboard
                       </Link>
-                      <Link href="/create" className="btn-ghost">
-                        New Mind
-                      </Link>
+                      {!creationDisabled && (
+                        <Link href="/create" className="btn-ghost">
+                          New Mind
+                        </Link>
+                      )}
                       <Link href="/environments" className="btn-ghost">
                         Environments
                       </Link>
-                      <Link href="/settings" className="btn-ghost">
-                        Settings
-                      </Link>
+                      {!creationDisabled && (
+                        <Link href="/settings" className="btn-ghost">
+                          Settings
+                        </Link>
+                      )}
                       {/* Admin link shown only to global admins */}
                       <AdminLink />
                       <a 

@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import AuthRequired from '@/components/AuthRequired';
 import { api } from '@/lib/api';
 import Link from 'next/link';
+import { isCreationDisabled } from '@/lib/env';
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
   const [saving, setSaving] = useState(false);
@@ -14,8 +17,13 @@ export default function SettingsPage() {
   const [geminiTestResult, setGeminiTestResult] = useState<{success: boolean, message: string} | null>(null);
 
   useEffect(() => {
+    // Redirect if creation is disabled in production
+    if (isCreationDisabled()) {
+      router.push('/');
+      return;
+    }
     loadKeys();
-  }, []);
+  }, [router]);
 
   const loadKeys = async () => {
     try {
@@ -63,6 +71,11 @@ export default function SettingsPage() {
       setSaving(false);
     }
   };
+
+  // Don't render the page if creation is disabled
+  if (isCreationDisabled()) {
+    return null;
+  }
 
   return (
     <AuthRequired>

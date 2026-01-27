@@ -272,6 +272,7 @@ class MemoryManager:
         limit: int = 10,
         min_importance: Optional[float] = None,
         user_email: Optional[str] = None,
+        environment_id: Optional[str] = None,
     ) -> List[Memory]:
         """
         Search memories semantically.
@@ -282,6 +283,7 @@ class MemoryManager:
             limit: Max results
             min_importance: Minimum importance threshold
             user_email: Filter by specific user's memories
+            environment_id: Filter by environment ID
 
         Returns:
             List of matching memories
@@ -300,7 +302,7 @@ class MemoryManager:
             filter_metadata=filter_metadata if filter_metadata else None,
         )
 
-        # Convert to Memory objects and filter by user if specified
+        # Convert to Memory objects and filter by user/environment if specified
         memories = []
         for result in results:
             memory = self.memories.get(result["id"])
@@ -315,7 +317,12 @@ class MemoryManager:
                         if rel != "shared":
                             continue
                     # Include all other memories (no user_email, matching user, or generic)
-                # If user_email is None, retrieve all relevant memories (no filtering)
+                
+                # Filter by environment_id if specified
+                # Memories with no environment_id are generic and shown in all environments
+                if environment_id and memory.environment_id and memory.environment_id != environment_id:
+                    continue
+                
                 memory.access()
                 memories.append(memory)
 
@@ -325,8 +332,20 @@ class MemoryManager:
         self,
         limit: int = 10,
         memory_type: Optional[MemoryType] = None,
+        user_email: Optional[str] = None,
+        environment_id: Optional[str] = None,
     ) -> List[Memory]:
-        """Get most recent memories."""
+        """Get most recent memories, optionally filtered by user and environment.
+        
+        Args:
+            limit: Maximum number of memories to return
+            memory_type: Filter by memory type
+            user_email: Filter by user email (only show memories for this user)
+            environment_id: Filter by environment ID
+            
+        Returns:
+            List of recent memories, filtered and sorted by timestamp
+        """
         # If in-memory cache is empty, load from vector store
         if not self.memories and self.vector_store:
             try:
@@ -364,6 +383,33 @@ class MemoryManager:
         # Filter by type if specified
         if memory_type:
             memories = [m for m in memories if m.type == memory_type]
+        
+        # CRITICAL: Filter by user_email to prevent cross-user memory leakage
+        if user_email:
+            filtered_memories = []
+            for m in memories:
+                # Include memory if:
+                # 1. It has no user_email (generic system memory)
+                # 2. It belongs to this user
+                # 3. It's marked as 'shared' and can be shown to other users
+                if not m.user_email:
+                    # Generic memory with no user association
+                    filtered_memories.append(m)
+                elif m.user_email == user_email:
+                    # User's own memory
+                    filtered_memories.append(m)
+                elif m.relationship_context == "shared":
+                    # Shared memory that can be shown to other users
+                    filtered_memories.append(m)
+                # Otherwise, skip (belongs to another user and is not shared)
+            memories = filtered_memories
+        
+        # Filter by environment_id if specified
+        if environment_id:
+            memories = [
+                m for m in memories 
+                if not m.environment_id or m.environment_id == environment_id
+            ]
 
         # Sort by timestamp (most recent first)
         memories.sort(key=lambda m: m.timestamp, reverse=True)
@@ -374,9 +420,49 @@ class MemoryManager:
         self,
         limit: int = 10,
         min_importance: float = 0.7,
+        user_email: Optional[str] = None,
+        environment_id: Optional[str] = None,
     ) -> List[Memory]:
-        """Get most important memories."""
+        """Get most important memories, optionally filtered by user and environment.
+        
+        Args:
+            limit: Maximum number of memories to return
+            min_importance: Minimum importance threshold (0.0-1.0)
+            user_email: Filter by user email (only show memories for this user)
+            environment_id: Filter by environment ID
+            
+        Returns:
+            List of important memories, filtered and sorted by importance
+        """
         memories = [m for m in self.memories.values() if m.importance >= min_importance]
+        
+        # CRITICAL: Filter by user_email to prevent cross-user memory leakage
+        if user_email:
+            filtered_memories = []
+            for m in memories:
+                # Include memory if:
+                # 1. It has no user_email (generic system memory)
+                # 2. It belongs to this user
+                # 3. It's marked as 'shared' and can be shown to other users
+                if not m.user_email:
+                    # Generic memory with no user association
+                    filtered_memories.append(m)
+                elif m.user_email == user_email:
+                    # User's own memory
+                    filtered_memories.append(m)
+                elif m.relationship_context == "shared":
+                    # Shared memory that can be shown to other users
+                    filtered_memories.append(m)
+                # Otherwise, skip (belongs to another user and is not shared)
+            memories = filtered_memories
+        
+        # Filter by environment_id if specified
+        if environment_id:
+            memories = [
+                m for m in memories 
+                if not m.environment_id or m.environment_id == environment_id
+            ]
+        
         memories.sort(key=lambda m: m.importance, reverse=True)
         return memories[:limit]
 
@@ -594,6 +680,7 @@ class MemoryManager:
         use_relevance_scoring: bool = True,
         min_importance: Optional[float] = None,
         user_email: Optional[str] = None,
+        environment_id: Optional[str] = None,
     ) -> List[Memory]:
         """
         Search memories with temporal decay and relevance scoring.
@@ -605,6 +692,7 @@ class MemoryManager:
             use_relevance_scoring: Apply temporal decay + access boost
             min_importance: Minimum importance threshold
             user_email: Filter by user
+            environment_id: Filter by environment ID
             
         Returns:
             List of memories ranked by relevance
@@ -618,7 +706,8 @@ class MemoryManager:
             memory_type=memory_type,
             limit=search_limit,
             min_importance=min_importance,
-            user_email=user_email
+            user_email=user_email,
+            environment_id=environment_id
         )
         
         if use_relevance_scoring:
