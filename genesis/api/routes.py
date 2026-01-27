@@ -1067,7 +1067,7 @@ async def chat(
             print(f"Mind has API keys configured: {bool(mind.intelligence.api_keys)}")
             print(f"Reasoning model: {mind.intelligence.reasoning_model}")
             print(f"Fast model: {mind.intelligence.fast_model}")
-            response = "I apologize, but I was unable to generate a response. Please check my configuration and API keys."
+            response = "I apologize, but I was unable to generate a response. Please check my configuration and API keys. Rate limit reached. Try again later."
 
         # ⚡ PERFORMANCE: Prepare response immediately
         chat_response = ChatResponse(
