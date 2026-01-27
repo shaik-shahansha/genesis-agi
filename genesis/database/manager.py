@@ -178,6 +178,16 @@ class MetaverseDB:
                 return None
             return mind.is_public
 
+    def set_mind_public(self, gmid: str, is_public: bool) -> bool:
+        """Set mind's public flag. Returns True if updated, False if missing."""
+        with get_session() as session:
+            mind = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if not mind:
+                return False
+            mind.is_public = bool(is_public)
+            session.commit()
+            return True
+
     def is_user_allowed_for_mind(self, gmid: str, user_identifier: str) -> bool:
         """Check whether a user identifier (email or username) can access a given Mind."""
         from genesis.database.models import MindAccess, GlobalAdmin
