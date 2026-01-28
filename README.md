@@ -105,7 +105,7 @@ async def main():
 asyncio.run(main())
 ```
 
-**Web Playground note:** The Web Playground supports Firebase Authentication (Google Sign-In and Email/Password). See `web-playground/FIREBASE_AUTH.md` for setup instructions and required environment variables.
+**Web Playground note:** The Web Playground supports Firebase Authentication (Google Sign-In and Email/Password). See `web-playground/FIREBASE_AUTH.md` for setup instructions and required environment variables. Features include free web search powered by DuckDuckGo and free image generation by Pollinations AI, accessible directly in the chat interface.
 
 **That's it.** You now have a being with:
 - [Done] **90% token savings** (automatic memory compression)
