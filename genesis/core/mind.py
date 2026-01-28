@@ -742,12 +742,27 @@ class Mind:
         all_memories = []
         seen_ids = set()
         
-        for query in search_queries:
-            memories = self.memory.search_memories(query=query, limit=3, user_email=user_email)
-            for mem in memories:
-                if mem.id not in seen_ids:
-                    all_memories.append(mem)
-                    seen_ids.add(mem.id)
+        try:
+            for query in search_queries:
+                memories = self.memory.search_memories(query=query, limit=3, user_email=user_email)
+                for mem in memories:
+                    if mem.id not in seen_ids:
+                        all_memories.append(mem)
+                        seen_ids.add(mem.id)
+        except Exception as e:
+            # Handle missing collection gracefully
+            if "does not exist" in str(e):
+                self.logger.log(
+                    level=LogLevel.WARN,
+                    message=f"Memory collection not found, initializing: {e}",
+                    metadata={"mind_id": self.identity.gmid}
+                )
+            else:
+                self.logger.log(
+                    level=LogLevel.ERROR,
+                    message=f"Error searching memories: {e}",
+                    metadata={"mind_id": self.identity.gmid}
+                )
         
         # Take top 5 most relevant
         relevant_memories = all_memories[:5]
@@ -1286,7 +1301,23 @@ class Mind:
         
         # NOT A TASK - Regular conversation flow
         # Get relevant memories (filter by user)
-        relevant_memories = self.memory.search_memories(query=prompt, limit=5, user_email=user_email)
+        relevant_memories = []
+        try:
+            relevant_memories = self.memory.search_memories(query=prompt, limit=5, user_email=user_email)
+        except Exception as e:
+            # Handle missing collection gracefully
+            if "does not exist" in str(e):
+                self.logger.log(
+                    level=LogLevel.WARN,
+                    message=f"Memory collection not found in stream_think: {e}",
+                    metadata={"mind_id": self.identity.gmid}
+                )
+            else:
+                self.logger.log(
+                    level=LogLevel.ERROR,
+                    message=f"Error searching memories in stream_think: {e}",
+                    metadata={"mind_id": self.identity.gmid}
+                )
 
         messages = []
         system_msg = self._build_system_message(relevant_memories)

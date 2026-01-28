@@ -75,11 +75,25 @@ class VectorStore:
         Returns:
             List of matching memories with scores
         """
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=n_results,
-            where=filter_metadata,
-        )
+        try:
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=n_results,
+                where=filter_metadata,
+            )
+        except Exception as e:
+            # If collection doesn't exist (e.g., after clear-memories), recreate it
+            if "does not exist" in str(e):
+                print(f"[VECTOR_STORE] Collection not found, recreating for mind {self.mind_id}")
+                self.collection = self.client.get_or_create_collection(
+                    name=f"mind_{self.mind_id}",
+                    metadata={"description": f"Memories for Mind {self.mind_id}"},
+                )
+                # Return empty results for this search
+                return []
+            else:
+                # Re-raise other errors
+                raise
 
         # Format results
         memories = []
