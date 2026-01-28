@@ -14,8 +14,11 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   
   // Mind Configuration
   const [name, setName] = useState(mind.name || '');
-  const [purpose, setPurpose] = useState(mind.primary_purpose || '');
+  const [primaryPurpose, setPrimaryPurpose] = useState(mind.primary_purpose || '');
   const [description, setDescription] = useState(mind.description || '');
+  const [purpose, setPurpose] = useState(mind.purpose || '');
+  const [role, setRole] = useState(mind.role || '');
+  const [guidanceNotes, setGuidanceNotes] = useState(mind.guidance_notes || '');
   
   // LLM Configuration
   const [provider, setProvider] = useState(mind.llm_provider || 'groq');
@@ -40,8 +43,11 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   useEffect(() => {
     // Reset form when mind changes
     setName(mind.name || '');
-    setPurpose(mind.primary_purpose || '');
+    setPrimaryPurpose(mind.primary_purpose || '');
     setDescription(mind.description || '');
+    setPurpose(mind.purpose || '');
+    setRole(mind.role || '');
+    setGuidanceNotes(mind.guidance_notes || '');
     setProvider(mind.llm_provider || 'groq');
     setModel(mind.llm_model || 'mixtral-8x7b-32768');
     setMaxTokens(mind.max_tokens || 8000);
@@ -69,8 +75,11 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
     try {
       await api.updateMindSettings(mind.gmid, {
         name,
-        primary_purpose: purpose,
+        primary_purpose: primaryPurpose,
         description,
+        purpose,
+        role,
+        guidance_notes: guidanceNotes,
         llm_provider: provider,
         llm_model: model,
         api_key: apiKey || undefined,
@@ -162,8 +171,8 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
             </label>
             <input
               type="text"
-              value={purpose}
-              onChange={(e) => setPurpose(e.target.value)}
+              value={primaryPurpose}
+              onChange={(e) => setPrimaryPurpose(e.target.value)}
               className="input w-full"
               placeholder="What is this Mind's main purpose?"
             />
@@ -180,6 +189,57 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
               rows={3}
               placeholder="Brief description of this Mind"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Purpose & Role (Creator-Defined) */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">🎯 Purpose & Role</h2>
+        <p className="text-sm text-gray-600 mb-4">Define the Mind's specific purpose, role, and guidance that will be part of every prompt. This helps the Mind understand its purpose and context.</p>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Purpose <span className="text-gray-500 font-normal">(Why does this Mind exist?)</span>
+            </label>
+            <textarea
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              className="input w-full"
+              rows={2}
+              placeholder="e.g., To teach science to Grade 10 students"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Role <span className="text-gray-500 font-normal">(What is this Mind's specific role?)</span>
+            </label>
+            <textarea
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="input w-full"
+              rows={2}
+              placeholder="e.g., Science Teacher for Grade 10, Section A"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Guidance Notes <span className="text-gray-500 font-normal">(Additional context and information)</span>
+            </label>
+            <textarea
+              value={guidanceNotes}
+              onChange={(e) => setGuidanceNotes(e.target.value)}
+              className="input w-full"
+              rows={5}
+              placeholder="e.g., Student list: Alice, Bob, Charlie&#10;Next exam: Physics Chapter 5 on Feb 15&#10;Focus areas: Thermodynamics, Kinematics"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              This information will be included in every prompt to help the Mind maintain context.
+            </p>
+          </div>
           </div>
         </div>
       </div>

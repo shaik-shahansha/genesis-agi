@@ -106,6 +106,18 @@ export default function IdentityTab({ mind }: IdentityTabProps) {
                       <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Creator</p>
                       <p className="text-lg font-semibold text-gray-900 mt-1">{mind.creator_email || mind.creator || 'N/A'}</p>
                     </div>
+                    {mind.purpose && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Purpose</p>
+                        <p className="text-lg font-semibold text-gray-900 mt-1">{mind.purpose}</p>
+                      </div>
+                    )}
+                    {mind.role && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Role</p>
+                        <p className="text-lg font-semibold text-gray-900 mt-1">{mind.role}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Personality Traits */}

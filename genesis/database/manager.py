@@ -53,6 +53,9 @@ class MetaverseDB:
         template: Optional[str] = None,
         primary_role: Optional[str] = None,
         storage_path: Optional[str] = None,
+        purpose: Optional[str] = None,
+        role: Optional[str] = None,
+        guidance_notes: Optional[str] = None,
     ) -> MindRecord:
         """Register a new Mind in the metaverse."""
         with get_session() as session:
@@ -70,6 +73,9 @@ class MetaverseDB:
                 template=template,
                 primary_role=primary_role,
                 storage_path=storage_path,
+                purpose=purpose,
+                role=role,
+                guidance_notes=guidance_notes,
                 birth_date=datetime.now(timezone.utc),
                 last_active=datetime.now(timezone.utc),
                 status="active",
@@ -120,6 +126,28 @@ class MetaverseDB:
                     mind.total_experiences = total_experiences
                 if consciousness_level is not None:
                     mind.consciousness_level = consciousness_level
+                session.commit()
+    
+    def update_mind_identity(
+        self,
+        gmid: str,
+        name: Optional[str] = None,
+        purpose: Optional[str] = None,
+        role: Optional[str] = None,
+        guidance_notes: Optional[str] = None,
+    ) -> None:
+        """Update Mind identity fields including purpose, role, and guidance notes."""
+        with get_session() as session:
+            mind = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if mind:
+                if name is not None:
+                    mind.name = name
+                if purpose is not None:
+                    mind.purpose = purpose
+                if role is not None:
+                    mind.role = role
+                if guidance_notes is not None:
+                    mind.guidance_notes = guidance_notes
                 session.commit()
 
     # =========================================================================

@@ -1466,7 +1466,7 @@ class ConsciousnessEngineV2:
 
     def _get_context_for_llm(self) -> Dict[str, Any]:
         """Get current context to pass to LLM."""
-        return {
+        context = {
             "mind_name": self.mind_name,
             "awareness_level": self.current_awareness.name,
             "domain": self.current_domain.value,
@@ -1478,6 +1478,16 @@ class ConsciousnessEngineV2:
             "urges": self.needs.get_urges(),
             "recent_thoughts": [t.content for t in self.monologue.thought_history[-3:]],
         }
+        
+        # Add purpose, role, and guidance_notes if available (passed from parent LivingMind)
+        if hasattr(self, '_purpose') and self._purpose:
+            context["purpose"] = self._purpose
+        if hasattr(self, '_role') and self._role:
+            context["role"] = self._role
+        if hasattr(self, '_guidance_notes') and self._guidance_notes:
+            context["guidance_notes"] = self._guidance_notes
+        
+        return context
 
     # =========================================================================
     # PUBLIC API

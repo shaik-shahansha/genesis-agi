@@ -147,6 +147,9 @@ class MindResponse(BaseModel):
     template: Optional[str] = None
     primary_purpose: Optional[str] = None
     description: Optional[str] = None
+    purpose: Optional[str] = None
+    role: Optional[str] = None
+    guidance_notes: Optional[str] = None
     llm_provider: Optional[str] = None
     llm_model: Optional[str] = None
     max_tokens: Optional[int] = None
@@ -692,6 +695,9 @@ async def create_mind(
             creator=mind.identity.creator,
             creator_email=getattr(mind.identity, 'creator_email', None),
             max_tokens=getattr(mind.intelligence, 'max_tokens', 8000),
+            purpose=getattr(mind.identity, 'purpose', None),
+            role=getattr(mind.identity, 'role', None),
+            guidance_notes=getattr(mind.identity, 'guidance_notes', None),
         )
 
     except Exception as e:
@@ -858,6 +864,9 @@ async def list_minds(current_user: User = Depends(get_current_active_user)):
                     template=identity.get('template'),
                     primary_purpose=identity.get('primary_purpose'),
                     description=identity.get('description'),
+                    purpose=identity.get('purpose'),
+                    role=identity.get('role'),
+                    guidance_notes=identity.get('guidance_notes'),
                     llm_provider=_extract_provider(data.get('intelligence', {})),
                     llm_model=_extract_model(data.get('intelligence', {})),
                     max_tokens=data.get('intelligence', {}).get('max_tokens', 8000),
@@ -922,6 +931,9 @@ async def get_mind(mind_id: str, current_user: User = Depends(get_current_active
         template=getattr(mind.identity, 'template', None),
         primary_purpose=getattr(mind.identity, 'primary_purpose', None),
         description=getattr(mind.identity, 'description', None),
+        purpose=getattr(mind.identity, 'purpose', None),
+        role=getattr(mind.identity, 'role', None),
+        guidance_notes=getattr(mind.identity, 'guidance_notes', None),
         llm_provider=_extract_provider(intelligence_dict),
         llm_model=_extract_model(intelligence_dict),
         max_tokens=getattr(mind.intelligence, 'max_tokens', 8000),
@@ -1491,6 +1503,12 @@ async def update_mind_settings(
             mind.identity.primary_purpose = settings['primary_purpose']
         if 'description' in settings:
             mind.identity.description = settings.get('description', '')
+        if 'purpose' in settings:
+            mind.identity.purpose = settings.get('purpose', '')
+        if 'role' in settings:
+            mind.identity.role = settings.get('role', '')
+        if 'guidance_notes' in settings:
+            mind.identity.guidance_notes = settings.get('guidance_notes', '')
         
         # Update LLM configuration
         # Update reasoning_model (and optionally fast_model if they were the same before)
@@ -1532,6 +1550,20 @@ async def update_mind_settings(
         
         # Save updated Mind
         mind.save()
+        
+        # Sync identity fields to database
+        try:
+            from genesis.database.manager import MetaverseDB
+            db = MetaverseDB()
+            db.update_mind_identity(
+                gmid=mind.identity.gmid,
+                name=mind.identity.name,
+                purpose=mind.identity.purpose,
+                role=mind.identity.role,
+                guidance_notes=mind.identity.guidance_notes,
+            )
+        except Exception as e:
+            print(f"[WARNING] Could not sync identity to database: {e}")
         
         return {
             "success": True,

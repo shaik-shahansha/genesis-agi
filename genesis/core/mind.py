@@ -65,6 +65,9 @@ class Mind:
         creator: str = "anonymous",
         creator_email: Optional[str] = None,
         primary_purpose: Optional[str] = None,
+        purpose: Optional[str] = None,
+        role: Optional[str] = None,
+        guidance_notes: Optional[str] = None,
         config: Optional[MindConfig] = None,
         timezone_offset: int = 0,
         gmid: Optional[str] = None,
@@ -92,6 +95,12 @@ class Mind:
             identity_kwargs["creator_email"] = creator_email
         if primary_purpose:
             identity_kwargs["primary_purpose"] = primary_purpose
+        if purpose:
+            identity_kwargs["purpose"] = purpose
+        if role:
+            identity_kwargs["role"] = role
+        if guidance_notes:
+            identity_kwargs["guidance_notes"] = guidance_notes
         if gmid:
             identity_kwargs["gmid"] = gmid
         self.identity = MindIdentity(**identity_kwargs)
@@ -175,6 +184,9 @@ class Mind:
             timezone_offset=timezone_offset,
             reasoning_model=self.intelligence.reasoning_model,
             fast_model=self.intelligence.fast_model,
+            purpose=self.identity.purpose,
+            role=self.identity.role,
+            guidance_notes=self.identity.guidance_notes,
         )
         self.consciousness = self.living_mind.consciousness
 
@@ -338,6 +350,9 @@ class Mind:
         creator_email: Optional[str] = None,
         primary_role: Optional[str] = None,
         primary_purpose: Optional[str] = None,
+        purpose: Optional[str] = None,
+        role: Optional[str] = None,
+        guidance_notes: Optional[str] = None,
         start_consciousness: bool = False,
         config: Optional[MindConfig] = None,
         timezone_offset: int = 0,
@@ -369,6 +384,9 @@ class Mind:
             creator=creator,
             creator_email=creator_email,
             primary_purpose=primary_purpose,
+            purpose=purpose,
+            role=role,
+            guidance_notes=guidance_notes,
             config=config,  # Pass config to initialize plugins
             timezone_offset=timezone_offset,
         )
@@ -497,6 +515,9 @@ class Mind:
                 creator=creator,
                 template=template,
                 primary_role=primary_role,
+                purpose=purpose,
+                role=role,
+                guidance_notes=guidance_notes,
             )
         except Exception as e:
             # Don't fail birth if database registration fails
@@ -1625,6 +1646,19 @@ Remember: You are not just responding - you are LIVING and experiencing. Use you
         
         # Save current state and emotional state to database
         self._save_state_to_db()
+        
+        # Sync identity fields (purpose, role, guidance_notes) to database
+        try:
+            metaverse_db = MetaverseDB()
+            metaverse_db.update_mind_identity(
+                gmid=self.identity.gmid,
+                name=self.identity.name,
+                purpose=self.identity.purpose,
+                role=self.identity.role,
+                guidance_notes=self.identity.guidance_notes,
+            )
+        except Exception as e:
+            print(f"[MIND] Could not sync identity to DB: {e}")
 
         # CORE DATA (always present)
         # NOTE: state, emotional_state, and gen data are now stored in SQLite, not JSON

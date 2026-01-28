@@ -61,6 +61,11 @@ class MindIdentity(BaseModel):
     primary_purpose: str = "General companion and assistant"
     specialization: Optional[str] = None
     description: Optional[str] = None
+    
+    # Creator-defined purpose and guidance (editable in settings)
+    purpose: Optional[str] = None  # Main purpose/reason for existence
+    role: Optional[str] = None  # Specific role (e.g., "Science Teacher for Grade 10")
+    guidance_notes: Optional[str] = None  # Additional context (e.g., student list, exam schedule)
 
     # Lifecycle
     lifespan_years: int = 5

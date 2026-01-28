@@ -273,6 +273,8 @@ def birth(
     ),
     email: Optional[str] = typer.Option(None, "--email", "-e", help="Your email address"),
     purpose: Optional[str] = typer.Option(None, "--purpose", "-p", help="Primary purpose (e.g., 'teacher to teach science')"),
+    role: Optional[str] = typer.Option(None, "--role", "-r", help="Specific role (e.g., 'Science Teacher for Grade 10')"),
+    guidance_notes: Optional[str] = typer.Option(None, "--guidance", "-g", help="Guidance notes (e.g., 'Students: Alice, Bob')"),
     reasoning_model: Optional[str] = typer.Option(None, help="Reasoning model"),
     fast_model: Optional[str] = typer.Option(None, help="Fast model"),
     autonomy_level: str = typer.Option("medium", help="Autonomy level (none/low/medium/high)"),
@@ -340,6 +342,24 @@ def birth(
         purpose_input = typer.prompt("Enter purpose (or press Enter to skip)", default="", show_default=False)
         if purpose_input.strip():
             purpose = purpose_input.strip()
+    
+    # Interactive role prompt if not specified
+    if interactive and not role:
+        console.print("\n[bold]👤 Role Definition[/bold]\n")
+        console.print("Define the specific role for this Mind (optional).")
+        console.print("Examples: 'Science Teacher for Grade 10', 'Python Coding Assistant', 'Daily Life Companion'\n")
+        role_input = typer.prompt("Enter role (or press Enter to skip)", default="", show_default=False)
+        if role_input.strip():
+            role = role_input.strip()
+    
+    # Interactive guidance notes prompt if not specified
+    if interactive and not guidance_notes:
+        console.print("\n[bold]📝 Guidance Notes[/bold]\n")
+        console.print("Add any additional context or guidance for this Mind (optional).")
+        console.print("Examples: 'Students: Alice, Bob, Charlie', 'Focus areas: Algebra, Geometry'\n")
+        guidance_input = typer.prompt("Enter guidance notes (or press Enter to skip)", default="", show_default=False)
+        if guidance_input.strip():
+            guidance_notes = guidance_input.strip()
 
     # Create autonomy config
     autonomy = Autonomy()
@@ -368,7 +388,8 @@ def birth(
     # Birth the Mind
     mind = Mind.birth(
         name=name, intelligence=intelligence, autonomy=autonomy,
-        template=template, creator_email=email, primary_purpose=purpose, config=mind_config
+        template=template, creator_email=email, primary_purpose=purpose,
+        purpose=purpose, role=role, guidance_notes=guidance_notes, config=mind_config
     )
 
     # Save to disk

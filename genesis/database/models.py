@@ -44,6 +44,11 @@ class MindRecord(Base):
     # Identity
     template = Column(String(100), nullable=True)
     primary_role = Column(String(100), nullable=True)
+    
+    # Purpose and guidance (creator-defined)
+    purpose = Column(Text, nullable=True)  # Main purpose/reason for existence
+    role = Column(Text, nullable=True)  # Specific role (e.g., "Science Teacher for Grade 10")
+    guidance_notes = Column(Text, nullable=True)  # Additional context (e.g., student list, exam schedule)
 
     # Metadata
     personality_type = Column(String(50), nullable=True)

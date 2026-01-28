@@ -340,7 +340,7 @@ export default function AdminPanel() {
                       </button>                      </div>
                     </div>
                     <div className="text-sm text-gray-400 mb-4">
-                      Creator: {mind.creator} • Status: {mind.status}
+                      Creator: {mind.creator_email || mind.creator || 'N/A'} • Status: {mind.status}
                     </div>
 
                     {/* Mind Actions */}
