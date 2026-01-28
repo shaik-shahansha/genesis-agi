@@ -819,7 +819,7 @@ export default function ChatPage() {
 
   return (
     <AuthRequired>
-      <div className="flex h-screen bg-slate-900 relative overflow-hidden w-full" style={{height: '75vh', maxWidth: '100vw'}}>
+      <div className="flex h-screen bg-slate-900 relative overflow-hidden w-full" style={{height: '80vh', maxWidth: '100vw'}}>
         {/* Mobile Overlay */}
         {sidebarOpen && (
           <div 
