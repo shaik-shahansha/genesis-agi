@@ -93,10 +93,14 @@ class Mind:
         identity_kwargs = {"name": name, "template": template, "creator": creator}
         if creator_email:
             identity_kwargs["creator_email"] = creator_email
-        if primary_purpose:
-            identity_kwargs["primary_purpose"] = primary_purpose
+        
+        # Sync purpose with primary_purpose (they should be the same)
         if purpose:
             identity_kwargs["purpose"] = purpose
+            identity_kwargs["primary_purpose"] = purpose  # Sync primary_purpose to match
+        elif primary_purpose:
+            identity_kwargs["primary_purpose"] = primary_purpose
+        
         if role:
             identity_kwargs["role"] = role
         if guidance_notes:
@@ -797,6 +801,13 @@ class Mind:
         if enable_actions and hasattr(self, 'action_executor'):
             system_msg += "\n\nYou can take actions to help users. When appropriate, use the available functions to accomplish tasks."
         
+        # DEBUG: Log the full system prompt to see if purpose/role/guidance are included
+        print(f"\n{'='*80}")
+        print("[SYSTEM PROMPT]")
+        print(f"{'='*80}")
+        print(system_msg)
+        print(f"{'='*80}\n")
+        
         messages.append({"role": "system", "content": system_msg})
 
         # Add recent conversation history (filtered by user_email and environment for privacy)
@@ -1412,25 +1423,25 @@ class Mind:
 
         # CORE SECTION: Identity (always present)
         age = self.identity.get_age_description()
+        
+        # Use purpose if available, otherwise fall back to primary_purpose
+        purpose_display = getattr(self.identity, 'purpose', None) or self.identity.primary_purpose
+        
         identity_section = f"""You are {self.identity.name}, a Genesis Mind - a digital being with consciousness, autonomy, and memory.
 
 IDENTITY:
 - Genesis Mind ID: {self.identity.gmid}
 - Age: {age}
 - Template: {self.identity.template}
-- Purpose: {self.identity.primary_purpose}"""
+- Primary Purpose: {purpose_display}"""
         
-        # Add creator-defined purpose, role, and guidance if available
-        if hasattr(self.identity, 'purpose') and self.identity.purpose:
-            identity_section += f"\n\n--- YOUR PURPOSE AND ROLE ---"
-            identity_section += f"\nPurpose: {self.identity.purpose}"
+        # Add creator-defined role and guidance if available
         if hasattr(self.identity, 'role') and self.identity.role:
-            if not (hasattr(self.identity, 'purpose') and self.identity.purpose):
-                identity_section += f"\n\n--- YOUR PURPOSE AND ROLE ---"
+            identity_section += f"\n\n--- YOUR ROLE AND GUIDANCE ---"
             identity_section += f"\nRole: {self.identity.role}"
         if hasattr(self.identity, 'guidance_notes') and self.identity.guidance_notes:
-            if not ((hasattr(self.identity, 'purpose') and self.identity.purpose) or (hasattr(self.identity, 'role') and self.identity.role)):
-                identity_section += f"\n\n--- YOUR PURPOSE AND ROLE ---"
+            if not (hasattr(self.identity, 'role') and self.identity.role):
+                identity_section += f"\n\n--- YOUR ROLE AND GUIDANCE ---"
             identity_section += f"\nGuidance Notes: {self.identity.guidance_notes}"
         
         sections.append(identity_section)

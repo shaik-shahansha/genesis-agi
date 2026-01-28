@@ -1511,6 +1511,8 @@ async def update_mind_settings(
             mind.identity.description = settings.get('description', '')
         if 'purpose' in settings:
             mind.identity.purpose = settings.get('purpose', '')
+            # Also update primary_purpose to match (they should be the same)
+            mind.identity.primary_purpose = settings.get('purpose', '')
         if 'role' in settings:
             mind.identity.role = settings.get('role', '')
         if 'guidance_notes' in settings:
