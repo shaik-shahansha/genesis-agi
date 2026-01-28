@@ -330,7 +330,7 @@ class MetaverseState(Base):
     total_interactions_today = Column(Integer, default=0)
 
     # Metadata
-    metaverse_version = Column(String(20), default="0.1.4")
+    metaverse_version = Column(String(20), default="0.1.5")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

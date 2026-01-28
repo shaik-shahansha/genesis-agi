@@ -46,7 +46,7 @@ Edit `pyproject.toml` and increment the version:
 ```toml
 [project]
 name = "genesis-minds"
-version = "0.1.4"  # ← Increment this
+version = "0.1.5"  # ← Increment this
 ```
 
 **Version Numbering:**
@@ -59,7 +59,7 @@ version = "0.1.4"  # ← Increment this
 Document changes in `README.md` or `CHANGELOG.md`:
 
 ```markdown
-## v0.1.4 (2026-01-XX)
+## v0.1.5 (2026-01-XX)
 - Added: New feature X
 - Fixed: Bug Y
 - Improved: Performance of Z
@@ -86,8 +86,8 @@ python -m build
 ```
 
 This creates:
-- `dist/genesis-minds-0.1.4.tar.gz` (source distribution)
-- `dist/genesis_minds-0.1.4-py3-none-any.whl` (wheel distribution)
+- `dist/genesis-minds-0.1.5.tar.gz` (source distribution)
+- `dist/genesis_minds-0.1.5-py3-none-any.whl` (wheel distribution)
 
 ### Step 5: Test on TestPyPI (Optional but Recommended)
 
@@ -114,13 +114,13 @@ python -m twine upload dist/*
 You'll see output like:
 ```
 Uploading distributions to https://upload.pypi.org/legacy/
-Uploading genesis_minds-0.1.4-py3-none-any.whl
+Uploading genesis_minds-0.1.5-py3-none-any.whl
 100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 150.0/150.0 kB • 00:01
-Uploading genesis-minds-0.1.4.tar.gz
+Uploading genesis-minds-0.1.5.tar.gz
 100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 120.0/120.0 kB • 00:01
 
 View at:
-https://pypi.org/project/genesis-minds/0.1.4/
+https://pypi.org/project/genesis-minds/0.1.5/
 ```
 
 ### Step 7: Verify Installation
@@ -138,8 +138,8 @@ Tag the release in Git:
 
 ```bash
 git add pyproject.toml README.md
-git commit -m "Release v0.1.4"
-git tag v0.1.4
+git commit -m "Release v0.1.5"
+git tag v0.1.5
 git push origin main --tags
 ```
 
@@ -148,7 +148,7 @@ git push origin main --tags
 Create a GitHub release:
 1. Go to https://github.com/shaik-shahansha/genesis-agi/releases
 2. Click "Draft a new release"
-3. Select tag `v0.1.4`
+3. Select tag `v0.1.5`
 4. Add release notes
 5. Publish release
 
@@ -171,8 +171,8 @@ python -m twine upload dist/*
 
 # 5. Git tag and push
 git add .
-git commit -m "Release v0.1.4"
-git tag v0.1.4
+git commit -m "Release v0.1.5"
+git tag v0.1.5
 git push origin main --tags
 ```
 
@@ -203,7 +203,7 @@ Make sure dependencies are correctly listed in `pyproject.toml` under `dependenc
 Current package info (from `pyproject.toml`):
 
 - **Name**: `genesis-minds`
-- **Current Version**: `0.1.4`
+- **Current Version**: `0.1.5`
 - **Python**: `>=3.11`
 - **License**: MIT
 - **PyPI**: https://pypi.org/project/genesis-minds/

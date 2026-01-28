@@ -76,7 +76,7 @@ class MindIdentity(BaseModel):
     is_public: bool = False  # Whether this mind is publicly visible
 
     # Genesis version
-    genesis_version: str = "0.1.4"
+    genesis_version: str = "0.1.5"
 
     def __init__(self, **data):
         super().__init__(**data)

@@ -53,7 +53,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Genesis AGI API",
         description="API for creating and interacting with digital beings",
-        version="0.1.4",
+        version="0.1.5",
         lifespan=lifespan,
     )
 
@@ -99,7 +99,7 @@ def create_app() -> FastAPI:
     async def root(request: Request):
         return {
             "name": "Genesis AGI API",
-            "version": "0.1.4",
+            "version": "0.1.5",
             "status": "running",
             "documentation": "/docs",
             "authentication": "/api/v1/auth/token",

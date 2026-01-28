@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "Genesis AGI Framework"
-    version: str = "0.1.4"
+    version: str = "0.1.5"
     debug: bool = False
 
     # Paths

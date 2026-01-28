@@ -310,7 +310,7 @@ These principles guide implementation but are not enforced at the code level (ye
 **Principle**: All changes to Mind behavior must be versioned and traceable.
 
 **Implementation**:
-- Semantic versioning (v0.1.4-alpha)
+- Semantic versioning (v0.1.5-alpha)
 - Change logs and migration guides
 - Backward compatibility when possible
 - Clear documentation of breaking changes

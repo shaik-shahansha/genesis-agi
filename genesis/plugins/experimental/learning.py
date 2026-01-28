@@ -38,7 +38,7 @@ class LearningPlugin(Plugin):
         return "learning"
 
     def get_version(self) -> str:
-        return "0.1.4-experimental"
+        return "0.1.5-experimental"
 
     def get_description(self) -> str:
         return "⚠️ EXPERIMENTAL: Skill tracking (not real learning)"

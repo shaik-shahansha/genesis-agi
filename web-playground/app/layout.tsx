@@ -83,7 +83,7 @@ export default function RootLayout({
           {!isLoginPage && (
             <footer className="border-t border-slate-700 mt-20 py-8 bg-slate-800">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-300 text-sm">
-                <p>Genesis AGI Framework v0.1.4</p>
+                <p>Genesis AGI Framework v0.1.5</p>
               </div>
             </footer>
           )}
