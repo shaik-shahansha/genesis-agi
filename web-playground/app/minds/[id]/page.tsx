@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthRequired from '@/components/AuthRequired';
 import { api } from '@/lib/api';
+import { useMindCache } from '@/lib/MindContext';
 import OverviewTab from '@/components/mind/OverviewTab';
 import IdentityTab from '@/components/mind/IdentityTab';
 import MemoryTab from '@/components/mind/MemoryTab';
@@ -25,6 +26,7 @@ export default function MindDetailPage() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [mind, setMind] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { getCachedMind, setCachedMind, invalidateMind } = useMindCache();
 
   useEffect(() => {
     loadMind();
@@ -32,13 +34,34 @@ export default function MindDetailPage() {
 
   const loadMind = async () => {
     try {
+      // Try to get from cache first
+      const cached = getCachedMind(mindId);
+      if (cached) {
+        setMind(cached);
+        setLoading(false);
+        // Still fetch in background to update cache with fresh data
+        api.getMind(mindId).then((data) => {
+          setMind(data);
+          setCachedMind(mindId, data);
+        }).catch(console.error);
+        return;
+      }
+
+      // Not in cache, fetch from API
       const data = await api.getMind(mindId);
       setMind(data);
+      setCachedMind(mindId, data);
     } catch (error) {
       console.error('Error loading mind:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    // Invalidate cache to force fresh data fetch
+    invalidateMind(mindId);
+    await loadMind();
   };
 
   const tabs = [
@@ -156,17 +179,17 @@ export default function MindDetailPage() {
 
         {/* Tab Content */}
         <div className="min-h-[500px]">
-          {activeTab === 'overview' && <OverviewTab mind={mind} onRefresh={loadMind} />}
+          {activeTab === 'overview' && <OverviewTab mind={mind} onRefresh={handleRefresh} />}
           {activeTab === 'identity' && <IdentityTab mind={mind} />}
           {activeTab === 'memory' && <MemoryTab mindId={mindId} />}
           {activeTab === 'consciousness' && <ConsciousnessTab mindId={mindId} />}
           {activeTab === 'thinking' && <ThinkingTab mindId={mindId} />}
-          {activeTab === 'autonomy' && <AutonomyTab mindId={mindId} />}
+          {activeTab === 'autonomy' && <AutonomyTab mindId={mindId} mind={mind} />}
           {activeTab === 'workspace' && <WorkspaceTab mindId={mindId} />}
           {activeTab === 'plugins' && <PluginsTab mindId={mindId} />}
           {activeTab === 'llm' && <LLMCallsTab mindId={mindId} />}
           {activeTab === 'logs' && <LogsTab mindId={mindId} />}
-          {activeTab === 'settings' && <SettingsTab mind={mind} onRefresh={loadMind} />}
+          {activeTab === 'settings' && <SettingsTab mind={mind} onRefresh={handleRefresh} />}
         </div>
       </div>
     </AuthRequired>

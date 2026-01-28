@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 
 interface AutonomyTabProps {
   mindId: string;
+  mind?: any; // Optional mind data to avoid redundant API calls
 }
 
 interface AutonomousAction {
@@ -17,7 +18,7 @@ interface AutonomousAction {
   result?: any;
 }
 
-export default function AutonomyTab({ mindId }: AutonomyTabProps) {
+export default function AutonomyTab({ mindId, mind }: AutonomyTabProps) {
   const [settings, setSettings] = useState({
     autonomy_level: 5,
     autonomous_actions_enabled: true,
@@ -32,14 +33,14 @@ export default function AutonomyTab({ mindId }: AutonomyTabProps) {
 
   useEffect(() => {
     loadData();
-  }, [mindId]);
+  }, [mindId, mind]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       
-      // Load autonomy settings
-      const mindData = await api.getMind(mindId);
+      // Load autonomy settings - use passed mind prop if available to avoid redundant API call
+      const mindData = mind || await api.getMind(mindId);
       if (mindData.autonomy) {
         setSettings({
           autonomy_level: mindData.autonomy.initiative_level || 5,

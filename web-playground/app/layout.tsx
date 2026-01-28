@@ -8,6 +8,7 @@ import { useState } from 'react';
 import AuthButton from '@/components/AuthButton';
 import NotificationBell from '@/components/NotificationBell';
 import { AuthProvider } from '@/lib/auth-context';
+import { MindProvider } from '@/lib/MindContext';
 import dynamic from 'next/dynamic';
 import { isCreationDisabled } from '@/lib/env';
 
@@ -31,14 +32,15 @@ export default function RootLayout({
     <html lang="en">
       <body className={fontClassName}>
         <AuthProvider>
-          <div className="min-h-screen bg-slate-900">
+          <MindProvider>
+            <div className="min-h-screen bg-slate-900">
             {/* Navigation - Hidden on login page */}
             {!isLoginPage && (
-              <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-800 border-b border-slate-700">
+              <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-slate-700/50 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="flex items-center justify-between h-16">
-                    <Link href="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
-                      <span className="text-base sm:text-lg md:text-xl font-semibold text-white truncate">Genesis AGI Playground</span>
+                    <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" onClick={() => setMobileMenuOpen(false)}>
+                      <span className="text-base sm:text-lg md:text-xl font-bold gradient-text truncate">Genesis AGI Playground</span>
                     </Link>
                     
                     {/* Desktop Menu */}
@@ -154,13 +156,14 @@ export default function RootLayout({
 
           {/* Footer - Hidden on login page */}
           {!isLoginPage && (
-            <footer className="border-t border-slate-700 mt-20 py-8 bg-slate-800">
+            <footer className="border-t border-slate-700 py-8 bg-slate-800">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-300 text-sm">
                 <p>Genesis AGI Framework v0.1.5</p>
               </div>
             </footer>
           )}
         </div>
+        </MindProvider>
         </AuthProvider>
       </body>
     </html>

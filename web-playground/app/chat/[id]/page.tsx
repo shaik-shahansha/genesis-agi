@@ -8,6 +8,7 @@ import AuthRequired from '@/components/AuthRequired';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { api } from '@/lib/api';
 import { getFirebaseToken } from '@/lib/firebase';
+import { useMindCache } from '@/lib/MindContext';
 
 interface Message {
   id?: number;
@@ -102,6 +103,7 @@ const generatePollinationsImageUrl = (prompt: string): string => {
 export default function ChatPage() {
   const params = useParams();
   const mindId = params.id as string;
+  const { getCachedMind, setCachedMind } = useMindCache();
 
   const [mind, setMind] = useState<Mind | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -344,6 +346,23 @@ export default function ChatPage() {
 
   const fetchMind = async () => {
     try {
+      // Try to get from cache first
+      const cached = getCachedMind(mindId);
+      if (cached) {
+        console.log('✅ Using cached mind data for chat page');
+        setMind(cached);
+        // Still fetch in background to update cache with fresh data
+        const token = await getFirebaseToken();
+        if (token) {
+          api.getMind(mindId).then((data) => {
+            setMind(data);
+            setCachedMind(mindId, data);
+          }).catch(console.error);
+        }
+        return;
+      }
+
+      // Not in cache, fetch from API
       // Wait for auth token to be available
       const token = await getFirebaseToken();
       if (!token) {
@@ -354,6 +373,7 @@ export default function ChatPage() {
       }
       const data = await api.getMind(mindId);
       setMind(data);
+      setCachedMind(mindId, data);
     } catch (error) {
       console.error('Error fetching mind:', error);
     }
@@ -969,9 +989,14 @@ export default function ChatPage() {
             )}
 
           {allMessages.length === 0 && (
-            <div className="text-center py-8 sm:py-12 px-4 text-gray-400">
-              <p className="text-base sm:text-lg mb-2">👋 Start a conversation with {mind.name}</p>
-              <p className="text-xs sm:text-sm">I'll be proactive, thoughtful, and spontaneously engage with you</p>
+            <div className="empty-state text-center py-12 sm:py-16 px-4 text-gray-400">
+              <div className="empty-state-icon mb-4">👋</div>
+              <p className="text-xl sm:text-2xl mb-3 font-semibold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Start a conversation with {mind.name}
+              </p>
+              <p className="text-sm sm:text-base text-gray-500 max-w-md mx-auto">
+                I'll be proactive, thoughtful, and spontaneously engage with you in meaningful conversations
+              </p>
             </div>
           )}
 
@@ -1064,28 +1089,33 @@ export default function ChatPage() {
                       </div>
                       {/* Feedback buttons for assistant messages */}
                       {message.role === 'assistant' && !feedbackSent.has(index) && (
-                        <div className="flex gap-2 mt-2 ml-0 sm:ml-2">
+                        <div className="flex gap-2 mt-2 ml-0 sm:ml-2 message-action">
                           <button
                             onClick={() => handleFeedback(index, 'positive')}
-                            className="text-xs bg-green-600/20 hover:bg-green-600/40 text-green-300 px-2 sm:px-3 py-1 rounded border border-green-600/30 transition-colors"
+                            className="feedback-button text-xs bg-green-600/20 hover:bg-green-600/40 text-green-300 px-2 sm:px-3 py-1.5 rounded-lg border border-green-600/30 transition-all"
                             title="Good response (+5 gens)"
                           >
-                            <span className="sm:hidden">👍</span>
-                            <span className="hidden sm:inline">👍 Good</span>
+                            <span className="flex items-center gap-1">
+                              <span>👍</span>
+                              <span className="hidden sm:inline">Helpful</span>
+                            </span>
                           </button>
                           <button
                             onClick={() => handleFeedback(index, 'negative')}
-                            className="text-xs bg-red-600/20 hover:bg-red-600/40 text-red-300 px-2 sm:px-3 py-1 rounded border border-red-600/30 transition-colors"
+                            className="feedback-button text-xs bg-red-600/20 hover:bg-red-600/40 text-red-300 px-2 sm:px-3 py-1.5 rounded-lg border border-red-600/30 transition-all"
                             title="Bad response (-5 gens)"
                           >
-                            <span className="sm:hidden">👎</span>
-                            <span className="hidden sm:inline">👎 Bad</span>
+                            <span className="flex items-center gap-1">
+                              <span>👎</span>
+                              <span className="hidden sm:inline">Not helpful</span>
+                            </span>
                           </button>
                         </div>
                       )}
                       {message.role === 'assistant' && feedbackSent.has(index) && (
-                        <div className="text-xs text-gray-500 mt-2 ml-2">
-                          ✓ Feedback sent
+                        <div className="text-xs text-green-400 mt-2 ml-2 flex items-center gap-1">
+                          <span>✓</span>
+                          <span>Thank you for your feedback!</span>
                         </div>
                       )}
                     </div>
@@ -1223,21 +1253,19 @@ export default function ChatPage() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 sm:p-3 bg-slate-700 hover:bg-slate-600 text-white rounded-full transition flex-shrink-0 w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center"
+                className="icon-button p-2 sm:p-3 flex-shrink-0 w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center"
                 title="Attach files"
               >
-                <span className="text-base sm:text-lg">📎</span>
+                <span className="text-lg sm:text-xl">📎</span>
               </button>
               <button
                 onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-                className={`p-2 sm:p-3 rounded-full transition flex-shrink-0 w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center ${
-                  webSearchEnabled
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-slate-700 hover:bg-slate-600 text-white'
+                className={`icon-button p-2 sm:p-3 flex-shrink-0 w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center ${
+                  webSearchEnabled ? 'active' : ''
                 }`}
                 title={webSearchEnabled ? 'Web search enabled' : 'Web search disabled'}
               >
-                <span className="text-base sm:text-lg">🔍</span>
+                <span className="text-lg sm:text-xl">🔍</span>
               </button>
               <input
                 type="text"
@@ -1251,10 +1279,10 @@ export default function ChatPage() {
               <button
                 onClick={sendMessage}
                 disabled={(!input.trim() && attachedFiles.length === 0) || loading}
-                className="send-button flex-shrink-0 p-2 sm:p-3 w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-lg sm:text-xl"
+                className="send-button flex-shrink-0 p-2 sm:p-3 w-12 h-12 sm:w-auto sm:h-auto flex items-center justify-center text-xl sm:text-2xl font-bold"
                 title="Send message"
               >
-                {loading ? '⏳' : '➤'}
+                {loading ? '⏳' : '↑'}
               </button>
             </div>
           </div>
