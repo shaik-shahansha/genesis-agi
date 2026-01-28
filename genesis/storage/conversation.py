@@ -62,7 +62,6 @@ class ConversationManager:
         Returns:
             Created message record
         """
-        print(f"[CONVERSATION] Adding message: role={role}, content_length={len(content)}, user={user_email}, env={environment_id}")
         try:
             with get_session() as session:
                 message = ConversationMessage(
@@ -77,10 +76,8 @@ class ConversationManager:
                 session.add(message)
                 session.commit()
                 session.refresh(message)
-                print(f"[CONVERSATION] ✓ Message saved successfully: role={role}, id={message.id}")
                 return message
         except Exception as e:
-            print(f"[CONVERSATION] ✗ ERROR saving message: {e}")
             import traceback
             traceback.print_exc()
             raise

@@ -39,19 +39,13 @@ class ModelOrchestrator:
         self.api_keys = api_keys or {}
         self.providers: dict[str, ModelProvider] = {}
         
-        # Debug logging
-        if self.api_keys:
-            print(f"[DEBUG orchestrator] Initializing with API keys for providers: {list(self.api_keys.keys())}")
-
         # Initialize providers
         # If api_keys provided, only use those providers. Otherwise fall back to settings.
         if self.api_keys:
             # Only initialize providers explicitly requested in api_keys
             if 'openrouter' in self.api_keys:
                 try:
-                    print(f"[DEBUG orchestrator] Initializing OpenRouter provider")
                     self.providers["openrouter"] = OpenRouterProvider(api_key=self.api_keys['openrouter'])
-                    print(f"[DEBUG orchestrator] OpenRouter provider initialized successfully")
                 except ImportError as e:
                     print(f"[WARNING] OpenRouter provider unavailable: {e}")
                     print("Install openai package: pip install openai")
@@ -77,9 +71,7 @@ class ModelOrchestrator:
             openrouter_key = self.settings.openrouter_api_key
             if openrouter_key:
                 try:
-                    print(f"[DEBUG orchestrator] Initializing OpenRouter provider")
                     self.providers["openrouter"] = OpenRouterProvider(api_key=openrouter_key)
-                    print(f"[DEBUG orchestrator] OpenRouter provider initialized successfully")
                 except ImportError as e:
                     print(f"[WARNING] OpenRouter provider unavailable: {e}")
                     print("Install openai package: pip install openai")
@@ -113,9 +105,6 @@ class ModelOrchestrator:
         ollama = OllamaProvider(base_url=self.settings.ollama_base_url)
         if ollama.is_available():
             self.providers["ollama"] = ollama
-        
-        # Debug: Show all initialized providers
-        print(f"[DEBUG orchestrator] Providers initialized: {list(self.providers.keys())}")
 
     def parse_model_string(self, model: str) -> tuple[str, str]:
         """
