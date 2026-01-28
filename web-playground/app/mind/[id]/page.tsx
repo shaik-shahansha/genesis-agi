@@ -195,7 +195,7 @@ function MindProfilePage() {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            {tab === 'memories' ? 'Conversations' : tab}
+            {tab}
           </button>
         ))}
       </div>
@@ -271,7 +271,7 @@ function MindProfilePage() {
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>� Conversation History</CardTitle>
+                <CardTitle>💾 Memory</CardTitle>
                 <Badge variant="info">{conversationMessages.length} messages</Badge>
               </div>
             </CardHeader>

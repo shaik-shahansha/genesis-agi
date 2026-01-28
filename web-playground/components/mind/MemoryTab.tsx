@@ -2,15 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { getFirebaseToken } from '@/lib/firebase';
 
-interface Memory {
-  id: string;
-  type: string;
+interface ConversationMessage {
+  id: number;
+  role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  emotion?: string;
-  importance: number;
-  tags: string[];
+  metadata?: any;
 }
 
 interface MemoryTabProps {
@@ -18,36 +17,76 @@ interface MemoryTabProps {
 }
 
 export default function MemoryTab({ mindId }: MemoryTabProps) {
-  const [memories, setMemories] = useState<Memory[]>([]);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [userEmail, setUserEmail] = useState<string>('');
 
   useEffect(() => {
-    loadMemories();
-  }, [mindId, filter]);
+    // Load user email from localStorage
+    const storedEmail = localStorage.getItem('genesis_user_email');
+    if (storedEmail) {
+      setUserEmail(storedEmail);
+    }
+    loadConversations();
+  }, [mindId]);
 
-  const loadMemories = async () => {
+  const loadConversations = async () => {
     setLoading(true);
     try {
-      const data = await api.getMindMemories(mindId, 100);
-      setMemories(data);
+      const storedEmail = localStorage.getItem('genesis_user_email');
+      if (!storedEmail) {
+        console.log('No user email found');
+        setLoading(false);
+        return;
+      }
+
+      const token = await getFirebaseToken();
+      if (!token) {
+        console.error('No authentication token available');
+        setLoading(false);
+        return;
+      }
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(
+        `${API_URL}/api/v1/minds/${mindId}/conversations/messages?user_email=${encodeURIComponent(storedEmail)}&limit=200`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch conversations');
+      }
+
+      const data = await response.json();
+      setMessages(data.messages || []);
     } catch (error) {
-      console.error('Error loading memories:', error);
+      console.error('Error loading conversations:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredMemories = memories.filter(m => {
-    const matchesFilter = filter === 'all' || m.type === filter;
+  const filteredMessages = messages.filter(m => {
+    const matchesFilter = filter === 'all' || m.role === filter;
     const matchesSearch = search === '' || 
-      m.content.toLowerCase().includes(search.toLowerCase()) ||
-      m.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()));
+      m.content.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
-  const memoryTypes = ['all', 'conversation', 'experience', 'reflection', 'learning', 'emotional'];
+  const filterOptions = [
+    { value: 'all', label: 'All Messages' },
+    { value: 'user', label: 'User Messages' },
+    { value: 'assistant', label: 'Assistant Messages' }
+  ];
+
+  const userMessages = messages.filter(m => m.role === 'user');
+  const assistantMessages = messages.filter(m => m.role === 'assistant');
 
   return (
     <div className="space-y-4">
@@ -56,7 +95,7 @@ export default function MemoryTab({ mindId }: MemoryTabProps) {
         <div className="flex flex-col md:flex-row gap-4">
           <input
             type="text"
-            placeholder="Search memories..."
+            placeholder="Search conversations..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input flex-1"
@@ -66,83 +105,85 @@ export default function MemoryTab({ mindId }: MemoryTabProps) {
             onChange={(e) => setFilter(e.target.value)}
             className="input md:w-48"
           >
-            {memoryTypes.map(type => (
-              <option key={type} value={type}>
-                {type.charAt(0).toUpperCase() + type.slice(1)}
+            {filterOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>
-          <button onClick={loadMemories} className="btn-ghost">
+          <button onClick={loadConversations} className="btn-ghost">
             🔄 Refresh
           </button>
         </div>
+        {userEmail && (
+          <div className="mt-2 text-xs text-gray-500">
+            Showing conversations for: {userEmail}
+          </div>
+        )}
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Total</div>
-          <div className="text-2xl font-bold text-gray-900">{memories.length}</div>
+          <div className="text-sm text-gray-600">Total Messages</div>
+          <div className="text-2xl font-bold text-gray-900">{messages.length}</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-sm text-gray-600">Your Messages</div>
+          <div className="text-2xl font-bold text-gray-900">{userMessages.length}</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-sm text-gray-600">Mind Responses</div>
+          <div className="text-2xl font-bold text-gray-900">{assistantMessages.length}</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm text-gray-600">Filtered</div>
-          <div className="text-2xl font-bold text-gray-900">{filteredMemories.length}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Avg Importance</div>
-          <div className="text-2xl font-bold text-gray-900">
-            {memories.length ? (memories.reduce((sum, m) => sum + m.importance, 0) / memories.length).toFixed(2) : '0'}
-          </div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Types</div>
-          <div className="text-2xl font-bold text-gray-900">
-            {new Set(memories.map(m => m.type)).size}
-          </div>
+          <div className="text-2xl font-bold text-gray-900">{filteredMessages.length}</div>
         </div>
       </div>
 
-      {/* Memory List */}
+      {/* Message List */}
       <div className="space-y-3">
         {loading ? (
           <div className="text-center py-8">
             <div className="spinner mx-auto"></div>
           </div>
-        ) : filteredMemories.length === 0 ? (
+        ) : filteredMessages.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-gray-600">
-            No memories found
+            {messages.length === 0 ? (
+              <>
+                <p className="mb-2">No conversation history yet</p>
+                <p className="text-sm">Start chatting to see messages here!</p>
+              </>
+            ) : (
+              <p>No messages match your search</p>
+            )}
           </div>
         ) : (
-          filteredMemories.map((memory) => (
-            <div key={memory.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
+          filteredMessages.map((message) => (
+            <div 
+              key={message.id} 
+              className={`border rounded-lg p-4 transition-colors ${
+                message.role === 'user'
+                  ? 'bg-blue-50 border-blue-200 hover:border-blue-300'
+                  : 'bg-purple-50 border-purple-200 hover:border-purple-300'
+              }`}
+            >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
-                    {memory.type}
-                  </span>
-                  {memory.emotion && (
-                    <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">
-                      {memory.emotion}
-                    </span>
-                  )}
-                  <span className="text-xs text-gray-500">
-                    Importance: {memory.importance.toFixed(2)}
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    message.role === 'user'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-purple-100 text-purple-700'
+                  }`}>
+                    {message.role === 'user' ? '👤 You' : '🤖 Mind'}
                   </span>
                 </div>
                 <span className="text-xs text-gray-500">
-                  {new Date(memory.timestamp).toLocaleString()}
+                  {new Date(message.timestamp).toLocaleString()}
                 </span>
               </div>
-              <p className="text-gray-900 mb-2">{memory.content}</p>
-              {memory.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {memory.tags.map((tag, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <p className="text-gray-900 whitespace-pre-wrap">{message.content}</p>
             </div>
           ))
         )}
