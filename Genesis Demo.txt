@@ -1,0 +1,29 @@
+What is Genesis?
+Why Genesis?
+How to get started with Genesis?
+- Groq or Openrouter api key
+Cli commands?
+- help
+- Birth
+- Mind
+- Admin
+- Plugins
+- daemon
+- env
+- chat
+- delete
+- clear-memories
+Use cases?
+Play ground
+- create mind
+- mind details
+- envs
+- mind chat
+- immersive chat
+- tasks
+- GEN
+- Concerns
+- Memory
+- Consciousness/memory/plugins
+
+Demo
