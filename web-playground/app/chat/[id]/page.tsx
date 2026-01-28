@@ -799,7 +799,7 @@ export default function ChatPage() {
 
   return (
     <AuthRequired>
-      <div className="flex h-screen bg-slate-900 relative" style={{height: '75vh'}}>
+      <div className="flex h-screen bg-slate-900 relative overflow-hidden w-full" style={{height: '75vh', maxWidth: '100vw'}}>
         {/* Mobile Overlay */}
         {sidebarOpen && (
           <div 
@@ -925,23 +925,23 @@ export default function ChatPage() {
         </div>
 
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 w-full lg:w-auto overflow-hidden">
           {/* Chat Header */}
-          <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-700 bg-slate-800 flex-shrink-0">
-            <div className="flex items-center justify-between gap-3">
+          <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-700 bg-slate-800 flex-shrink-0 w-full">
+            <div className="flex items-center justify-between gap-2 sm:gap-3 w-full">
               {/* Hamburger Menu for Mobile */}
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 hover:bg-slate-700 rounded-lg transition"
+                className="lg:hidden p-2 hover:bg-slate-700 rounded-lg transition flex-shrink-0"
                 title="Open sidebar"
               >
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
               
-              <div className="flex-1 min-w-0">
-                <h1 className="text-lg sm:text-xl font-semibold text-white truncate">
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <h1 className="text-base sm:text-lg md:text-xl font-semibold text-white truncate">
                   {selectedEnvironment
                     ? conversationThreads.find(t => t.environment_id === selectedEnvironment)?.environment_name || 'Chat'
                     : 'New Conversation'}
@@ -962,7 +962,7 @@ export default function ChatPage() {
                 loadEarlierMessages();
               }
             }}
-            className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4 messages-container bg-slate-900"
+            className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6 space-y-3 sm:space-y-4 messages-container bg-slate-900 w-full"
           >
             {loadingMore && (
               <div className="text-center py-2 text-sm text-gray-400">Loading earlier messages...</div>
@@ -989,9 +989,11 @@ export default function ChatPage() {
                     <div className="message-group">
                       <div className={`message-bubble ${message.role === 'user' ? 'message-user' : 'message-assistant'}`}>
                         {message.role === 'assistant' ? (
-                          <MarkdownRenderer content={message.content} />
+                          <div className="overflow-x-auto">
+                            <MarkdownRenderer content={message.content} />
+                          </div>
                         ) : (
-                          <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                          <div className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere">{message.content}</div>
                         )}
                         
                         {/* Display generated image with download button */}
@@ -1187,16 +1189,16 @@ export default function ChatPage() {
           </div>
 
           {/* Input Area */}
-          <div className="p-2 sm:p-4 border-t border-slate-700 bg-slate-800 flex-shrink-0">
+          <div className="p-2 sm:p-4 border-t border-slate-700 bg-slate-800 flex-shrink-0 w-full">
             {/* File Attachments Preview */}
             {attachedFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-2 sm:mb-3">
+              <div className="flex flex-wrap gap-2 mb-2 sm:mb-3 w-full">
                 {attachedFiles.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 bg-slate-700 px-2 sm:px-3 py-1 rounded text-xs sm:text-sm"
+                    className="flex items-center gap-2 bg-slate-700 px-2 sm:px-3 py-1 rounded text-xs sm:text-sm max-w-full"
                   >
-                    <span className="text-gray-300 truncate max-w-[150px] sm:max-w-none">📎 {file.name}</span>
+                    <span className="text-gray-300 truncate max-w-[120px] sm:max-w-[200px]">📎 {file.name}</span>
                     <button
                       onClick={() => removeFile(index)}
                       className="text-red-400 hover:text-red-300 flex-shrink-0"
@@ -1210,7 +1212,7 @@ export default function ChatPage() {
             )}
 
             {/* Input Controls */}
-            <div className="flex gap-2 sm:gap-3 items-end">
+            <div className="flex gap-2 sm:gap-3 items-end w-full">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -1221,21 +1223,21 @@ export default function ChatPage() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 sm:px-3 sm:py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-full transition flex-shrink-0 text-lg sm:text-base"
+                className="p-2 sm:p-3 bg-slate-700 hover:bg-slate-600 text-white rounded-full transition flex-shrink-0 w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center"
                 title="Attach files"
               >
-                📎
+                <span className="text-base sm:text-lg">📎</span>
               </button>
               <button
                 onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-                className={`p-2 sm:px-3 sm:py-3 rounded-full transition flex-shrink-0 text-lg sm:text-base ${
+                className={`p-2 sm:p-3 rounded-full transition flex-shrink-0 w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center ${
                   webSearchEnabled
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
                     : 'bg-slate-700 hover:bg-slate-600 text-white'
                 }`}
                 title={webSearchEnabled ? 'Web search enabled' : 'Web search disabled'}
               >
-                🔍
+                <span className="text-base sm:text-lg">🔍</span>
               </button>
               <input
                 type="text"
@@ -1243,13 +1245,13 @@ export default function ChatPage() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type a message..."
-                className="chat-input flex-1 text-sm sm:text-base"
+                className="chat-input flex-1 min-w-0 text-sm sm:text-base"
                 disabled={loading}
               />
               <button
                 onClick={sendMessage}
                 disabled={(!input.trim() && attachedFiles.length === 0) || loading}
-                className="send-button flex-shrink-0 p-2 sm:px-4 sm:py-3 text-lg sm:text-xl"
+                className="send-button flex-shrink-0 p-2 sm:p-3 w-10 h-10 sm:w-auto sm:h-auto flex items-center justify-center text-lg sm:text-xl"
                 title="Send message"
               >
                 {loading ? '⏳' : '➤'}
