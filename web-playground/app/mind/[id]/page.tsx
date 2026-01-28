@@ -45,14 +45,20 @@ function MindProfilePage() {
   const mindId = params.id as string;
 
   const [mind, setMind] = useState<Mind | null>(null);
-  const [memories, setMemories] = useState<Memory[]>([]);
+  const [conversationMessages, setConversationMessages] = useState<any[]>([]);
   const [dreams, setDreams] = useState<Dream[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'memories' | 'dreams' | 'settings'>('overview');
   const [loading, setLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState<string>('');
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
+    // Load user email from localStorage
+    const storedEmail = localStorage.getItem('genesis_user_email');
+    if (storedEmail) {
+      setUserEmail(storedEmail);
+    }
     fetchData();
   }, [mindId]);
 
@@ -73,10 +79,16 @@ function MindProfilePage() {
       const mindData = await mindRes.json();
       setMind(mindData);
 
-      // Fetch memories
-      const memRes = await fetch(`${API_URL}/api/v1/minds/${mindId}/memories`, { headers });
-      const memData = await memRes.json();
-      setMemories(memData.slice(0, 10));
+      // Fetch conversation messages (with user email if available)
+      const storedEmail = localStorage.getItem('genesis_user_email');
+      if (storedEmail) {
+        const messagesRes = await fetch(
+          `${API_URL}/api/v1/minds/${mindId}/conversations/messages?user_email=${encodeURIComponent(storedEmail)}&limit=100`,
+          { headers }
+        );
+        const messagesData = await messagesRes.json();
+        setConversationMessages(messagesData.messages || []);
+      }
 
       // Fetch dreams
       const dreamRes = await fetch(`${API_URL}/api/v1/minds/${mindId}/dreams`, { headers });
@@ -143,16 +155,16 @@ function MindProfilePage() {
                 <div className="text-sm text-gray-400">Age</div>
               </div>
               <div>
-                <div className="text-2xl font-bold gradient-text">{mind.memory_count}</div>
-                <div className="text-sm text-gray-400">Memories</div>
+                <div className="text-2xl font-bold gradient-text">{conversationMessages.length}</div>
+                <div className="text-sm text-gray-400">Messages</div>
               </div>
               <div>
                 <div className="text-2xl font-bold gradient-text">{mind.dream_count}</div>
                 <div className="text-sm text-gray-400">Dreams</div>
               </div>
               <div>
-                <div className="text-2xl font-bold gradient-text">{Math.floor(mind.memory_count * 0.15)}</div>
-                <div className="text-sm text-gray-400">Thoughts</div>
+                <div className="text-2xl font-bold gradient-text">{mind.memory_count}</div>
+                <div className="text-sm text-gray-400">Memories</div>
               </div>
             </div>
 
@@ -183,7 +195,7 @@ function MindProfilePage() {
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            {tab}
+            {tab === 'memories' ? 'Conversations' : tab}
           </button>
         ))}
       </div>
@@ -259,43 +271,40 @@ function MindProfilePage() {
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>💾 Recent Memories</CardTitle>
-                <Badge variant="info">{memories.length} shown</Badge>
+                <CardTitle>� Conversation History</CardTitle>
+                <Badge variant="info">{conversationMessages.length} messages</Badge>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {memories.map(memory => (
-                  <Card key={memory.memory_id} hover>
-                    <div className="flex justify-between items-start mb-2">
-                      <Badge variant={
-                        memory.memory_type === 'episodic' ? 'purple' :
-                        memory.memory_type === 'semantic' ? 'info' :
-                        memory.memory_type === 'procedural' ? 'warning' : 'success'
-                      }>
-                        {memory.memory_type}
-                      </Badge>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">Importance:</span>
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4, 5].map(star => (
-                            <span
-                              key={star}
-                              className={star <= memory.importance * 5 ? 'text-yellow-400' : 'text-gray-600'}
-                            >
-                              ⭐
-                            </span>
-                          ))}
-                        </div>
+              {conversationMessages.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p>No conversation history yet.</p>
+                  <p className="text-sm mt-2">Start chatting to see messages here!</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {conversationMessages.map((msg, idx) => (
+                    <div
+                      key={msg.id || idx}
+                      className={`p-4 rounded-lg ${
+                        msg.role === 'user'
+                          ? 'bg-blue-900/20 border border-blue-500/30'
+                          : 'bg-purple-900/20 border border-purple-500/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant={msg.role === 'user' ? 'info' : 'purple'}>
+                          {msg.role === 'user' ? '👤 You' : '🤖 ' + (mind?.name || 'Mind')}
+                        </Badge>
+                        <span className="text-xs text-gray-500">
+                          {new Date(msg.timestamp).toLocaleString()}
+                        </span>
                       </div>
+                      <p className="text-gray-300 text-sm whitespace-pre-wrap">{msg.content}</p>
                     </div>
-                    <p className="text-gray-300 text-sm mb-2">{memory.content}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(memory.timestamp).toLocaleString()}
-                    </p>
-                  </Card>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
