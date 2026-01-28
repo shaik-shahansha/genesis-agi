@@ -123,10 +123,10 @@ export default function MindDetailPage() {
               <p className="text-gray-300 mt-1">GMID: {mind.gmid}</p>
             </div>
             <div className="flex gap-2">
-              <Link href={`/chat/${mind.gmid}`} className="btn-ghost">
+              <Link href={`/chat/${mind.gmid}`} className="btn-primary">
                 💬 Chat
               </Link>
-              <Link href={`/immersive/${mind.gmid}`} className="btn-primary">
+              <Link href={`/immersive/${mind.gmid}`} className="btn-ghost">
                 🎭 Immersive Mode
               </Link>
             </div>
