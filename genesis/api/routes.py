@@ -1043,26 +1043,41 @@ async def chat(
                 
                 print(f"[WEB SEARCH] Performing search for: {request.message}")
                 
-                # Perform the search
-                results = DDGS().text(request.message, max_results=5)
+                # Perform the search - use simple params for better reliability
+                ddgs = DDGS()
+                results = []
+                
+                # Try to get results, handling potential empty responses
+                try:
+                    results = list(ddgs.text(request.message, max_results=5))
+                except Exception as search_err:
+                    print(f"[WEB SEARCH] Search attempt failed: {search_err}")
+                    results = []
+                
                 web_search_results = results
                 
-                # Build context from search results
-                search_context = "\n\n[Web Search Results]:\n"
-                for i, result in enumerate(results, 1):
-                    search_context += f"\n{i}. {result.get('title', 'No title')}\n"
-                    search_context += f"   {result.get('body', result.get('snippet', 'No description'))}\n"
-                    search_context += f"   URL: {result.get('href', result.get('url', 'No URL'))}\n"
-                
-                search_context += "\n[End of Web Search Results]\n\n"
-                
-                print(f"[WEB SEARCH] Found {len(results)} results")
-                
-                # Append search results to the message
-                enhanced_message = f"{request.message}\n{search_context}\nPlease answer based on the web search results above."
+                if results:
+                    # Build context from search results
+                    search_context = "\n\n[Web Search Results]:\n"
+                    for i, result in enumerate(results, 1):
+                        search_context += f"\n{i}. {result.get('title', 'No title')}\n"
+                        search_context += f"   {result.get('body', 'No description')}\n"
+                        search_context += f"   Source: {result.get('href', 'No URL')}\n"
+                    
+                    search_context += "\n[End of Web Search Results]\n\n"
+                    
+                    print(f"[WEB SEARCH] Found {len(results)} results")
+                    
+                    # Append search results to the message
+                    enhanced_message = f"{request.message}\n{search_context}\nPlease answer based on the web search results above."
+                else:
+                    print(f"[WEB SEARCH] No results found, proceeding without web context")
+                    enhanced_message = request.message
                 
             except Exception as search_error:
                 print(f"[WEB SEARCH] Error: {search_error}")
+                import traceback
+                traceback.print_exc()
                 enhanced_message = request.message
                 search_context = "\n\n[Note: Web search failed, answering without web results]\n"
         else:
