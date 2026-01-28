@@ -426,24 +426,20 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                API Key {['openai', 'anthropic'].includes(provider) && <span className="text-red-500">*</span>}
-                {['groq', 'openrouter'].includes(provider) && <span className="text-green-600 text-xs ml-1">(Optional - Free tier available)</span>}
+                API Key
               </label>
               <input
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="input w-full"
-                placeholder={
-                  ['groq', 'openrouter'].includes(provider) 
-                    ? "Optional - Leave blank for free usage" 
-                    : "Required - Enter your API key"
-                }
+                placeholder="Leave blank to keep existing key"
               />
               <p className="text-xs text-gray-500 mt-1">
-                {provider === 'openrouter' && '🌟 OpenRouter has many FREE models available!'}
-                {provider === 'groq' && '⚡ Groq is FREE - API key optional for higher limits'}
-                {['openai', 'anthropic'].includes(provider) && '⚠️ Required - Get your key from the provider'}
+                {provider === 'openrouter' && '🌟 Only enter a new API key if you want to update it. Get your API key from openrouter.ai'}
+                {provider === 'groq' && '⚡ Only enter a new API key if you want to update it. Get your API key from groq.com'}
+                {provider === 'openai' && 'Only enter a new API key if you want to update it. Get your API key from platform.openai.com'}
+                {provider === 'anthropic' && 'Only enter a new API key if you want to update it. Get your API key from console.anthropic.com'}
               </p>
             </div>
           </div>
