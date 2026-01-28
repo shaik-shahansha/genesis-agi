@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Query, Depends, Request, UploadFile, File
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Query, Depends, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -1648,9 +1648,17 @@ async def get_mind_access(mind_id: str, current_user: User = Depends(get_current
 async def upload_workspace_file(
     mind_id: str,
     file: UploadFile = File(...),
+    user_email: Optional[str] = Form(None),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Upload a file to Mind's workspace with embedding and vector storage."""
+    """Upload a file to Mind's workspace with embedding and vector storage.
+    
+    Args:
+        mind_id: The mind ID to upload to
+        file: The file to upload
+        user_email: Optional user email to tag the file with
+        current_user: Authenticated user from JWT/API key
+    """
     mind = await _load_mind(mind_id)
     
     # Check if mind has workspace plugin
@@ -1686,13 +1694,18 @@ async def upload_workspace_file(
             except:
                 content_str = content.decode('latin-1')
         
+        # Build tags including user_email if provided
+        tags = ["uploaded", "chat"]
+        if user_email:
+            tags.append(f"user:{user_email}")
+        
         # Create file in workspace
         mind_file = mind.workspace.create_file(
             filename=file.filename,
             content=content_str if content_str else "",
             file_type=file_type,
-            description=f"Uploaded via chat: {file.filename}",
-            tags=["uploaded", "chat"],
+            description=f"Uploaded via chat: {file.filename}" + (f" by {user_email}" if user_email else ""),
+            tags=tags,
             is_private=True
         )
         
@@ -1724,6 +1737,8 @@ async def upload_workspace_file(
         # Use file content + summary for better searchability
         embedding_content = f"File: {file.filename}\n"
         embedding_content += f"Type: {file_type}\n"
+        if user_email:
+            embedding_content += f"Uploaded by: {user_email}\n"
         if file_summary:
             embedding_content += f"Summary: {file_summary}\n"
         if content_str:
@@ -1744,11 +1759,12 @@ async def upload_workspace_file(
                         "size_bytes": mind_file.size_bytes,
                         "created_at": mind_file.created_at.isoformat(),
                         "tags": mind_file.tags,
-                        "has_summary": bool(file_summary)
+                        "has_summary": bool(file_summary),
+                        "user_email": user_email if user_email else None
                     }
                 )
                 
-                mind.logger.info(f"[UPLOAD] Created vector embedding for {file.filename}")
+                mind.logger.info(f"[UPLOAD] Created vector embedding for {file.filename} by {user_email or 'unknown'}")
             except Exception as e:
                 mind.logger.warning(f"Vector storage failed: {e}")
         
@@ -1756,6 +1772,8 @@ async def upload_workspace_file(
         try:
             from genesis.storage.memory import MemoryType
             memory_content = f"Uploaded file: {file.filename}"
+            if user_email:
+                memory_content += f" by {user_email}"
             if file_summary:
                 memory_content += f"\n\n{file_summary}"
             elif content_str:
@@ -1768,8 +1786,10 @@ async def upload_workspace_file(
                     "file_id": mind_file.file_id,
                     "filename": mind_file.filename,
                     "file_type": mind_file.file_type,
-                    "action": "file_upload"
-                }
+                    "action": "file_upload",
+                    "user_email": user_email if user_email else None
+                },
+                user_email=user_email  # Tag memory with user email
             )
         except Exception as e:
             mind.logger.warning(f"Memory creation failed: {e}")

@@ -576,19 +576,14 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      let uploadedFileInfo = [];
-      
-      // Upload files first if any
+      // Build user message with file attachments immediately
+      let messageContent = currentInput;
       if (currentFiles.length > 0) {
-        const uploadPromises = currentFiles.map(file => api.uploadFile(mindId, file));
-        const uploadResults = await Promise.all(uploadPromises);
-        uploadedFileInfo = uploadResults.map(result => `📎 ${result.filename}`);
+        const fileList = currentFiles.map(f => `📎 ${f.name}`).join('\n');
+        messageContent = messageContent ? `${messageContent}\n\n${fileList}` : fileList;
       }
 
-      // Build message with file references
-      const messageContent = currentInput + 
-        (uploadedFileInfo.length > 0 ? `\n\n${uploadedFileInfo.join('\n')}` : '');
-
+      // Show user message immediately in chat
       const userMessage: Message = {
         role: 'user',
         content: messageContent,
@@ -597,6 +592,25 @@ export default function ChatPage() {
 
       setMessages(prev => [...prev, userMessage]);
       setAllMessages(prev => [...prev, { type: 'chat', data: userMessage }]);
+
+      let uploadedFileInfo = [];
+      
+      // Upload files first if any
+      if (currentFiles.length > 0) {
+        const uploadPromises = currentFiles.map(file => api.uploadFile(mindId, file, userEmail));
+        const uploadResults = await Promise.all(uploadPromises);
+        uploadedFileInfo = uploadResults.map(result => {
+          // Include file summary if available
+          if (result.summary) {
+            return `\n📎 File: ${result.filename}\nSummary: ${result.summary}`;
+          }
+          return `\n📎 File uploaded: ${result.filename}`;
+        });
+      }
+
+      // Build final message content for backend (includes file upload info)
+      const backendMessageContent = currentInput + 
+        (uploadedFileInfo.length > 0 ? `\n\n${uploadedFileInfo.join('\n')}` : '');
 
       // Check if this is an image generation request
       const imagePrompt = detectImageGenerationRequest(currentInput);
@@ -622,7 +636,7 @@ export default function ChatPage() {
         // Send message with context about uploaded files to backend
         const data = await api.chatWithEnvironment(
           mindId, 
-          messageContent, 
+          backendMessageContent,  // Use message content with file info
           userEmail || undefined,
           selectedEnvironment || undefined
         );

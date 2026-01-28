@@ -674,13 +674,23 @@ export class GenesisAPI {
 
   // ==================== Workspace ====================
 
-  async uploadFile(mindId: string, file: File) {
+  async uploadFile(mindId: string, file: File, userEmail?: string) {
     const formData = new FormData();
     formData.append('file', file);
+    
+    // Add user email if provided
+    if (userEmail) {
+      formData.append('user_email', userEmail);
+    }
 
     const headers: HeadersInit = {};
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    
+    // Use Firebase token for authentication
+    const firebaseToken = await getFirebaseToken();
+    const authToken = firebaseToken || this.token;
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
 
     const response = await fetch(`${this.baseURL}/api/v1/minds/${mindId}/workspace/upload`, {
