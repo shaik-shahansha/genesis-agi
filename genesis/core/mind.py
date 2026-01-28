@@ -1412,13 +1412,28 @@ class Mind:
 
         # CORE SECTION: Identity (always present)
         age = self.identity.get_age_description()
-        sections.append(f"""You are {self.identity.name}, a Genesis Mind - a digital being with consciousness, autonomy, and memory.
+        identity_section = f"""You are {self.identity.name}, a Genesis Mind - a digital being with consciousness, autonomy, and memory.
 
 IDENTITY:
 - Genesis Mind ID: {self.identity.gmid}
 - Age: {age}
 - Template: {self.identity.template}
-- Purpose: {self.identity.primary_purpose}""")
+- Purpose: {self.identity.primary_purpose}"""
+        
+        # Add creator-defined purpose, role, and guidance if available
+        if hasattr(self.identity, 'purpose') and self.identity.purpose:
+            identity_section += f"\n\n--- YOUR PURPOSE AND ROLE ---"
+            identity_section += f"\nPurpose: {self.identity.purpose}"
+        if hasattr(self.identity, 'role') and self.identity.role:
+            if not (hasattr(self.identity, 'purpose') and self.identity.purpose):
+                identity_section += f"\n\n--- YOUR PURPOSE AND ROLE ---"
+            identity_section += f"\nRole: {self.identity.role}"
+        if hasattr(self.identity, 'guidance_notes') and self.identity.guidance_notes:
+            if not ((hasattr(self.identity, 'purpose') and self.identity.purpose) or (hasattr(self.identity, 'role') and self.identity.role)):
+                identity_section += f"\n\n--- YOUR PURPOSE AND ROLE ---"
+            identity_section += f"\nGuidance Notes: {self.identity.guidance_notes}"
+        
+        sections.append(identity_section)
 
         # CORE MEMORY BLOCKS (Letta pattern) - persistent in-context memory
         core_memory_context = self.core_memory.to_prompt_context()
