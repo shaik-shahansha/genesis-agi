@@ -1173,9 +1173,9 @@ class Mind:
                     
                     try:
                         # Get recent conversation history for context
-                        recent_history = self.conversation.get_messages(limit=10)
+                        recent_history = self.conversation.get_recent_messages(limit=10, user_email=user_email)
                         conversation_history = [
-                            {"role": msg.role, "content": msg.content}
+                            {"role": msg["role"], "content": msg["content"]}
                             for msg in recent_history
                         ]
                         

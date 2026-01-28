@@ -468,15 +468,19 @@ class AutonomousOrchestrator:
     ):
         """Store successful solution in procedural memory."""
         try:
-            await self.mind.memory.add_procedural_memory(
-                context=f"Successfully completed task: {task}",
+            from genesis.storage.memory import MemoryType
+            self.mind.memory.add_memory(
                 content=json.dumps({
                     "task": task,
+                    "context": f"Successfully completed task: {task}",
                     "plan": {
                         "steps": [{"type": s.type, "description": s.description} for s in plan.steps]
                     },
                     "success": True
                 }),
+                memory_type=MemoryType.PROCEDURAL,
+                importance=0.7,
+                tags=["autonomous_task", "solution"],
                 metadata={
                     "task_type": "autonomous_execution",
                     "steps_count": len(plan.steps),
