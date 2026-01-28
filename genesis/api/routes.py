@@ -1039,7 +1039,7 @@ async def chat(
         
         if request.enable_web_search:
             try:
-                from duckduckgo_search import DDGS
+                from ddgs import DDGS
                 
                 print(f"[WEB SEARCH] Performing search for: {request.message}")
                 
