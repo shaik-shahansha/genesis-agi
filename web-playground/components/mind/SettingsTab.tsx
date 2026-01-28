@@ -26,11 +26,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
   const [maxTokens, setMaxTokens] = useState(mind.max_tokens || 8000);
   
-  // Autonomy Settings
-  const [autonomyLevel, setAutonomyLevel] = useState(mind.autonomy_level || 5);
-  const [consciousnessActive, setConsciousnessActive] = useState(mind.consciousness_active || true);
-  const [dreamingEnabled, setDreamingEnabled] = useState(mind.dreaming_enabled || true);
-  
   // Currency
   const [currency, setCurrency] = useState(mind.gens || 100);
 
@@ -47,9 +42,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
     setProvider(mind.llm_provider || 'groq');
     setModel(mind.llm_model || 'mixtral-8x7b-32768');
     setMaxTokens(mind.max_tokens || 8000);
-    setAutonomyLevel(mind.autonomy_level || 5);
-    setConsciousnessActive(mind.consciousness_active !== false);
-    setDreamingEnabled(mind.dreaming_enabled !== false);
     setCurrency(mind.gens || 100);
 
     // Fetch access info
@@ -80,9 +72,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
         use_ollama: useOllama,
         ollama_url: useOllama ? ollamaUrl : undefined,
         max_tokens: maxTokens,
-        autonomy_level: autonomyLevel,
-        consciousness_active: consciousnessActive,
-        dreaming_enabled: dreamingEnabled,
         gens: currency,
       });
       setMessage('Settings saved successfully!');
@@ -463,70 +452,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
           <p className="text-xs text-gray-500 mt-1">
             Maximum number of tokens for AI response generation (default: 8000)
           </p>
-        </div>
-      </div>
-
-      {/* Autonomy Settings */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">🧠 Autonomy & Consciousness</h2>
-        
-        <div className="space-y-6">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700">
-                Autonomy Level: {autonomyLevel}
-              </label>
-              <span className="text-xs text-gray-500">
-                {autonomyLevel === 0 ? 'Fully Controlled' : 
-                 autonomyLevel < 3 ? 'Low Autonomy' :
-                 autonomyLevel < 7 ? 'Moderate Autonomy' :
-                 'High Autonomy'}
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="10"
-              value={autonomyLevel}
-              onChange={(e) => setAutonomyLevel(parseInt(e.target.value))}
-              className="w-full"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Higher levels allow more independent thinking and actions
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={consciousnessActive}
-                onChange={(e) => setConsciousnessActive(e.target.checked)}
-                className="w-5 h-5"
-              />
-              <div>
-                <div className="font-medium text-gray-900">Consciousness Active</div>
-                <div className="text-sm text-gray-600">
-                  Enable continuous consciousness and awareness updates
-                </div>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={dreamingEnabled}
-                onChange={(e) => setDreamingEnabled(e.target.checked)}
-                className="w-5 h-5"
-              />
-              <div>
-                <div className="font-medium text-gray-900">Dreaming Enabled</div>
-                <div className="text-sm text-gray-600">
-                  Allow Mind to process experiences through dreams
-                </div>
-              </div>
-            </label>
-          </div>
         </div>
       </div>
 
