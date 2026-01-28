@@ -271,13 +271,14 @@ export class GenesisAPI {
     });
   }
 
-  async chatWithEnvironment(mindId: string, message: string, userEmail?: string, environmentId?: string) {
+  async chatWithEnvironment(mindId: string, message: string, userEmail?: string, environmentId?: string, enableWebSearch?: boolean) {
     return this.request(`/api/v1/minds/${mindId}/chat`, {
       method: 'POST',
       body: JSON.stringify({ 
         message, 
         user_email: userEmail,
-        environment_id: environmentId 
+        environment_id: environmentId,
+        enable_web_search: enableWebSearch || false
       }),
     });
   }

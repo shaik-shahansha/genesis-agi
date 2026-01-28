@@ -162,6 +162,7 @@ class ChatRequest(BaseModel):
     stream: bool = False
     user_email: Optional[str] = None  # User identifier for memory filtering
     environment_id: Optional[str] = None  # Environment context for the conversation
+    enable_web_search: bool = False  # Enable web search for this message
 
 
 class ChatResponse(BaseModel):
@@ -171,6 +172,7 @@ class ChatResponse(BaseModel):
     emotion: str
     memory_created: bool
     gen_earned: Optional[float] = None  # Gens earned from this response
+    web_search_results: Optional[List[Dict[str, Any]]] = None  # Web search results if used
 
 
 class FeedbackRequest(BaseModel):
@@ -1031,8 +1033,43 @@ async def chat(
             if env:
                 env_manager.enter(request.environment_id)
         
+        # Handle web search if enabled
+        web_search_results = None
+        search_context = ""
+        
+        if request.enable_web_search:
+            try:
+                from duckduckgo_search import DDGS
+                
+                print(f"[WEB SEARCH] Performing search for: {request.message}")
+                
+                # Perform the search
+                results = DDGS().text(request.message, max_results=5)
+                web_search_results = results
+                
+                # Build context from search results
+                search_context = "\n\n[Web Search Results]:\n"
+                for i, result in enumerate(results, 1):
+                    search_context += f"\n{i}. {result.get('title', 'No title')}\n"
+                    search_context += f"   {result.get('body', result.get('snippet', 'No description'))}\n"
+                    search_context += f"   URL: {result.get('href', result.get('url', 'No URL'))}\n"
+                
+                search_context += "\n[End of Web Search Results]\n\n"
+                
+                print(f"[WEB SEARCH] Found {len(results)} results")
+                
+                # Append search results to the message
+                enhanced_message = f"{request.message}\n{search_context}\nPlease answer based on the web search results above."
+                
+            except Exception as search_error:
+                print(f"[WEB SEARCH] Error: {search_error}")
+                enhanced_message = request.message
+                search_context = "\n\n[Note: Web search failed, answering without web results]\n"
+        else:
+            enhanced_message = request.message
+        
         try:
-            response = await mind.think(request.message, user_email=user_identifier)
+            response = await mind.think(enhanced_message, user_email=user_identifier)
             print(f"[DEBUG ROUTES] Response from mind.think(): {response[:200] if response else 'None'}...")
         except Exception as think_error:
             print(f"ERROR in mind.think(): {str(think_error)}")
@@ -1074,6 +1111,7 @@ async def chat(
             response=response or "No response generated",
             emotion=mind.current_emotion,
             memory_created=True,
+            web_search_results=web_search_results,
         )
         
         # Send response via WebSocket to update UI immediately

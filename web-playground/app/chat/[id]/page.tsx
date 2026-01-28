@@ -125,6 +125,7 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [feedbackSent, setFeedbackSent] = useState<Set<number>>(new Set());
   const [frontendHandledImage, setFrontendHandledImage] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -638,7 +639,8 @@ export default function ChatPage() {
           mindId, 
           backendMessageContent,  // Use message content with file info
           userEmail || undefined,
-          selectedEnvironment || undefined
+          selectedEnvironment || undefined,
+          webSearchEnabled  // Pass web search toggle state
         );
 
         const assistantMessage: Message = {
@@ -1184,6 +1186,17 @@ export default function ChatPage() {
                 title="Attach files"
               >
                 📎
+              </button>
+              <button
+                onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                className={`px-3 py-3 rounded-full transition flex-shrink-0 ${
+                  webSearchEnabled
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-slate-700 hover:bg-slate-600 text-white'
+                }`}
+                title={webSearchEnabled ? 'Web search enabled' : 'Web search disabled'}
+              >
+                🔍
               </button>
               <input
                 type="text"
