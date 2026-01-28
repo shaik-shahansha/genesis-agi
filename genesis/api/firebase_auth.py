@@ -111,10 +111,11 @@ async def verify_firebase_token(id_token: str) -> Optional[Dict[str, Any]]:
     
     print("DEBUG FIREBASE: Firebase is enabled, attempting REST API verification")
     
-    # Get Firebase API key from settings or use the one from Flutter config
+    # Get Firebase API key from settings - MUST be set via environment variable
     firebase_api_key = getattr(settings, 'firebase_api_key', None)
     if not firebase_api_key:
-        firebase_api_key = 'AIzaSyAGYlwCkkzuFgQtF-0nyM9CIjelh0qMAFA'  # Fallback to hardcoded key
+        logger.error("Firebase API key not configured. Set FIREBASE_API_KEY environment variable.")
+        return None
     
     try:
         import requests

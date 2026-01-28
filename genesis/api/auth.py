@@ -155,7 +155,7 @@ async def get_current_user_from_token(
     token = credentials.credentials
     print(f"DEBUG AUTH: Token present: {token is not None}")
     print(f"DEBUG AUTH: Token length: {len(token) if token else 0}")
-    print(f"DEBUG AUTH: Token starts with: {token[:50] if token and len(token) > 50 else token}")
+    # Note: Never log actual token data for security
 
     # First, try Firebase token verification if Firebase is enabled
     print(f"DEBUG AUTH: Checking if Firebase is enabled...")
