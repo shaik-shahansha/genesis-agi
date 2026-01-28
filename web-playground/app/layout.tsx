@@ -4,6 +4,7 @@ import './globals.css';
 import '../styles/chat-enhancements.css';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import AuthButton from '@/components/AuthButton';
 import NotificationBell from '@/components/NotificationBell';
 import { AuthProvider } from '@/lib/auth-context';
@@ -24,6 +25,7 @@ export default function RootLayout({
   const pathname = usePathname();
   const isLoginPage = pathname === '/login' || pathname?.startsWith('/login/');
   const creationDisabled = isCreationDisabled();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <html lang="en">
@@ -35,10 +37,11 @@ export default function RootLayout({
               <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-800 border-b border-slate-700">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="flex items-center justify-between h-16">
-                    <Link href="/" className="flex items-center gap-2">
-                      <span className="text-xl font-semibold text-white">Genesis AGI Framework - Playground</span>
+                    <Link href="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
+                      <span className="text-base sm:text-lg md:text-xl font-semibold text-white truncate">Genesis AGI</span>
                     </Link>
                     
+                    {/* Desktop Menu */}
                     <div className="hidden md:flex items-center gap-1">
                       <Link href="/" className="btn-ghost">
                         Dashboard
@@ -69,7 +72,77 @@ export default function RootLayout({
                       <NotificationBell />
                       <AuthButton />
                     </div>
+
+                    {/* Mobile Menu Button & Auth */}
+                    <div className="md:hidden flex items-center gap-2">
+                      <NotificationBell />
+                      <AuthButton />
+                      <button
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        className="p-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                        aria-label="Toggle menu"
+                      >
+                        {mobileMenuOpen ? (
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        ) : (
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Mobile Menu Dropdown */}
+                  {mobileMenuOpen && (
+                    <div className="md:hidden border-t border-slate-700 py-2">
+                      <div className="flex flex-col space-y-1">
+                        <Link 
+                          href="/" 
+                          className="px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          🏠 Dashboard
+                        </Link>
+                        {!creationDisabled && (
+                          <Link 
+                            href="/create" 
+                            className="px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            ➕ New Mind
+                          </Link>
+                        )}
+                        <Link 
+                          href="/environments" 
+                          className="px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          🌐 Environments
+                        </Link>
+                        {!creationDisabled && (
+                          <Link 
+                            href="/settings" 
+                            className="px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            ⚙️ Settings
+                          </Link>
+                        )}
+                        <a 
+                          href="https://github.com/shaik-shahansha/genesis-agi" 
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          📦 GitHub
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </nav>
             )}
