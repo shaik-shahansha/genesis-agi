@@ -126,6 +126,7 @@ export default function ChatPage() {
   const [feedbackSent, setFeedbackSent] = useState<Set<number>>(new Set());
   const [frontendHandledImage, setFrontendHandledImage] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -556,6 +557,7 @@ export default function ChatPage() {
   const handleThreadSelect = (thread: ConversationThread) => {
     setSelectedEnvironment(thread.environment_id);
     loadConversationMessages(thread.environment_id);
+    setSidebarOpen(false);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -797,26 +799,48 @@ export default function ChatPage() {
 
   return (
     <AuthRequired>
-      <div className="flex h-screen bg-slate-900" style={{height: '75vh'}}>
+      <div className="flex h-screen bg-slate-900 relative" style={{height: '75vh'}}>
+        {/* Mobile Overlay */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-10 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        
         {/* Sidebar */}
-        <div className="w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
+        <div className={`
+          w-80 bg-slate-800 border-r border-slate-700 flex flex-col
+          fixed lg:relative h-full z-20
+          transform transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
           {/* Sidebar Header */}
           <div className="p-4 border-b border-slate-700 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
               <Link href="/" className="text-gray-400 hover:text-white text-sm">
                 ← Back
               </Link>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('genesis_user_email');
-                  setUserEmail('');
-                  setShowEmailPrompt(true);
-                }}
-                className="text-xs text-gray-400 hover:text-white"
-                title="Change Identity"
-              >
-                🔄
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('genesis_user_email');
+                    setUserEmail('');
+                    setShowEmailPrompt(true);
+                  }}
+                  className="text-xs text-gray-400 hover:text-white"
+                  title="Change Identity"
+                >
+                  🔄
+                </button>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="lg:hidden text-gray-400 hover:text-white"
+                  title="Close sidebar"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <h2 className="text-lg font-semibold text-white">{mind.name}</h2>
             <p className="text-xs text-gray-400">{userEmail}</p>
@@ -891,6 +915,7 @@ export default function ChatPage() {
                 setSelectedEnvironment(null);
                 setMessages([]);
                 setAllMessages([]);
+                setSidebarOpen(false);
               }}
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
             >
@@ -902,16 +927,27 @@ export default function ChatPage() {
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col min-h-0">
           {/* Chat Header */}
-          <div className="px-6 py-4 border-b border-slate-700 bg-slate-800 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-semibold text-white">
+          <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-700 bg-slate-800 flex-shrink-0">
+            <div className="flex items-center justify-between gap-3">
+              {/* Hamburger Menu for Mobile */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 hover:bg-slate-700 rounded-lg transition"
+                title="Open sidebar"
+              >
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg sm:text-xl font-semibold text-white truncate">
                   {selectedEnvironment
                     ? conversationThreads.find(t => t.environment_id === selectedEnvironment)?.environment_name || 'Chat'
                     : 'New Conversation'}
                 </h1>
-                <p className="text-sm text-gray-400 mt-0.5">
-                  {mind.model} • {mind.memory_count} total memories stored
+                <p className="text-xs sm:text-sm text-gray-400 mt-0.5 truncate">
+                  {mind.model} • {mind.memory_count} memories
                 </p>
               </div>
             </div>
@@ -926,16 +962,16 @@ export default function ChatPage() {
                 loadEarlierMessages();
               }
             }}
-            className="flex-1 overflow-y-auto p-6 space-y-4 messages-container bg-slate-900"
+            className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4 messages-container bg-slate-900"
           >
             {loadingMore && (
               <div className="text-center py-2 text-sm text-gray-400">Loading earlier messages...</div>
             )}
 
           {allMessages.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
-              <p className="text-lg mb-2">👋 Start a conversation with {mind.name}</p>
-              <p className="text-sm">I'll be proactive, thoughtful, and spontaneously engage with you</p>
+            <div className="text-center py-8 sm:py-12 px-4 text-gray-400">
+              <p className="text-base sm:text-lg mb-2">👋 Start a conversation with {mind.name}</p>
+              <p className="text-xs sm:text-sm">I'll be proactive, thoughtful, and spontaneously engage with you</p>
             </div>
           )}
 
@@ -966,7 +1002,7 @@ export default function ChatPage() {
                               <img 
                                 src={message.metadata.image_url} 
                                 alt={message.metadata.image_prompt || 'Generated image'}
-                                className="rounded-lg w-full max-w-md border border-slate-600"
+                                className="rounded-lg w-full max-w-full sm:max-w-md border border-slate-600"
                                 loading="lazy"
                               />
                               <a
@@ -974,10 +1010,11 @@ export default function ChatPage() {
                                 download={`generated-${message.metadata.image_prompt?.substring(0, 30).replace(/[^a-z0-9]/gi, '-') || 'image'}.png`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors"
                               >
                                 <span>⬇️</span>
-                                <span>Download Image</span>
+                                <span className="hidden sm:inline">Download Image</span>
+                                <span className="sm:hidden">Download</span>
                               </a>
                             </div>
                           </div>
@@ -1025,20 +1062,22 @@ export default function ChatPage() {
                       </div>
                       {/* Feedback buttons for assistant messages */}
                       {message.role === 'assistant' && !feedbackSent.has(index) && (
-                        <div className="flex gap-2 mt-2 ml-2">
+                        <div className="flex gap-2 mt-2 ml-0 sm:ml-2">
                           <button
                             onClick={() => handleFeedback(index, 'positive')}
-                            className="text-xs bg-green-600/20 hover:bg-green-600/40 text-green-300 px-3 py-1 rounded border border-green-600/30 transition-colors"
+                            className="text-xs bg-green-600/20 hover:bg-green-600/40 text-green-300 px-2 sm:px-3 py-1 rounded border border-green-600/30 transition-colors"
                             title="Good response (+5 gens)"
                           >
-                            👍 Good
+                            <span className="sm:hidden">👍</span>
+                            <span className="hidden sm:inline">👍 Good</span>
                           </button>
                           <button
                             onClick={() => handleFeedback(index, 'negative')}
-                            className="text-xs bg-red-600/20 hover:bg-red-600/40 text-red-300 px-3 py-1 rounded border border-red-600/30 transition-colors"
+                            className="text-xs bg-red-600/20 hover:bg-red-600/40 text-red-300 px-2 sm:px-3 py-1 rounded border border-red-600/30 transition-colors"
                             title="Bad response (-5 gens)"
                           >
-                            👎 Bad
+                            <span className="sm:hidden">👎</span>
+                            <span className="hidden sm:inline">👎 Bad</span>
                           </button>
                         </div>
                       )}
@@ -1148,19 +1187,19 @@ export default function ChatPage() {
           </div>
 
           {/* Input Area */}
-          <div className="p-4 border-t border-slate-700 bg-slate-800 flex-shrink-0">
+          <div className="p-2 sm:p-4 border-t border-slate-700 bg-slate-800 flex-shrink-0">
             {/* File Attachments Preview */}
             {attachedFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
+              <div className="flex flex-wrap gap-2 mb-2 sm:mb-3">
                 {attachedFiles.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 bg-slate-700 px-3 py-1 rounded text-sm"
+                    className="flex items-center gap-2 bg-slate-700 px-2 sm:px-3 py-1 rounded text-xs sm:text-sm"
                   >
-                    <span className="text-gray-300">📎 {file.name}</span>
+                    <span className="text-gray-300 truncate max-w-[150px] sm:max-w-none">📎 {file.name}</span>
                     <button
                       onClick={() => removeFile(index)}
-                      className="text-red-400 hover:text-red-300"
+                      className="text-red-400 hover:text-red-300 flex-shrink-0"
                       title="Remove file"
                     >
                       ✕
@@ -1171,7 +1210,7 @@ export default function ChatPage() {
             )}
 
             {/* Input Controls */}
-            <div className="flex gap-3 items-end">
+            <div className="flex gap-2 sm:gap-3 items-end">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -1182,14 +1221,14 @@ export default function ChatPage() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-full transition flex-shrink-0"
+                className="p-2 sm:px-3 sm:py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-full transition flex-shrink-0 text-lg sm:text-base"
                 title="Attach files"
               >
                 📎
               </button>
               <button
                 onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-                className={`px-3 py-3 rounded-full transition flex-shrink-0 ${
+                className={`p-2 sm:px-3 sm:py-3 rounded-full transition flex-shrink-0 text-lg sm:text-base ${
                   webSearchEnabled
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
                     : 'bg-slate-700 hover:bg-slate-600 text-white'
@@ -1204,13 +1243,13 @@ export default function ChatPage() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type a message..."
-                className="chat-input flex-1"
+                className="chat-input flex-1 text-sm sm:text-base"
                 disabled={loading}
               />
               <button
                 onClick={sendMessage}
                 disabled={(!input.trim() && attachedFiles.length === 0) || loading}
-                className="send-button flex-shrink-0"
+                className="send-button flex-shrink-0 p-2 sm:px-4 sm:py-3 text-lg sm:text-xl"
                 title="Send message"
               >
                 {loading ? '⏳' : '➤'}
