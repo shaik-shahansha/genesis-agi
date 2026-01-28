@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { isCreationDisabled } from '@/lib/env';
 
 interface OverviewTabProps {
   mind: any;
@@ -15,6 +16,7 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
+  const deletionDisabled = isCreationDisabled();
 
   useEffect(() => {
     checkDaemonStatus();
@@ -173,21 +175,23 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
         </div>
       </div>
 
-      {/* Danger Zone */}
-      <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-red-900 mb-2 flex items-center gap-2">
-          ⚠️ Danger Zone
-        </h2>
-        <p className="text-sm text-red-700 mb-4">
-          Once you delete a Mind, there is no going back. All memories, dreams, and consciousness data will be permanently lost.
-        </p>
-        <button
-          onClick={() => setShowDeleteModal(true)}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
-        >
-          🗑️ Delete Mind Permanently
-        </button>
-      </div>
+      {/* Danger Zone - Hidden in production */}
+      {!deletionDisabled && (
+        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
+          <h2 className="text-lg font-semibold text-red-900 mb-2 flex items-center gap-2">
+            ⚠️ Danger Zone
+          </h2>
+          <p className="text-sm text-red-700 mb-4">
+            Once you delete a Mind, there is no going back. All memories, dreams, and consciousness data will be permanently lost.
+          </p>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+          >
+            🗑️ Delete Mind Permanently
+          </button>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
