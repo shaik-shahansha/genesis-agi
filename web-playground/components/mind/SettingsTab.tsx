@@ -14,8 +14,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   
   // Mind Configuration
   const [name, setName] = useState(mind.name || '');
-  const [primaryPurpose, setPrimaryPurpose] = useState(mind.primary_purpose || '');
-  const [description, setDescription] = useState(mind.description || '');
   const [purpose, setPurpose] = useState(mind.purpose || '');
   const [role, setRole] = useState(mind.role || '');
   const [guidanceNotes, setGuidanceNotes] = useState(mind.guidance_notes || '');
@@ -43,8 +41,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   useEffect(() => {
     // Reset form when mind changes
     setName(mind.name || '');
-    setPrimaryPurpose(mind.primary_purpose || '');
-    setDescription(mind.description || '');
     setPurpose(mind.purpose || '');
     setRole(mind.role || '');
     setGuidanceNotes(mind.guidance_notes || '');
@@ -75,8 +71,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
     try {
       await api.updateMindSettings(mind.gmid, {
         name,
-        primary_purpose: primaryPurpose,
-        description,
         purpose,
         role,
         guidance_notes: guidanceNotes,
@@ -102,37 +96,29 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
 
   const providerModels: Record<string, string[]> = {
     openrouter: [
-      'deepseek/deepseek-chat',
-      'xiaomi/mimo-v2-flash:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'deepseek/deepseek-r1-0528:free',
       'mistralai/devstral-2512:free',
       'nex-agi/deepseek-v3.1-nex-n1:free',
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'allenai/olmo-3.1-32b-think:free',
     ],
     groq: [
-      'mixtral-8x7b-32768',
-      'llama3-70b-8192',
-      'llama3-8b-8192',
-      'gemma-7b-it',
+      'openai/gpt-oss-20b',
+      'openai/gpt-oss-120b',
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
     ],
     openai: [
       'gpt-5.2',
       'gpt-5-mini',
-      'gpt-5-nano',
-      'gpt-4.1',
     ],
     anthropic: [
       'claude-sonnet-4.5',
-      'claude-haiku-4.5',
-      'claude-sonnet-4',
-      'claude-haiku-4',
     ],
     ollama: [
+      'llama3.1',
       'llama2',
       'mistral',
       'codellama',
-      'phi',
-      'neural-chat',
     ],
   };
 
@@ -165,40 +151,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Primary Purpose
-            </label>
-            <input
-              type="text"
-              value={primaryPurpose}
-              onChange={(e) => setPrimaryPurpose(e.target.value)}
-              className="input w-full"
-              placeholder="What is this Mind's main purpose?"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="input w-full"
-              rows={3}
-              placeholder="Brief description of this Mind"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Purpose & Role (Creator-Defined) */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">🎯 Purpose & Role</h2>
-        <p className="text-sm text-gray-600 mb-4">Define the Mind's specific purpose, role, and guidance that will be part of every prompt. This helps the Mind understand its purpose and context.</p>
-        
-        <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Purpose <span className="text-gray-500 font-normal">(Why does this Mind exist?)</span>
@@ -239,7 +191,6 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
             <p className="text-xs text-gray-500 mt-1">
               This information will be included in every prompt to help the Mind maintain context.
             </p>
-          </div>
           </div>
         </div>
       </div>

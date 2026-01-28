@@ -128,6 +128,9 @@ class CreateMindRequest(BaseModel):
     fast_model: Optional[str] = None
     autonomy_level: str = "medium"
     api_keys: Optional[dict[str, str]] = None  # Provider API keys (e.g., {'groq': 'gsk_...'})
+    purpose: Optional[str] = None
+    role: Optional[str] = None
+    guidance_notes: Optional[str] = None
 
 
 class MindResponse(BaseModel):
@@ -632,6 +635,9 @@ async def create_mind(
             start_consciousness=False,  # Always False - consciousness runs in daemon
             config=mind_config,
             creator_email=request.creator_email,
+            purpose=request.purpose,
+            role=request.role,
+            guidance_notes=request.guidance_notes,
         )
 
         # Test provider connection (since it was skipped in birth due to async context)

@@ -26,6 +26,9 @@ export default function CreateMindPage() {
     config: 'standard',
     plugins: [] as string[],
     api_keys: {} as Record<string, string>,
+    purpose: '',
+    role: '',
+    guidance_notes: '',
   });
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -257,6 +260,9 @@ export default function CreateMindPage() {
         start_consciousness: false,  // Always false - consciousness runs in daemon
         config: formData.config,
         api_keys: Object.keys(formData.api_keys).length > 0 ? formData.api_keys : undefined,
+        purpose: formData.purpose || undefined,
+        role: formData.role || undefined,
+        guidance_notes: formData.guidance_notes || undefined,
       };
 
       // Get Firebase token for authentication
@@ -371,6 +377,57 @@ export default function CreateMindPage() {
                 />
                 <p className="text-sm text-gray-300 mt-2">
                   Your email helps the Mind remember conversations with you separately from other users
+                </p>
+              </div>
+
+              {/* Purpose Input */}
+              <div>
+                <label className="block text-white font-bold text-lg mb-3">
+                  Purpose
+                </label>
+                <textarea
+                  value={formData.purpose}
+                  onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                  placeholder="e.g., A science teacher to teach students"
+                  className="input min-h-[80px]"
+                  rows={3}
+                />
+                <p className="text-sm text-gray-300 mt-2">
+                  Define why this mind exists and what it should accomplish
+                </p>
+              </div>
+
+              {/* Role Input */}
+              <div>
+                <label className="block text-white font-bold text-lg mb-3">
+                  Role
+                </label>
+                <textarea
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  placeholder="e.g., High school physics and chemistry instructor"
+                  className="input min-h-[80px]"
+                  rows={3}
+                />
+                <p className="text-sm text-gray-300 mt-2">
+                  Describe the specific role or function this mind will perform
+                </p>
+              </div>
+
+              {/* Guidance Notes Input */}
+              <div>
+                <label className="block text-white font-bold text-lg mb-3">
+                  Guidance Notes
+                </label>
+                <textarea
+                  value={formData.guidance_notes}
+                  onChange={(e) => setFormData({ ...formData, guidance_notes: e.target.value })}
+                  placeholder="e.g., List of students: Alice, Bob, Charlie. Exam schedule: March 15. Focus on practical experiments."
+                  className="input min-h-[100px]"
+                  rows={4}
+                />
+                <p className="text-sm text-gray-300 mt-2">
+                  Add any specific guidance, context, or notes the mind should always remember
                 </p>
               </div>
 
