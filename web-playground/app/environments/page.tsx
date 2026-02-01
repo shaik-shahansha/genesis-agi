@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import AuthRequired from '@/components/AuthRequired';
-import { isCreationDisabled } from '@/lib/env';
+import { isCreationDisabled, isProduction } from '@/lib/env';
 
 interface Environment {
   id: string;
@@ -19,6 +20,7 @@ interface Environment {
 }
 
 function EnvironmentsPage() {
+  const router = useRouter();
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [active, setActive] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -33,8 +35,18 @@ function EnvironmentsPage() {
   });
 
   useEffect(() => {
+    // Redirect if environments are disabled in production
+    if (isProduction()) {
+      router.push('/');
+      return;
+    }
     loadData();
-  }, []);
+  }, [router]);
+
+  // Don't render the page if environments are disabled
+  if (isProduction()) {
+    return null;
+  }
 
   const loadData = async () => {
     setLoading(true);

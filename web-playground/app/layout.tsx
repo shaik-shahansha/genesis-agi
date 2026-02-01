@@ -10,7 +10,7 @@ import NotificationBell from '@/components/NotificationBell';
 import { AuthProvider } from '@/lib/auth-context';
 import { MindProvider } from '@/lib/MindContext';
 import dynamic from 'next/dynamic';
-import { isCreationDisabled } from '@/lib/env';
+import { isCreationDisabled, isProduction } from '@/lib/env';
 
 // Dynamically import AdminLink to avoid using hooks directly in layout's top-level
 const AdminLink = dynamic(() => import('@/components/AdminLink').then(mod => mod.AdminLink), { ssr: false });
@@ -53,9 +53,11 @@ export default function RootLayout({
                           New Mind
                         </Link>
                       )}
-                      <Link href="/environments" className="btn-ghost">
-                        Environments
-                      </Link>
+                      {!isProduction() && (
+                        <Link href="/environments" className="btn-ghost">
+                          Environments
+                        </Link>
+                      )}
                       {!creationDisabled && (
                         <Link href="/settings" className="btn-ghost">
                           Settings
@@ -117,13 +119,15 @@ export default function RootLayout({
                             ➕ New Mind
                           </Link>
                         )}
-                        <Link 
-                          href="/environments" 
-                          className="px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          🌐 Environments
-                        </Link>
+                        {!isProduction() && (
+                          <Link 
+                            href="/environments" 
+                            className="px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            🌐 Environments
+                          </Link>
+                        )}
                         {!creationDisabled && (
                           <Link 
                             href="/settings" 

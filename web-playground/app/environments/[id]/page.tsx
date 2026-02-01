@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { EnvironmentWebSocket, EnvironmentMessage } from '@/lib/websocket';
+import { isProduction } from '@/lib/env';
 
 interface Message {
   type: string;
@@ -16,6 +17,7 @@ interface Message {
 }
 
 export default function EnvironmentChatPage() {
+  const router = useRouter();
   const params = useParams();
   const envId = params.id as string;
 
@@ -37,6 +39,11 @@ export default function EnvironmentChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Redirect if environments are disabled in production
+    if (isProduction()) {
+      router.push('/');
+      return;
+    }
     loadEnvironment();
 
     // Cleanup on unmount
@@ -45,7 +52,12 @@ export default function EnvironmentChatPage() {
         wsRef.current.disconnect();
       }
     };
-  }, [envId]);
+  }, [envId, router]);
+
+  // Don't render the page if environments are disabled
+  if (isProduction()) {
+    return null;
+  }
 
   useEffect(() => {
     scrollToBottom();
