@@ -47,10 +47,6 @@ ENV/
 genesis.db
 chroma_db/
 
-# Mobile app
-mobile-app/
-
-
 # Logs
 *.log
 logs/
