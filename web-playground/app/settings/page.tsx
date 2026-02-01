@@ -17,11 +17,6 @@ export default function SettingsPage() {
   const [geminiTestResult, setGeminiTestResult] = useState<{success: boolean, message: string} | null>(null);
 
   useEffect(() => {
-    // Redirect if creation is disabled in production
-    if (isCreationDisabled()) {
-      router.push('/');
-      return;
-    }
     loadKeys();
   }, [router]);
 

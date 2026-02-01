@@ -28,6 +28,7 @@ from genesis.api.auth import (
     create_api_key,
     create_user,
     User,
+    UserRole,
     Token,
     UserRole,
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -567,6 +568,24 @@ async def create_mind(
     # Check if Mind name already exists
     from genesis.config.settings import get_settings
     settings = get_settings()
+    
+    # Check max minds limit for non-admin users
+    if current_user.role != UserRole.ADMIN:
+        try:
+            from genesis.database.manager import MetaverseDB
+            db = MetaverseDB()
+            user_minds = db.get_minds_for_user(current_user.email or current_user.username)
+            max_allowed = settings.max_minds_per_user
+            
+            if len(user_minds) >= max_allowed:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"You have reached the maximum limit of {max_allowed} mind(s). Please delete an existing mind to create a new one."
+                )
+        except HTTPException:
+            raise
+        except Exception as limit_error:
+            logger.warning(f"Could not check mind limit for user {current_user.username}: {limit_error}")
     
     existing_mind_names = set()
     for path in settings.minds_dir.glob("*.json"):

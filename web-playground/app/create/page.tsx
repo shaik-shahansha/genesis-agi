@@ -296,18 +296,6 @@ export default function CreateMindPage() {
     }
   };
 
-  // Check if creation is disabled in production
-  useEffect(() => {
-    if (isCreationDisabled()) {
-      router.push('/');
-    }
-  }, [router]);
-
-  // Don't render the page if creation is disabled
-  if (isCreationDisabled()) {
-    return null;
-  }
-
   return (
     <AuthRequired>
     <div className="container mx-auto px-6 py-12">

@@ -14,10 +14,11 @@ export function isProduction(): boolean {
 
 /**
  * Check if creation features should be disabled
- * In production, we disable creation of new minds, environments, and modification of settings
+ * Creation is now allowed in production, but with limits enforced by backend
  */
 export function isCreationDisabled(): boolean {
-  const disabled = isProduction();
+  // Allow creation in production (backend enforces per-user limits)
+  const disabled = false;
   console.log('[ENV CHECK] Creation disabled?', disabled);
   return disabled;
 }

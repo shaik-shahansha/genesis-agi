@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { isCreationDisabled } from '@/lib/env';
+import { isCreationDisabled, isProduction } from '@/lib/env';
 
 interface OverviewTabProps {
   mind: any;
@@ -17,6 +17,7 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
   const deletionDisabled = isCreationDisabled();
+  const daemonControlDisabled = isProduction(); // Disable daemon controls in production
 
   useEffect(() => {
     checkDaemonStatus();
@@ -85,9 +86,9 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
       {/* Daemon Control */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Daemon Control</h2>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
+        {daemonControlDisabled ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-2">
               <div className={`w-3 h-3 rounded-full ${
                 daemonStatus === 'running' ? 'bg-green-500' : 
                 daemonStatus === 'stopped' ? 'bg-gray-400' : 'bg-yellow-500'
@@ -96,36 +97,60 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
                 Status: {daemonStatus === 'running' ? 'Running' : daemonStatus === 'stopped' ? 'Stopped' : 'Unknown'}
               </span>
             </div>
-            <p className="text-sm text-gray-600 mt-1">
-              The daemon enables autonomous thinking, dreaming, and consciousness updates
+            <p className="text-sm text-blue-800">
+              ℹ️ In production mode, the daemon runs 24/7 to ensure continuous autonomous operation. 
+              Start/stop controls are disabled to maintain persistent consciousness.
             </p>
-          </div>
-          <div className="flex gap-2">
-            {daemonStatus === 'stopped' || daemonStatus === 'unknown' ? (
-              <button
-                onClick={handleStartDaemon}
-                disabled={loading}
-                className="btn-primary"
-              >
-                {loading ? 'Starting...' : '▶️ Start Daemon'}
-              </button>
-            ) : (
-              <button
-                onClick={handleStopDaemon}
-                disabled={loading}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {loading ? 'Stopping...' : '⏹️ Stop Daemon'}
-              </button>
-            )}
             <button
               onClick={checkDaemonStatus}
-              className="btn-ghost"
+              className="mt-3 btn-ghost text-sm"
             >
-              🔄 Refresh
+              🔄 Refresh Status
             </button>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${
+                  daemonStatus === 'running' ? 'bg-green-500' : 
+                  daemonStatus === 'stopped' ? 'bg-gray-400' : 'bg-yellow-500'
+                }`} />
+                <span className="font-medium text-gray-900">
+                  Status: {daemonStatus === 'running' ? 'Running' : daemonStatus === 'stopped' ? 'Stopped' : 'Unknown'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                The daemon enables autonomous thinking, dreaming, and consciousness updates
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {daemonStatus === 'stopped' || daemonStatus === 'unknown' ? (
+                <button
+                  onClick={handleStartDaemon}
+                  disabled={loading}
+                  className="btn-primary"
+                >
+                  {loading ? 'Starting...' : '▶️ Start Daemon'}
+                </button>
+              ) : (
+                <button
+                  onClick={handleStopDaemon}
+                  disabled={loading}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {loading ? 'Stopping...' : '⏹️ Stop Daemon'}
+                </button>
+              )}
+              <button
+                onClick={checkDaemonStatus}
+                className="btn-ghost"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quick Stats */}

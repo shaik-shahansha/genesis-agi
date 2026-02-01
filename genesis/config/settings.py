@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     # Firebase Authentication (optional)
     firebase_project_id: Optional[str] = None  # Set to enable Firebase auth
     firebase_api_key: Optional[str] = None  # Firebase Web API key for token verification
+    
+    # Mind Creation Limits
+    max_minds_per_user: int = 1  # Maximum minds a user can create (admins exempt)
 
     @property
     def cors_origins_list(self) -> list[str]:
