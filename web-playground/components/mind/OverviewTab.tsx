@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { isCreationDisabled, isProduction } from '@/lib/env';
+import { useAuth } from '@/lib/auth-context';
 
 interface OverviewTabProps {
   mind: any;
@@ -16,8 +17,23 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
+  const { user, genesisUser } = useAuth();
   const deletionDisabled = isCreationDisabled();
   const daemonControlDisabled = isProduction(); // Disable daemon controls in production
+  
+  // Check if current user can delete this Mind
+  const canDeleteMind = () => {
+    if (!user) return false;
+    
+    // Check if user is global admin
+    if (genesisUser?.is_global_admin) return true;
+    
+    // Check if user is the creator
+    const userEmail = user.email?.toLowerCase();
+    const creatorEmail = (mind.creator_email || mind.creator || '').toLowerCase();
+    
+    return userEmail === creatorEmail;
+  };
 
   useEffect(() => {
     checkDaemonStatus();
@@ -200,8 +216,8 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
         </div>
       </div>
 
-      {/* Danger Zone - Hidden in production */}
-      {!deletionDisabled && (
+      {/* Danger Zone - Only shown to creator and global admins */}
+      {!deletionDisabled && canDeleteMind() && (
         <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-red-900 mb-2 flex items-center gap-2">
             ⚠️ Danger Zone
