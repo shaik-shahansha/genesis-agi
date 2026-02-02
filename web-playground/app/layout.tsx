@@ -40,7 +40,8 @@ export default function RootLayout({
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="flex items-center justify-between h-16">
                     <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" onClick={() => setMobileMenuOpen(false)}>
-                      <span className="text-base sm:text-lg md:text-xl font-bold gradient-text truncate">Genesis AGI Playground</span>
+                      <span className="text-2xl" style={{ color: 'var(--genesis-primary)' }}>◉</span>
+                      <span className="text-base sm:text-lg md:text-xl font-bold gradient-text tracking-wide">GENESIS AGI FRAMEWORK</span>
                     </Link>
                     
                     {/* Desktop Menu */}
