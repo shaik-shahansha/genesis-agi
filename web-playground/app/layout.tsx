@@ -59,7 +59,7 @@ export default function RootLayout({
                           Environments
                         </Link>
                       )}
-                      {!creationDisabled && (
+                      {!isProduction() && (
                         <Link href="/settings" className="btn-ghost">
                           Settings
                         </Link>
@@ -129,7 +129,7 @@ export default function RootLayout({
                             🌐 Environments
                           </Link>
                         )}
-                        {!creationDisabled && (
+                        {!isProduction() && (
                           <Link 
                             href="/settings" 
                             className="px-3 py-2 text-gray-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
