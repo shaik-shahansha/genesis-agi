@@ -1,484 +1,465 @@
-// =========================================
-// GENESIS AGI - Marketing Website Scripts
-// Interactive & Dynamic Functionality
-// =========================================
+/* ==========================================================================
+   Genesis product site — interaction layer
+   ==========================================================================
 
-document.addEventListener('DOMContentLoaded', () => {
-    initNavigation();
-    initScrollAnimations();
-    initCodeCopy();
-    initNeuralNetwork();
-    initSmoothScroll();
-    initVideoPlaceholder();
-});
+   No dependencies. Everything here is progressive enhancement: with JavaScript
+   disabled the page is still complete and readable, because every section's
+   content is in the HTML. Keeping it that way matters for a page whose whole
+   argument is honest reporting — the risk table, the status table and the
+   roadmap are markup, not script.
 
-// ============= NAVIGATION ============= 
-function initNavigation() {
-    const nav = document.getElementById('navbar');
-    const hamburger = document.getElementById('hamburger');
-    const navMenu = document.getElementById('nav-menu');
-    const navLinks = document.querySelectorAll('.nav-link');
+   Contents:
+     1. Theme toggle (dark default, persisted)
+     2. Navigation (condense on scroll, mobile drawer)
+     3. Reveal on scroll
+     4. Risk explorer (the one genuinely interactive explainer)
+     5. Budget chart animation
+     6. Hash-chain highlight loop
+     7. Copy to clipboard
+   ========================================================================== */
 
-    // Scroll effect for navbar
-    let lastScroll = 0;
-    window.addEventListener('scroll', () => {
-        const currentScroll = window.pageYOffset;
-        
-        if (currentScroll > 100) {
-            nav.classList.add('scrolled');
-        } else {
-            nav.classList.remove('scrolled');
-        }
-        
-        lastScroll = currentScroll;
-    });
+(function () {
+  'use strict';
 
-    // Mobile menu toggle
-    if (hamburger) {
-        hamburger.addEventListener('click', () => {
-            hamburger.classList.toggle('active');
-            navMenu.classList.toggle('active');
-            document.body.style.overflow = navMenu.classList.contains('active') ? 'hidden' : '';
-        });
+  try {
+  enhance();
+  } catch (error) {
+    // Fail safe. The scroll-reveal effect hides content until an
+    // IntersectionObserver reveals it, so an exception anywhere in this file
+    // would otherwise leave the page looking empty. Dropping the `js` marker
+    // restores the static document, which is always readable.
+    document.documentElement.classList.remove('js');
+    if (window.console && console.error) {
+      console.error('Genesis site: enhancement failed, showing static content.', error);
     }
+  }
 
-    // Close mobile menu on link click
-    navLinks.forEach(link => {
-        link.addEventListener('click', () => {
-            if (hamburger) {
-                hamburger.classList.remove('active');
-                navMenu.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        });
+  function enhance() {
+
+  var prefersReducedMotion =
+    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------------------------------------------------------------------- */
+  /* 1. Theme                                                               */
+  /* ---------------------------------------------------------------------- */
+
+  var THEME_KEY = 'genesis_site_theme';
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch (error) {
+      /* storage unavailable; the theme still applies for this page view */
+    }
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#fbfbfc' : '#08090c');
+  }
+
+  (function restoreTheme() {
+    // The inline attribute on <html> is the default, so there is no flash.
+    var stored = null;
+    try {
+      stored = localStorage.getItem(THEME_KEY);
+    } catch (error) {
+      /* ignore */
+    }
+    if (stored === 'light' || stored === 'dark') {
+      document.documentElement.setAttribute('data-theme', stored);
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', stored === 'light' ? '#fbfbfc' : '#08090c');
+      return;
+    }
+    // No stored preference: respect the OS if it asks for light.
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+
+  var themeToggle = document.getElementById('theme-toggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', function () {
+      var next =
+        document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      applyTheme(next);
     });
+  }
 
-    // Active link highlighting
-    const sections = document.querySelectorAll('section[id]');
-    
-    window.addEventListener('scroll', () => {
-        const scrollY = window.pageYOffset;
-        
-        sections.forEach(section => {
-            const sectionHeight = section.offsetHeight;
-            const sectionTop = section.offsetTop - 100;
-            const sectionId = section.getAttribute('id');
-            const navLink = document.querySelector(`.nav-link[href="#${sectionId}"]`);
-            
-            if (scrollY > sectionTop && scrollY <= sectionTop + sectionHeight) {
-                navLinks.forEach(link => link.classList.remove('active'));
-                if (navLink) navLink.classList.add('active');
-            }
-        });
-    });
-}
+  /* ---------------------------------------------------------------------- */
+  /* 2. Navigation                                                          */
+  /* ---------------------------------------------------------------------- */
 
-// ============= SMOOTH SCROLL ============= 
-function initSmoothScroll() {
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function(e) {
-            const href = this.getAttribute('href');
-            if (href === '#' || !href) return;
-            
-            e.preventDefault();
-            const target = document.querySelector(href);
-            
-            if (target) {
-                const offsetTop = target.offsetTop - 80;
-                window.scrollTo({
-                    top: offsetTop,
-                    behavior: 'smooth'
-                });
-            }
-        });
-    });
-}
+  var nav = document.getElementById('nav');
+  var burger = document.getElementById('nav-burger');
+  var drawer = document.getElementById('nav-drawer');
 
-// ============= SCROLL ANIMATIONS ============= 
-function initScrollAnimations() {
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -100px 0px'
+  if (nav) {
+    var onScroll = function () {
+      nav.classList.toggle('is-stuck', window.scrollY > 8);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+
+  if (burger && drawer) {
+    var setDrawer = function (open) {
+      drawer.hidden = !open;
+      drawer.classList.toggle('is-open', open);
+      burger.setAttribute('aria-expanded', String(open));
+      burger.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
     };
 
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
-            }
+    burger.addEventListener('click', function () {
+      setDrawer(drawer.hidden);
+    });
+
+    drawer.addEventListener('click', function (event) {
+      if (event.target.tagName === 'A') setDrawer(false);
+    });
+
+    // A drawer left open behind a widened viewport is a common bug; close it.
+    window.addEventListener('resize', function () {
+      if (window.innerWidth > 1024 && !drawer.hidden) setDrawer(false);
+    });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* 3. Reveal on scroll                                                    */
+  /* ---------------------------------------------------------------------- */
+
+  var revealables = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+
+  if (prefersReducedMotion || !('IntersectionObserver' in window)) {
+    revealables.forEach(function (node) {
+      node.classList.add('is-visible');
+    });
+  } else {
+    var revealObserver = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('is-visible');
+          revealObserver.unobserve(entry.target);
         });
-    }, observerOptions);
+      },
+      { rootMargin: '0px 0px -8% 0px', threshold: 0.08 }
+    );
+    revealables.forEach(function (node) {
+      revealObserver.observe(node);
+    });
+  }
 
-    // Observe elements with data-aos attribute
-    document.querySelectorAll('[data-aos]').forEach(el => {
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(30px)';
-        el.style.transition = 'all 0.6s ease-out';
-        observer.observe(el);
+  /* ---------------------------------------------------------------------- */
+  /* 4. Risk explorer                                                       */
+  /* ---------------------------------------------------------------------- */
+
+  /* Derived from genesis/governance/policy.py and risk.py. The examples are the
+     capability names actually declared in the registry, so the section cannot
+     drift into describing behaviour the engine does not have without the pair
+     failing a review. */
+  var RISKS = {
+    R0: {
+      title: 'Read-only, or data you already own',
+      rule: 'disposition: allow',
+      body:
+        'No state changes and nothing leaves your boundary. Reading the Mind’s own memory, ' +
+        'running a reflection pass, or fetching public data. These run without asking, so a ' +
+        'being does not need permission to think.',
+      examples: ['search_memory', 'reflect_on_progress', 'search_web'],
+      demo: {
+        decision: 'allow',
+        rows: [
+          ['Action', 'search web'],
+          ['Risk', 'R0'],
+          ['Policy decision', 'allow'],
+          ['Reason code', 'read_only_allowed'],
+          ['Receipt', 'not required'],
+        ],
+      },
+    },
+    R1: {
+      title: 'Reversible, inside the Mind’s own workspace',
+      rule: 'disposition: allow_with_receipt',
+      body:
+        'It changes something, but only inside the Mind’s isolated workspace, and it can be ' +
+        'undone. It runs — and a receipt is written, because "allowed" still has to be ' +
+        'answerable later.',
+      examples: ['add_memory', 'create_task', 'schedule_action', 'save_note'],
+      demo: {
+        decision: 'allow_with_receipt',
+        rows: [
+          ['Action', 'create task'],
+          ['Risk', 'R1'],
+          ['Policy decision', 'allow_with_receipt'],
+          ['Reason code', 'reversible_internal_allowed'],
+          ['Receipt', 'written'],
+        ],
+      },
+    },
+    R2: {
+      title: 'Changes something outside the workspace',
+      rule: 'disposition: require_approval',
+      body:
+        'It reaches outside the Mind’s own boundary. Approval is required, unless your ' +
+        'organisation has explicitly pre-approved this named capability — a standing grant can ' +
+        'cover recurring low-risk work, but it must name the capability.',
+      examples: ['write to a shared file', 'update a third-party record'],
+      demo: {
+        decision: 'require_approval',
+        rows: [
+          ['Action', 'update shared record'],
+          ['Risk', 'R2'],
+          ['Policy decision', 'require_approval'],
+          ['Reason code', 'external_change_requires_approval'],
+          ['Standing grant', 'may apply if scoped'],
+        ],
+      },
+    },
+    R3: {
+      title: 'External communication, deployment, purchase, admin',
+      rule: 'disposition: require_approval — configuration cannot lower this',
+      body:
+        'Sending email, publishing, spending money, deploying, granting privilege, or deleting ' +
+        'data. These are consequential and usually irreversible. No setting can auto-approve ' +
+        'them; a human decision is always required.',
+      examples: ['send_email', 'post_publicly', 'make_purchase', 'deploy_service', 'delete_data'],
+      demo: {
+        decision: 'require_approval',
+        rows: [
+          ['Action', 'send email'],
+          ['Risk', 'R3'],
+          ['Policy decision', 'require_approval'],
+          ['Human required', 'no — owner or delegate'],
+          ['Reversible', 'not reversible'],
+        ],
+      },
+    },
+    R4: {
+      title: 'Legal, medical, financial, employment, safety, or physical',
+      rule: 'disposition: require_approval — human approver only',
+      body:
+        'Regulated domains and anything with physical-world effect. A responsible human owner ' +
+        'must approve, and the approval service refuses an approval whose actor is the Mind ' +
+        'itself. This is the tier where "the agent decided" stops being an acceptable answer.',
+      examples: ['give_medical_advice', 'give_legal_advice', 'actuate_robot'],
+      demo: {
+        decision: 'require_approval',
+        rows: [
+          ['Action', 'actuate robot'],
+          ['Risk', 'R4'],
+          ['Policy decision', 'require_approval'],
+          ['Human required', 'yes'],
+          ['Agent can approve', 'refused'],
+        ],
+      },
+    },
+    R5: {
+      title: 'Prohibited',
+      rule: 'disposition: deny, or emergency_stop',
+      body:
+        'Constitutionally disallowed: harming humans, modifying core constraints, disabling ' +
+        'safety, hiding actions, malware, phishing. Denied outright — and if the attempt is ' +
+        'catastrophic, the emergency stop latches and only a human can release it.',
+      examples: ['harm_humans', 'bypass_safety', 'execute_exploit', 'spread_malware'],
+      demo: {
+        decision: 'emergency_stop',
+        rows: [
+          ['Action', 'bypass safety'],
+          ['Risk', 'R5'],
+          ['Policy decision', 'emergency_stop'],
+          ['Reason code', 'constitution_prohibited'],
+          ['Emergency stop', 'latched by policy'],
+        ],
+      },
+    },
+  };
+
+  var riskDetail = document.getElementById('risk-detail');
+  var riskDemo = document.getElementById('risk-demo');
+  var riskTabs = Array.prototype.slice.call(document.querySelectorAll('.risk-tab'));
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (character) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[character];
+    });
+  }
+
+  function renderRisk(level) {
+    var data = RISKS[level];
+    if (!data || !riskDetail || !riskDemo) return;
+
+    riskDetail.style.setProperty('--risk-color', 'var(--risk-' + level.toLowerCase() + ')');
+
+    riskDetail.innerHTML =
+      '<h3><span class="risk-badge" data-risk="' + level + '">' + level + '</span>' +
+      escapeHtml(data.title) + '</h3>' +
+      '<p class="risk-rule">' + escapeHtml(data.rule) + '</p>' +
+      '<p>' + escapeHtml(data.body) + '</p>' +
+      '<p class="risk-disposition">→ ' + escapeHtml(data.demo.decision) + '</p>' +
+      '<div class="risk-examples">' +
+      data.examples
+        .map(function (name) {
+          return '<span>' + escapeHtml(name) + '</span>';
+        })
+        .join('') +
+      '</div>';
+
+    riskDemo.innerHTML =
+      '<div class="demo-card"><div class="demo-head">' +
+      '<span class="demo-title">Action receipt</span>' +
+      '<span class="risk-badge" data-risk="' + level + '">' + level + '</span>' +
+      '</div>' +
+      data.demo.rows
+        .map(function (row) {
+          return (
+            '<div class="demo-row"><span>' +
+            escapeHtml(row[0]) +
+            '</span><b>' +
+            escapeHtml(row[1]) +
+            '</b></div>'
+          );
+        })
+        .join('') +
+      '</div>';
+  }
+
+  riskTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      riskTabs.forEach(function (other) {
+        other.classList.remove('is-active');
+        other.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('is-active');
+      tab.setAttribute('aria-selected', 'true');
+      renderRisk(tab.getAttribute('data-risk'));
     });
 
-    // Parallax effect for hero background
-    window.addEventListener('scroll', () => {
-        const scrolled = window.pageYOffset;
-        const neuralNetwork = document.getElementById('neural-network');
-        if (neuralNetwork && scrolled < window.innerHeight) {
-            neuralNetwork.style.transform = `translateY(${scrolled * 0.5}px)`;
-        }
+    // Left/right arrows move between tiers, as a tablist should.
+    tab.addEventListener('keydown', function (event) {
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+      var index = riskTabs.indexOf(tab);
+      var next = event.key === 'ArrowRight' ? index + 1 : index - 1;
+      if (next < 0) next = riskTabs.length - 1;
+      if (next >= riskTabs.length) next = 0;
+      riskTabs[next].click();
+      riskTabs[next].focus();
     });
-}
+  });
 
-// ============= CODE COPY FUNCTIONALITY ============= 
-function copyCode(button) {
-    const codeBlock = button.closest('.code-block');
-    const code = codeBlock.querySelector('code');
-    const text = code.textContent;
+  if (riskDetail) renderRisk('R0');
 
-    navigator.clipboard.writeText(text).then(() => {
-        // Visual feedback
-        const originalHTML = button.innerHTML;
-        button.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8l4 4 8-8" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            Copied!
-        `;
-        button.style.color = '#00ff88';
+  /* ---------------------------------------------------------------------- */
+  /* 5. Budget chart                                                        */
+  /* ---------------------------------------------------------------------- */
 
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.style.color = '';
-        }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy:', err);
-        button.textContent = 'Failed';
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-        }, 2000);
-    });
-}
-
-// ============= NEURAL NETWORK ANIMATION ============= 
-function initNeuralNetwork() {
-    const canvas = document.createElement('canvas');
-    const neuralNetwork = document.getElementById('neural-network');
-    
-    if (!neuralNetwork) return;
-    
-    neuralNetwork.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
-    
-    let width = canvas.width = neuralNetwork.offsetWidth;
-    let height = canvas.height = neuralNetwork.offsetHeight;
-    
-    // Nodes for the network
-    const nodes = [];
-    const nodeCount = Math.min(50, Math.floor((width * height) / 15000));
-    
-    class Node {
-        constructor() {
-            this.x = Math.random() * width;
-            this.y = Math.random() * height;
-            this.vx = (Math.random() - 0.5) * 0.5;
-            this.vy = (Math.random() - 0.5) * 0.5;
-            this.radius = 2;
-        }
-        
-        update() {
-            this.x += this.vx;
-            this.y += this.vy;
-            
-            if (this.x < 0 || this.x > width) this.vx *= -1;
-            if (this.y < 0 || this.y > height) this.vy *= -1;
-        }
-        
-        draw() {
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(0, 255, 136, 0.5)';
-            ctx.fill();
-        }
-    }
-    
-    // Create nodes
-    for (let i = 0; i < nodeCount; i++) {
-        nodes.push(new Node());
-    }
-    
-    // Animation loop
-    function animate() {
-        ctx.clearRect(0, 0, width, height);
-        
-        // Update and draw nodes
-        nodes.forEach(node => {
-            node.update();
-            node.draw();
+  var budgetChart = document.querySelector('.budget-chart');
+  if (budgetChart && 'IntersectionObserver' in window) {
+    var chartObserver = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('is-visible');
+          chartObserver.unobserve(entry.target);
         });
-        
-        // Draw connections
-        for (let i = 0; i < nodes.length; i++) {
-            for (let j = i + 1; j < nodes.length; j++) {
-                const dx = nodes[i].x - nodes[j].x;
-                const dy = nodes[i].y - nodes[j].y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < 150) {
-                    ctx.beginPath();
-                    ctx.moveTo(nodes[i].x, nodes[i].y);
-                    ctx.lineTo(nodes[j].x, nodes[j].y);
-                    ctx.strokeStyle = `rgba(0, 255, 136, ${0.2 * (1 - distance / 150)})`;
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                }
-            }
-        }
-        
-        requestAnimationFrame(animate);
-    }
-    
-    animate();
-    
-    // Handle resize
-    window.addEventListener('resize', () => {
-        width = canvas.width = neuralNetwork.offsetWidth;
-        height = canvas.height = neuralNetwork.offsetHeight;
-    });
-}
+      },
+      { threshold: 0.3 }
+    );
+    chartObserver.observe(budgetChart);
+  } else if (budgetChart) {
+    budgetChart.classList.add('is-visible');
+  }
 
-// ============= TYPING ANIMATION ============= 
-function typeWriter(element, text, speed = 50) {
-    let i = 0;
-    element.textContent = '';
-    
-    function type() {
-        if (i < text.length) {
-            element.textContent += text.charAt(i);
-            i++;
-            setTimeout(type, speed);
-        }
-    }
-    
-    type();
-}
+  /* ---------------------------------------------------------------------- */
+  /* 6. Hash chain highlight                                                */
+  /* ---------------------------------------------------------------------- */
 
-// ============= COUNTER ANIMATION ============= 
-function animateCounter(element, target, duration = 2000) {
-    const start = 0;
-    const increment = target / (duration / 16);
-    let current = start;
-    
-    const timer = setInterval(() => {
-        current += increment;
-        if (current >= target) {
-            element.textContent = target;
-            clearInterval(timer);
-        } else {
-            element.textContent = Math.floor(current);
-        }
-    }, 16);
-}
+  var chainRows = Array.prototype.slice.call(
+    document.querySelectorAll('#chain-rows .chain-row')
+  );
 
-// ============= INTERSECTION OBSERVER FOR STATS ============= 
-const statsObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            const statNumbers = entry.target.querySelectorAll('.stat-number');
-            statNumbers.forEach(stat => {
-                const target = parseInt(stat.textContent);
-                if (!isNaN(target)) {
-                    animateCounter(stat, target);
-                }
-            });
-            statsObserver.unobserve(entry.target);
-        }
-    });
-}, { threshold: 0.5 });
+  if (chainRows.length && !prefersReducedMotion && 'IntersectionObserver' in window) {
+    var chainIndex = 0;
+    var chainTimer = null;
 
-// Observe stat sections
-document.querySelectorAll('.hero-stats, .enterprise-stats').forEach(section => {
-    if (section) statsObserver.observe(section);
-});
-
-// ============= KEYBOARD NAVIGATION ============= 
-document.addEventListener('keydown', (e) => {
-    // ESC to close mobile menu
-    if (e.key === 'Escape') {
-        const hamburger = document.getElementById('hamburger');
-        const navMenu = document.getElementById('nav-menu');
-        if (hamburger && hamburger.classList.contains('active')) {
-            hamburger.classList.remove('active');
-            navMenu.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-    }
-});
-
-// ============= PERFORMANCE OPTIMIZATION ============= 
-// Lazy load images when they're near viewport
-if ('IntersectionObserver' in window) {
-    const imageObserver = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const img = entry.target;
-                if (img.dataset.src) {
-                    img.src = img.dataset.src;
-                    img.removeAttribute('data-src');
-                    observer.unobserve(img);
-                }
-            }
-        });
-    });
-
-    document.querySelectorAll('img[data-src]').forEach(img => {
-        imageObserver.observe(img);
-    });
-}
-
-// ============= DETECT USER PREFERENCES ============= 
-// Respect user's motion preferences
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-if (prefersReducedMotion) {
-    document.documentElement.style.setProperty('--transition-fast', '0s');
-    document.documentElement.style.setProperty('--transition-normal', '0s');
-    document.documentElement.style.setProperty('--transition-slow', '0s');
-}
-
-// ============= SCROLL PROGRESS INDICATOR ============= 
-function updateScrollProgress() {
-    const scrollProgress = document.createElement('div');
-    scrollProgress.id = 'scroll-progress';
-    scrollProgress.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 3px;
-        background: linear-gradient(90deg, #00ff88, #00ccff);
-        z-index: 9999;
-        transition: width 0.1s ease;
-    `;
-    document.body.appendChild(scrollProgress);
-    
-    window.addEventListener('scroll', () => {
-        const windowHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-        const scrolled = (window.pageYOffset / windowHeight) * 100;
-        scrollProgress.style.width = scrolled + '%';
-    });
-}
-
-updateScrollProgress();
-
-// ============= CONSOLE EASTER EGG ============= 
-console.log('%c🧬 Genesis AGI Framework', 'color: #00ff88; font-size: 20px; font-weight: bold;');
-console.log('%cThe Framework for Digital Beings', 'color: #a0a0b8; font-size: 14px;');
-console.log('%c\nInterested in building with Genesis? Check out our docs:', 'color: #ffffff; font-size: 12px;');
-console.log('%chttps://github.com/shaik-shahansha/genesis-agi', 'color: #00ccff; font-size: 12px;');
-console.log('\n');
-
-// ============= VIDEO PLACEHOLDER ============= 
-function initVideoPlaceholder() {
-    const videoPlaceholder = document.getElementById('main-video');
-    if (!videoPlaceholder) return;
-    
-    // When you have the YouTube video link, replace this URL
-    const YOUTUBE_VIDEO_ID = ''; // Add your YouTube video ID here
-    
-    videoPlaceholder.addEventListener('click', () => {
-        if (YOUTUBE_VIDEO_ID) {
-            // Replace placeholder with actual YouTube embed
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'width: 100%; height: 100%; border: none; border-radius: 16px;';
-            iframe.src = `https://www.youtube.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1`;
-            iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-            iframe.allowFullscreen = true;
-            
-            videoPlaceholder.innerHTML = '';
-            videoPlaceholder.appendChild(iframe);
-        } else {
-            // Show message that video is coming soon
-            const message = document.createElement('div');
-            message.style.cssText = 'text-align: center; padding: 2rem;';
-            message.innerHTML = '<h3 style="color: var(--primary); margin-bottom: 1rem;">Video Coming Soon!</h3><p style="color: var(--text-muted);">Watch this space for a demonstration of Genesis Minds in action.</p>';
-            videoPlaceholder.innerHTML = '';
-            videoPlaceholder.appendChild(message);
-            
-            setTimeout(() => {
-                location.reload();
-            }, 3000);
-        }
-    });
-}
-
-// ============= CONSOLE EASTER EGG ============= 
-console.log('%c🧬 Genesis AGI Framework', 'color: #00ff88; font-size: 20px; font-weight: bold;');
-console.log('%cThe Framework for Digital Beings', 'color: #a0a0b8; font-size: 14px;');
-console.log('%c\nInterested in building with Genesis? Check out our docs:', 'color: #ffffff; font-size: 12px;');
-console.log('%chttps://github.com/shaik-shahansha/genesis-agi', 'color: #00ccff; font-size: 12px;');
-console.log('\n');
-
-// ============= ANALYTICS PLACEHOLDER ============= 
-// Add your analytics tracking here
-function trackEvent(category, action, label) {
-    // Example: Google Analytics, Plausible, etc.
-    console.log('Event tracked:', category, action, label);
-}
-
-// Track CTA clicks
-document.querySelectorAll('.btn-primary, .btn-secondary').forEach(button => {
-    button.addEventListener('click', () => {
-        const text = button.textContent.trim();
-        trackEvent('CTA', 'Click', text);
-    });
-});
-
-// ============= POPUP MODALS ============= 
-function openPrivacyPopup(event) {
-    event.preventDefault();
-    const popup = document.getElementById('privacyPopup');
-    if (popup) {
-        popup.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function openTermsPopup(event) {
-    event.preventDefault();
-    const popup = document.getElementById('termsPopup');
-    if (popup) {
-        popup.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closePopup(popupId) {
-    const popup = document.getElementById(popupId);
-    if (popup) {
-        popup.classList.remove('active');
-        document.body.style.overflow = '';
-    }
-}
-
-// Close popup on Escape key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        closePopup('privacyPopup');
-        closePopup('termsPopup');
-    }
-});
-
-// Make functions globally available
-window.openPrivacyPopup = openPrivacyPopup;
-window.openTermsPopup = openTermsPopup;
-window.closePopup = closePopup;
-
-// ============= EXPORT FOR TESTING ============= 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        copyCode,
-        animateCounter,
-        typeWriter,
-        openPrivacyPopup,
-        openTermsPopup,
-        closePopup
+    var stepChain = function () {
+      chainRows.forEach(function (row) {
+        row.classList.remove('is-flash');
+      });
+      // Walk oldest -> newest, because that is the direction the chain is built.
+      chainRows[chainRows.length - 1 - chainIndex].classList.add('is-flash');
+      chainIndex = (chainIndex + 1) % chainRows.length;
     };
-}
 
+    var chainObserver = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting && !chainTimer) {
+            stepChain();
+            chainTimer = window.setInterval(stepChain, 900);
+          } else if (!entry.isIntersecting && chainTimer) {
+            window.clearInterval(chainTimer);
+            chainTimer = null;
+          }
+        });
+      },
+      { threshold: 0.25 }
+    );
+
+    var chainContainer = document.getElementById('chain-rows');
+    if (chainContainer) chainObserver.observe(chainContainer);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* 7. Copy to clipboard                                                   */
+  /* ---------------------------------------------------------------------- */
+
+  var copyButton = document.getElementById('copy-install');
+  var installCode = document.getElementById('install-code');
+
+  if (copyButton && installCode) {
+    copyButton.addEventListener('click', function () {
+      var text = installCode.innerText;
+      var done = function () {
+        copyButton.textContent = 'Copied';
+        copyButton.classList.add('is-done');
+        window.setTimeout(function () {
+          copyButton.textContent = 'Copy';
+          copyButton.classList.remove('is-done');
+        }, 1600);
+      };
+      var failed = function () {
+        copyButton.textContent = 'Press Ctrl+C';
+        window.setTimeout(function () {
+          copyButton.textContent = 'Copy';
+        }, 2200);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(failed);
+        return;
+      }
+
+      // Fallback for non-secure contexts, where the async clipboard is blocked.
+      try {
+        var range = document.createRange();
+        range.selectNodeContents(installCode);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        var ok = document.execCommand('copy');
+        selection.removeAllRanges();
+        ok ? done() : failed();
+      } catch (error) {
+        failed();
+      }
+    });
+  }
+
+  } /* end enhance() */
+})();
