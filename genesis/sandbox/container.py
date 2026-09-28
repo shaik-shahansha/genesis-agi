@@ -782,6 +782,9 @@ class ContainerSandboxProvider:
             execution_time=elapsed,
             exit_reason="completed",
             output_truncated=truncated,
+            # `--network none` is unconditional for a policy that does not enable
+            # network access, so this claim is structural rather than probed.
+            network_isolated=not effective.network_enabled,
         )
 
     # -- internals ---------------------------------------------------------- #

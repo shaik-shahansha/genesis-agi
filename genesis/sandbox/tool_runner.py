@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
@@ -127,6 +127,23 @@ class ToolRunOutcome:
     stderr: str = ""
     exit_reason: str = "completed"
     provider: str = "unknown"
+    #: Whether the sandbox blocked egress for this run. ``None`` means the
+    #: provider does not isolate the network; ``False`` means it should have and
+    #: did not. Recorded so a receipt states the fact instead of implying it.
+    network_isolated: Optional[bool] = None
+    #: Non-fatal observations worth carrying into the receipt.
+    warnings: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "success": self.success,
+            "error": self.error,
+            "error_type": self.error_type,
+            "exit_reason": self.exit_reason,
+            "provider": self.provider,
+            "network_isolated": self.network_isolated,
+            "warnings": list(self.warnings),
+        }
 
 
 def run_coroutine_sync(coro):
@@ -202,6 +219,14 @@ async def execute_tool_code(
 
         execution = await sandbox.execute(handle, wrapper, policy=policy)
 
+        # Carry the provider's isolation facts into the outcome. A run that could
+        # not block egress is not the same as one that did, and only the receipt
+        # can make that distinction later.
+        isolation = {
+            "network_isolated": execution.network_isolated,
+            "warnings": list(execution.warnings),
+        }
+
         if execution.exit_reason == "policy_denied":
             return ToolRunOutcome(
                 success=False,
@@ -209,6 +234,7 @@ async def execute_tool_code(
                 stderr=execution.stderr,
                 exit_reason=execution.exit_reason,
                 provider=provider_name,
+                **isolation,
             )
 
         if execution.timed_out:
@@ -218,6 +244,7 @@ async def execute_tool_code(
                 stderr=execution.stderr,
                 exit_reason="timeout",
                 provider=provider_name,
+                **isolation,
             )
 
         payload = _parse_envelope(execution.stdout)
@@ -231,6 +258,7 @@ async def execute_tool_code(
                 stderr=execution.stderr,
                 exit_reason=execution.exit_reason,
                 provider=provider_name,
+                **isolation,
             )
 
         if payload.get("success"):
@@ -239,6 +267,7 @@ async def execute_tool_code(
                 result=payload.get("result"),
                 stderr=execution.stderr,
                 provider=provider_name,
+                **isolation,
             )
 
         return ToolRunOutcome(
@@ -248,6 +277,7 @@ async def execute_tool_code(
             stderr=execution.stderr or payload.get("traceback", ""),
             exit_reason=execution.exit_reason,
             provider=provider_name,
+            **isolation,
         )
 
     except SandboxError as exc:

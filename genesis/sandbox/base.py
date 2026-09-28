@@ -190,6 +190,17 @@ class ExecutionResult:
     timed_out: bool = False
     output_truncated: bool = False
 
+    #: Whether egress was actually blocked for THIS run. ``None`` means the
+    #: provider does not isolate the network at all, which is different from
+    #: ``False`` (it should have, and did not). Recorded so an ActionReceipt can
+    #: state the fact rather than imply it.
+    network_isolated: Optional[bool] = None
+
+    #: Non-fatal observations worth recording alongside the outcome, such as
+    #: "egress was not blocked because this host has no usable network
+    #: namespace". Surfaced instead of being swallowed into a log line.
+    warnings: list[str] = field(default_factory=list)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "success": self.success,
@@ -201,6 +212,8 @@ class ExecutionResult:
             "exit_reason": self.exit_reason,
             "timed_out": self.timed_out,
             "output_truncated": self.output_truncated,
+            "network_isolated": self.network_isolated,
+            "warnings": list(self.warnings),
             "artifacts": [
                 {"name": a.name, "size_bytes": a.size_bytes, "host_path": str(a.host_path) if a.host_path else None}
                 for a in self.artifacts

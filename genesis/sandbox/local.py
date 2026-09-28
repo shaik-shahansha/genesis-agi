@@ -42,6 +42,7 @@ import sys
 import tempfile
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -118,6 +119,55 @@ runpy.run_path(_target, run_name="__main__")
 # Small, self-contained probe used to detect usable network isolation.
 _PROBE_CODE = "print('genesis-probe-ok')"
 
+#: Script that reports whether it can reach the network. Used to *verify* network
+#: isolation rather than infer it from `unshare` merely existing: the previous
+#: check proved only that a namespace could be created, which is not the same
+#: claim as "egress is blocked".
+#:
+#: Addresses are literal IPs so the result does not depend on DNS working.
+_EGRESS_PROBE_CODE = '''\
+import socket
+
+TARGETS = [("1.1.1.1", 443), ("8.8.8.8", 53), ("9.9.9.9", 53)]
+
+reached = []
+for host, port in TARGETS:
+    try:
+        socket.create_connection((host, port), timeout=2).close()
+        reached.append(f"{host}:{port}")
+    except OSError:
+        pass
+
+print("genesis-egress=" + (",".join(reached) if reached else "blocked"))
+'''
+
+
+@dataclass(frozen=True)
+class NetworkIsolationProbe:
+    """Result of verifying whether network isolation actually works here.
+
+    Distinguishes three states the old boolean conflated:
+
+    * **verified** — the host has egress and the namespace provably blocks it.
+    * **unverified** — the namespace runs, but the host has no egress either, so
+      there is nothing to demonstrate. Reporting this as isolation would be a
+      claim we cannot support.
+    * **unavailable** — no usable mechanism at all.
+    """
+
+    verified: bool
+    reason: str
+    host_has_egress: Optional[bool] = None
+    namespace_blocks_egress: Optional[bool] = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "verified": self.verified,
+            "reason": self.reason,
+            "host_has_egress": self.host_has_egress,
+            "namespace_blocks_egress": self.namespace_blocks_egress,
+        }
+
 
 class LocalSandboxProvider:
     """Hardened-subprocess sandbox provider."""
@@ -138,6 +188,7 @@ class LocalSandboxProvider:
         self.root.mkdir(parents=True, exist_ok=True)
         self.base_image_packages = base_image_packages or set()
         self._network_isolation: Optional[bool] = None
+        self._network_probe: Optional[NetworkIsolationProbe] = None
 
     # -- capabilities ------------------------------------------------------
 
@@ -145,8 +196,11 @@ class LocalSandboxProvider:
         """What this provider actually enforces here, for receipts and logs.
 
         Reported honestly: a caller must be able to tell whether egress was
-        really blocked or merely intended to be.
+        really blocked or merely intended to be. ``network_isolation`` is true
+        only when the probe *demonstrated* the block; ``network_probe`` carries
+        the reason either way.
         """
+        probe = self.probe_network_isolation()
         return {
             "provider": self.name,
             "is_security_boundary": False,
@@ -157,7 +211,14 @@ class LocalSandboxProvider:
             "package_install": False,
             "filesystem_isolation": False,
             "pid_isolation": False,
-            "network_isolation": self._detect_network_isolation(),
+            "network_isolation": probe.verified,
+            "network_probe": probe.to_dict(),
+            "recommendation": (
+                None
+                if probe.verified
+                else "Use the container sandbox provider (GENESIS_SANDBOX_PROVIDER="
+                "container) for filesystem, PID and network isolation."
+            ),
         }
 
     # -- lifecycle ---------------------------------------------------------
@@ -305,8 +366,31 @@ class LocalSandboxProvider:
         )
 
         argv = [sys.executable, str(runner), str(script)]
-        if self._detect_network_isolation() and not effective.network_enabled:
+
+        # Network handling. The probe is evidence, not a guess, so this branch
+        # knows whether the namespace is real.
+        probe = self.probe_network_isolation()
+        egress_blocked = False
+        warnings: list[str] = []
+
+        if effective.network_enabled:
+            warnings.append(
+                "This policy enables network access, which the local provider "
+                "cannot restrict to allowed domains. Use the container provider "
+                "with an egress proxy if the destination matters."
+            )
+        elif probe.verified:
             argv = ["unshare", "-rn", "--", *argv]
+            egress_blocked = True
+        else:
+            # The policy wanted egress blocked and we cannot deliver that. Run
+            # anyway (refusing would make the local provider unusable in the
+            # container the project ships in), but say so, loudly and in the
+            # result, so an ActionReceipt records it rather than implying the
+            # run was isolated.
+            warnings.append(
+                f"Egress was NOT blocked for this run: {probe.reason}"
+            )
 
         env = self._build_env(effective)
         start = time.time()
@@ -356,6 +440,8 @@ class LocalSandboxProvider:
                 exit_reason="timeout",
                 timed_out=True,
                 output_truncated=truncated,
+                network_isolated=egress_blocked,
+                warnings=warnings,
             )
 
         return ExecutionResult(
@@ -366,6 +452,8 @@ class LocalSandboxProvider:
             execution_time=elapsed,
             exit_reason="completed",
             output_truncated=truncated,
+            network_isolated=egress_blocked,
+            warnings=warnings,
         )
 
     # -- internals ---------------------------------------------------------
@@ -531,35 +619,123 @@ class LocalSandboxProvider:
         )
 
     def _detect_network_isolation(self) -> bool:
-        """Probe once for an unprivileged network namespace.
+        """Whether egress is *verified* to be blocked in this environment.
 
-        Cached because the probe costs a process spawn. Docker/kernel
-        configuration varies, so this is detected rather than assumed.
+        True only when the probe demonstrated both halves: the host can reach the
+        network, and the namespace cannot. `unshare` merely existing is not
+        evidence — that was the previous behaviour, and it reported isolation
+        whenever the binary was present, including in environments where the
+        namespace could not actually be created.
         """
-        if self._network_isolation is not None:
-            return self._network_isolation
+        return self.probe_network_isolation().verified
 
-        self._network_isolation = False
+    def probe_network_isolation(self) -> NetworkIsolationProbe:
+        """Verify network isolation empirically, once per provider instance.
+
+        Three subprocesses at most, cached, and never raising: a detection
+        failure must degrade to "not verified", never break execution.
+        """
+        if self._network_probe is not None:
+            return self._network_probe
+
+        self._network_probe = self._run_network_probe()
+        self._network_isolation = self._network_probe.verified
+        return self._network_probe
+
+    def _run_network_probe(self) -> NetworkIsolationProbe:
         if sys.platform == "win32":
-            return False
+            return NetworkIsolationProbe(
+                verified=False,
+                reason="No unprivileged network namespaces on Windows; use the "
+                "container sandbox provider for network isolation.",
+            )
+
         if shutil.which("unshare") is None:
-            return False
+            return NetworkIsolationProbe(
+                verified=False,
+                reason="`unshare` is not installed, so no network namespace is available.",
+            )
 
         try:
             import subprocess
 
-            probe = subprocess.run(
+            namespace_available = subprocess.run(
                 ["unshare", "-rn", "--", sys.executable, "-c", _PROBE_CODE],
                 capture_output=True,
                 timeout=10,
                 check=False,
             )
-            self._network_isolation = probe.returncode == 0 and b"genesis-probe-ok" in probe.stdout
-        except Exception:  # noqa: BLE001 - detection must never break execution
-            self._network_isolation = False
+            if namespace_available.returncode != 0 or b"genesis-probe-ok" not in namespace_available.stdout:
+                return NetworkIsolationProbe(
+                    verified=False,
+                    reason=(
+                        "`unshare -rn` could not create a network namespace here "
+                        "(common inside a container without the required privileges). "
+                        "Use the container sandbox provider, which isolates the "
+                        "network at the container level."
+                    ),
+                )
 
-        return self._network_isolation
+            # Half one: does this host have egress at all? Without this, a host
+            # with no network would look "isolated" because nothing connects.
+            host = subprocess.run(
+                [sys.executable, "-c", _EGRESS_PROBE_CODE],
+                capture_output=True,
+                timeout=20,
+                check=False,
+            )
+            host_output = host.stdout.decode("utf-8", errors="replace")
+            host_has_egress = "genesis-egress=" in host_output and "genesis-egress=blocked" not in host_output
+
+            if not host_has_egress:
+                return NetworkIsolationProbe(
+                    verified=False,
+                    reason=(
+                        "Network isolation is untested: this host has no outbound "
+                        "network, so there is nothing to demonstrate. Not reported as "
+                        "isolated because that claim cannot be supported here."
+                    ),
+                    host_has_egress=False,
+                )
+
+            # Half two: does the namespace block it?
+            inside = subprocess.run(
+                ["unshare", "-rn", "--", sys.executable, "-c", _EGRESS_PROBE_CODE],
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+            inside_output = inside.stdout.decode("utf-8", errors="replace")
+            blocked = "genesis-egress=blocked" in inside_output
+
+            if not blocked:
+                return NetworkIsolationProbe(
+                    verified=False,
+                    reason=(
+                        "The network namespace did not block outbound connections, so "
+                        "egress is NOT isolated. Use the container sandbox provider."
+                    ),
+                    host_has_egress=True,
+                    namespace_blocks_egress=False,
+                )
+
+            return NetworkIsolationProbe(
+                verified=True,
+                reason="Verified: the host has egress and the namespace blocks it.",
+                host_has_egress=True,
+                namespace_blocks_egress=True,
+            )
+
+        except Exception as exc:  # noqa: BLE001 - detection must never break execution
+            return NetworkIsolationProbe(
+                verified=False,
+                reason=f"Network isolation could not be verified: {type(exc).__name__}.",
+            )
 
 
 # ``CapabilityUnavailableError`` is re-exported for callers that catch it here.
-__all__ = ["CapabilityUnavailableError", "LocalSandboxProvider"]
+__all__ = [
+    "CapabilityUnavailableError",
+    "LocalSandboxProvider",
+    "NetworkIsolationProbe",
+]
