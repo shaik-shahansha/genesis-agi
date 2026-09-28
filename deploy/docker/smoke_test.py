@@ -123,37 +123,53 @@ def check_authed_endpoint(base: str, token: str | None) -> None:
         record(False, "GET /api/v1/auth/me (authenticated)", f"{type(exc).__name__}: {exc}")
 
 
-def check_websocket_upgrade(base: str) -> None:
-    """Confirm nginx proxies the WebSocket upgrade.
+def check_websocket_upgrade(base: str, token: str | None) -> None:
+    """Confirm nginx proxies the WebSocket upgrade, and that auth is enforced.
 
-    A 404 error frame is a PASS: it proves the handshake completed and the API
-    answered. It also demonstrates SEC-01: the socket is accepted with no token
-    and a caller-supplied user_email. See docs/v3/SECURITY_BASELINE.md.
+    Two assertions:
+      1. WITHOUT a credential the handshake must be rejected (SEC-01 fix).
+      2. WITH a valid credential the upgrade must be proxied by nginx.
+
+    For (2), a "Mind not found" error frame counts as a PASS: it proves the
+    handshake completed and the API answered. It also confirms the caller was
+    authenticated, because an unauthenticated handshake is closed first.
     """
     try:
         import asyncio
 
         import websockets  # type: ignore
     except ImportError:
-        record(False, "WS upgrade through nginx", "skipped: websockets not installed")
+        record(False, "WS auth + upgrade through nginx", "skipped: websockets not installed")
         return
 
     ws_base = base.replace("https://", "wss://").replace("http://", "ws://")
-    url = (
-        f"{ws_base}/api/v1/minds/GMD-SMOKE-0000-0000/stream"
-        "?user_email=smoke-test@example.com"
-    )
+    path = "/api/v1/minds/GMD-SMOKE-0000-0000/stream"
 
-    async def _attempt() -> tuple[bool, str]:
+    async def _try(url: str) -> tuple[bool, str]:
         try:
             async with websockets.connect(url, open_timeout=20) as ws:
                 frame = await asyncio.wait_for(ws.recv(), timeout=20)
                 return True, str(frame)[:120]
         except Exception as exc:  # noqa: BLE001
-            return False, f"{type(exc).__name__}: {exc}"
+            return False, f"{type(exc).__name__}: {str(exc)[:120]}"
 
-    ok, detail = asyncio.run(_attempt())
-    record(ok, "WS upgrade through nginx", detail)
+    async def _run() -> None:
+        # 1. No credential -> must be refused during the handshake.
+        ok_unauthed, detail = await _try(f"{ws_base}{path}?user_email=spoof@example.com")
+        record(
+            not ok_unauthed,
+            "WS rejects unauthenticated handshake (SEC-01)",
+            f"refused ({detail})" if not ok_unauthed else f"ACCEPTED WITHOUT AUTH: {detail}",
+        )
+
+        # 2. With a credential -> nginx must proxy the upgrade.
+        if not token:
+            record(False, "WS upgrade through nginx", "skipped: no token")
+            return
+        ok_auth, detail = await _try(f"{ws_base}{path}?token={urllib.parse.quote(token)}")
+        record(ok_auth, "WS upgrade through nginx (authenticated)", detail)
+
+    asyncio.run(_run())
 
 
 def check_persistence() -> None:
@@ -214,7 +230,7 @@ def main() -> int:
     check_web(base)
     token = check_api_auth(base)
     check_authed_endpoint(base, token)
-    check_websocket_upgrade(base)
+    check_websocket_upgrade(base, token)
     check_persistence()
 
     passed = sum(1 for ok, _, _ in results if ok)

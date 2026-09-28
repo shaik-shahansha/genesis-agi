@@ -13,7 +13,7 @@
 
 | ID | Severity | Finding |
 |---|---|---|
-| SEC-01 | **C** | Unauthenticated WebSocket accepts any `user_email` and falls back to a shared identity |
+| SEC-01 | ~~**C**~~ **FIXED** | Unauthenticated WebSocket accepts any `user_email` and falls back to a shared identity |
 | SEC-02 | **C** | Arbitrary host file write via unsanitised `filename` in workspace upload/create |
 | SEC-03 | **C** | Model-generated code executes with no sandbox, no resource limits, no egress control |
 | SEC-04 | **C** | Runtime `pip install` driven by imports found in model-generated code |
@@ -169,7 +169,25 @@ Consequences:
 
 ---
 
-## 7. Authorization risks — SEC-01 (critical)
+## 7. Authorization risks — SEC-01 (critical) — **FIXED 2026-09-28**
+
+> **Resolution.** The endpoint now authenticates during the handshake, before
+> `accept()`, using the same verification path as HTTP (`resolve_user_from_token` /
+> `resolve_user_from_api_key` via the new `authenticate_websocket` helper). The user
+> identity is derived server-side from the verified credential; `?user_email=` is no
+> longer read at all. Unauthenticated handshakes are refused with HTTP 403; a user
+> without access to the Mind is closed with code 1008. Mind access follows the same
+> rules as the HTTP endpoints (admin / explicit grant / public / creator).
+>
+> Covered by `tests/security/test_websocket_auth.py` (17 tests, all passing) and by
+> `deploy/docker/smoke_test.py`, which asserts an unauthenticated handshake is refused
+> against the running container.
+>
+> *Remaining:* the environment WebSocket (`/api/v1/environments/ws/{id}`) still has its
+> original handling. A token in a query string can also reach access logs, so the
+> bundled nginx config strips query strings from its log format.
+
+### Original finding (retained for the record)
 
 `genesis/api/routes.py:3003`:
 

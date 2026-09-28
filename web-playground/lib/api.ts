@@ -751,3 +751,37 @@ export class GenesisAPI {
 
 // Export singleton instance
 export const api = new GenesisAPI();
+
+/**
+ * Credential to use for WebSocket authentication.
+ *
+ * A Firebase ID token takes precedence, then the legacy JWT stored by
+ * `GenesisAPI.setToken`. Mirrors the precedence used for HTTP requests.
+ */
+export async function getWebSocketToken(): Promise<string | null> {
+  const firebaseToken = await getFirebaseToken();
+  if (firebaseToken) {
+    return firebaseToken;
+  }
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('genesis_token');
+  }
+  return null;
+}
+
+/**
+ * Build a WebSocket URL with the auth credential attached.
+ *
+ * Browsers cannot set headers on a WebSocket handshake, so the credential is
+ * passed as a query parameter. The server verifies it *before* accepting the
+ * socket (see `authenticate_websocket` in genesis/api/auth.py).
+ */
+export async function buildAuthenticatedWebSocketUrl(path: string): Promise<string> {
+  const base = buildWebSocketUrl(path);
+  const token = await getWebSocketToken();
+  if (!token) {
+    return base;
+  }
+  const separator = base.includes('?') ? '&' : '?';
+  return `${base}${separator}token=${encodeURIComponent(token)}`;
+}

@@ -32,15 +32,16 @@ does not change them, and putting it on a public VPS makes them reachable.
 
 | Risk | Detail | Containment for now |
 |---|---|---|
-| **SEC-01 — unauthenticated WebSocket** | `ws /api/v1/minds/{id}/stream` calls `accept()` before any auth check and trusts a client-supplied `user_email` query parameter. Anyone who can reach the port can open a chat session and impersonate an email. | Do **not** expose port 8080 publicly. Put it behind a VPN/SSH tunnel, or restrict with firewall allow-listing, until Phase B fixes this. |
+| ~~**SEC-01 — unauthenticated WebSocket**~~ | ~~`ws /api/v1/minds/{id}/stream` accepted connections before any auth check.~~ | ✅ **FIXED.** The handshake now requires a valid credential and identity is derived server-side. Verified in-container: an unauthenticated handshake is refused with HTTP 403. |
 | **SEC-03/04 — no real sandbox** | The Mind's code executor runs model-generated code in a subprocess **inside this container**, and can `pip install` at runtime. | This container is not a security boundary for generated code. Treat Mind autonomy as untrusted. |
-| **T-16 — default JWT secret** | The app ships a public default secret. | `docker-compose.yml` now **refuses to start** unless `API_SECRET_KEY` is set. |
-| **SEC-02 — workspace path traversal** | Uploaded filenames were used unsanitised. | Not yet fixed in code; do not enable multi-user access. |
+| **SEC-02 — workspace path traversal** | Uploaded filenames were used unsanitised. | **Not yet fixed** in code; do not enable multi-user file upload. |
+| **T-16 — default JWT secret** | The app ships a public default secret. | `docker-compose.yml` **refuses to start** unless `API_SECRET_KEY` is set. |
 | In-container generated code (restricted) | Even restricted, generated code shares the container's network and filesystem with the API. | For stronger isolation, run the executor as a separate container later (the `SandboxProvider` abstraction in Phase B is designed for exactly this). |
 
 **Bottom line:** this container is a good *deployment* unit and a poor *security boundary*.
-Ship it to your own VPS behind a firewall/tunnel for personal use; do not hand the URL to
-other people until Phase B lands.
+Because generated code still runs unsandboxed inside it, do not expose it to untrusted users
+until the sandbox work (Phase B) lands. For personal use on your own VPS, bind it to
+`127.0.0.1` behind a tunnel or restrict it with a firewall allow-list.
 
 ---
 

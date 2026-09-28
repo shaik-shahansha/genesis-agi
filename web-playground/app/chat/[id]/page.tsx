@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthRequired from '@/components/AuthRequired';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
-import { api } from '@/lib/api';
+import { api, buildAuthenticatedWebSocketUrl } from '@/lib/api';
 import { getFirebaseToken } from '@/lib/firebase';
 import { useMindCache } from '@/lib/MindContext';
 import { buildWebSocketUrl } from '@/lib/urls';
@@ -187,13 +187,26 @@ export default function ChatPage() {
 
   // WebSocket connection for proactive messages
   useEffect(() => {
-    if (mindId && userEmail) {  // Only connect after email is set
-      const wsUrl = buildWebSocketUrl(
-        `/api/v1/minds/${mindId}/stream?user_email=${encodeURIComponent(userEmail)}`
+    if (!mindId || !userEmail) {  // Only connect after email is set
+      return;
+    }
+
+    let ws: WebSocket | null = null;
+    let cancelled = false;
+
+    (async () => {
+      // The server derives the caller's identity from this credential, and no
+      // longer trusts a client-supplied user_email (SEC-01).
+      const wsUrl = await buildAuthenticatedWebSocketUrl(
+        `/api/v1/minds/${mindId}/stream`
       );
-      
-      console.log('[WebSocket] Connecting with email:', userEmail);
-      const ws = new WebSocket(wsUrl);
+
+      if (cancelled) {
+        return;
+      }
+
+      console.log('[WebSocket] Connecting as:', userEmail);
+      ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
         console.log('[WebSocket] ✅ Connected successfully');
@@ -341,10 +354,12 @@ export default function ChatPage() {
         console.error('[WebSocket] Check if backend WebSocket endpoint is accessible');
       };
       
-      return () => {
-        ws.close();
-      };
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+      ws?.close();
+    };
   }, [mindId, userEmail, API_URL]);
 
   const fetchMind = async () => {

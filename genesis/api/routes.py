@@ -3000,46 +3000,105 @@ async def disable_plugin(
 
 
 # WebSocket endpoint for real-time chat
+async def _user_can_access_mind(mind: Mind, user: User) -> bool:
+    """Authorize a user against a Mind.
+
+    Mirrors the rules used by the HTTP endpoints: admins always have access; a
+    user is allowed when explicitly granted access, when the Mind is public, or
+    when they are the Mind's creator.
+    """
+    from genesis.api.auth import UserRole
+
+    if user.role == UserRole.ADMIN:
+        return True
+
+    email = (user.email or "").strip().lower()
+    gmid = mind.identity.gmid
+
+    try:
+        from genesis.database.manager import MetaverseDB
+        db = MetaverseDB()
+
+        allowed = {e.strip().lower() for e in (db.get_mind_allowed_users(gmid) or [])}
+        if email and email in allowed:
+            return True
+
+        if db.get_mind_is_public(gmid):
+            return True
+    except Exception as exc:
+        # Fail closed: a broken access check must never grant access.
+        logger.error("Mind access check failed for %s: %s", gmid, exc)
+        return False
+
+    creator = (mind.identity.creator_email or mind.identity.creator or "").strip().lower()
+    return bool(email and creator and email == creator)
+
+
 @minds_router.websocket("/{mind_id}/stream")
 async def websocket_chat(websocket: WebSocket, mind_id: str):
+    """WebSocket endpoint for real-time streaming chat.
+
+    Authentication is REQUIRED and is verified during the handshake, before the
+    socket is accepted. The user identity is derived server-side from the
+    verified credential; a client-supplied ``user_email`` is never trusted
+    (fixes SEC-01, where any client could impersonate an email address and
+    receive another user's proactive notifications).
+
+    Closes with code 1008 when the handshake carries no valid credential, and
+    when the authenticated user has no access to the requested Mind.
     """
-    WebSocket endpoint for real-time streaming chat with proactive messaging support.
-    
-    The Mind can now send proactive messages through this connection!
-    """
-    await websocket.accept()
-    
-    # Extract user email from query params or try to infer from Authorization header
-    user_email = websocket.query_params.get("user_email")
+    from genesis.api.auth import authenticate_websocket
+
+    # --- Authenticate before doing anything else ---------------------------
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        logger.warning("Rejected unauthenticated WebSocket for Mind %s", mind_id)
+        await websocket.close(code=1008, reason="Authentication required")
+        return
+
+    user_email = (user.email or user.username or "").strip()
     if not user_email:
-        # Try to extract email from a Bearer token (Firebase ID token, etc.)
-        try:
-            from genesis.api.firebase_auth import get_firebase_user_email
-            auth_header = websocket.headers.get('authorization')
-            if auth_header and auth_header.lower().startswith('bearer '):
-                token = auth_header.split(' ', 1)[1]
-                try:
-                    email = get_firebase_user_email(token)
-                    if email:
-                        user_email = email
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        logger.warning("Rejected WebSocket: authenticated principal has no email address")
+        await websocket.close(code=1008, reason="Account has no email address")
+        return
 
-    if not user_email:
-        user_email = "web_user@genesis.local"
-        logger.warning("WebSocket connected without user_email; defaulting to web_user@genesis.local")
-
-    mind = None  # Initialize to None to avoid UnboundLocalError
-
+    # --- Load the Mind (before accept, so failures close cleanly) ----------
     try:
         # Load Mind - USE CACHED MIND so WebSocket registration persists!
         print(f"[WEBSOCKET ENDPOINT] Loading mind from cache...")
         mind = await _get_cached_mind(mind_id)
+    except HTTPException as exc:
+        # Authenticated, but the Mind does not exist. Preserve the previous
+        # client-visible behaviour: accept, report the problem, then close, so
+        # the UI can show a useful message rather than an opaque handshake
+        # failure. No data is exposed because there is no Mind to read.
+        logger.warning("WebSocket for unknown Mind %s: %s", mind_id, exc.detail)
+        await websocket.accept()
+        await websocket.send_json({"type": "error", "message": str(exc.detail)})
+        await websocket.close(code=1008)
+        return
+    except Exception as exc:
+        logger.error("WebSocket could not load Mind %s: %s", mind_id, exc)
+        await websocket.accept()
+        await websocket.send_json({"type": "error", "message": "Failed to load Mind"})
+        await websocket.close(code=1011)
+        return
+
+    try:
         print(f"[WEBSOCKET ENDPOINT] ✓ Mind loaded: {mind.identity.name}")
         print(f"[WEBSOCKET ENDPOINT] Mind instance ID: {id(mind)}")
         
+        # --- Authorize this user against this Mind (SEC-01) ----------------
+        if not await _user_can_access_mind(mind, user):
+            logger.warning(
+                "Rejected WebSocket: user %s has no access to Mind %s", user_email, mind_id
+            )
+            await websocket.close(code=1008, reason="Access denied")
+            return
+
+        # Only accept once the caller is authenticated AND authorized.
+        await websocket.accept()
+
         # Register websocket with notification manager for proactive messages
         if hasattr(mind, 'notification_manager') and mind.notification_manager:
             mind.notification_manager.register_websocket(user_email, websocket)

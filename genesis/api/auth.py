@@ -141,21 +141,18 @@ def revoke_api_key(api_key: str) -> bool:
     return False
 
 
-async def get_current_user_from_token(
-    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
-) -> Optional[User]:
-    """Get current user from JWT token or Firebase ID token."""
-    print(f"DEBUG AUTH: get_current_user_from_token called")
-    print(f"DEBUG AUTH: credentials present: {credentials is not None}")
-    
-    if not credentials:
-        print("DEBUG AUTH: No credentials provided")
-        return None
+async def resolve_user_from_token(token: str) -> Optional[User]:
+    """Resolve a user from a raw JWT or Firebase ID token.
 
-    token = credentials.credentials
-    print(f"DEBUG AUTH: Token present: {token is not None}")
-    print(f"DEBUG AUTH: Token length: {len(token) if token else 0}")
-    # Note: Never log actual token data for security
+    This is the single verification path. HTTP bearer auth and WebSocket
+    authentication both call it, so the two transports cannot drift apart
+    (see docs/v3/SECURITY_BASELINE.md SEC-01).
+
+    Returns None when the token is missing, malformed, expired, or belongs to an
+    unknown user.
+    """
+    if not token:
+        return None
 
     # First, try Firebase token verification if Firebase is enabled
     print(f"DEBUG AUTH: Checking if Firebase is enabled...")
@@ -249,10 +246,20 @@ async def get_current_user_from_token(
     return User(**user_dict)
 
 
-async def get_current_user_from_api_key(
-    api_key: Optional[str] = Security(api_key_header),
+async def get_current_user_from_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
 ) -> Optional[User]:
-    """Get current user from API key."""
+    """Get current user from a JWT or Firebase ID token (HTTP bearer)."""
+    if not credentials or not credentials.credentials:
+        return None
+    return await resolve_user_from_token(credentials.credentials)
+
+
+async def resolve_user_from_api_key(api_key: str) -> Optional[User]:
+    """Resolve a user from a raw API key.
+
+    Shared by HTTP `X-API-Key` auth and WebSocket authentication.
+    """
     if not api_key:
         return None
 
@@ -280,6 +287,15 @@ async def get_current_user_from_api_key(
         pass
 
     return User(**user_dict)
+
+
+async def get_current_user_from_api_key(
+    api_key: Optional[str] = Security(api_key_header),
+) -> Optional[User]:
+    """Get current user from API key (HTTP)."""
+    if not api_key:
+        return None
+    return await resolve_user_from_api_key(api_key)
 
 
 async def get_current_user(
@@ -339,6 +355,53 @@ async def require_write_access(
             detail="Write access required",
         )
     return current_user
+
+
+async def authenticate_websocket(websocket) -> Optional[User]:
+    """Authenticate a WebSocket from its handshake, BEFORE the socket is accepted.
+
+    Uses exactly the same verification as HTTP auth (``resolve_user_from_token``
+    / ``resolve_user_from_api_key``) so the two transports cannot diverge.
+    Fixes SEC-01, where the socket was accepted with no credential and the caller
+    supplied its own identity via ``?user_email=``.
+
+    Credential sources, tried in order:
+
+    1. ``Authorization: Bearer <jwt>`` header
+    2. ``?token=<jwt>`` query parameter (browsers cannot set WS headers)
+    3. ``X-API-Key`` header, or ``?api_key=`` query parameter
+
+    Returns None when no usable credential is present or it fails verification.
+    Callers MUST treat None as unauthorized and close the handshake.
+
+    Note: a token in a query string can be captured by access logs and browser
+    history. The bundled nginx config strips query strings from access logs for
+    this reason; prefer the header form for non-browser clients.
+    """
+    headers = websocket.headers
+    query = websocket.query_params
+
+    auth_header = headers.get("authorization") or ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+        if token:
+            user = await resolve_user_from_token(token)
+            if user:
+                return user
+
+    token = (query.get("token") or "").strip()
+    if token:
+        user = await resolve_user_from_token(token)
+        if user:
+            return user
+
+    api_key = (headers.get("x-api-key") or query.get("api_key") or "").strip()
+    if api_key:
+        user = await resolve_user_from_api_key(api_key)
+        if user:
+            return user
+
+    return None
 
 
 def create_user(
