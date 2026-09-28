@@ -9,6 +9,12 @@ from genesis.database.models import (
     SharedEvent,
     MetaverseState,
 )
+from genesis.database.governance_models import (
+    ActionReceiptRecord,
+    ApprovalRequestRecord,
+    GovernanceEventRecord,
+    PermissionGrantRecord,
+)
 from genesis.database.manager import MetaverseDB
 
 __all__ = [
@@ -21,5 +27,9 @@ __all__ = [
     "EnvironmentVisit",
     "SharedEvent",
     "MetaverseState",
+    "GovernanceEventRecord",
+    "ActionReceiptRecord",
+    "ApprovalRequestRecord",
+    "PermissionGrantRecord",
     "MetaverseDB",
 ]

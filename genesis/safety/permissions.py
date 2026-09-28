@@ -28,9 +28,17 @@ class ActionLog(BaseModel):
 
 class PermissionSystem:
     """
-    Permission and action logging system.
+    Legacy permission ladder and action log.
 
-    Enforces permission levels and logs all autonomous actions.
+    ADR-0006/0007 changed where authorization is decided: the authoritative
+    control is :class:`genesis.governance.GovernanceGate`, which evaluates the
+    action deterministically and owns the approval queue. This class remains for
+    the append-only JSONL action log and for callers that only need the ladder.
+
+    Note that :meth:`check_permission` cannot authorize a confirmation-required
+    action, because it has no approval context. It returns ``False`` with a
+    message pointing at the governance path rather than claiming to have made a
+    decision it did not make.
     """
 
     def __init__(self, mind_id: str):
@@ -80,14 +88,31 @@ class PermissionSystem:
         if permission_level == PermissionLevel.AUTO_APPROVED_WITH_LOG:
             return True, "Auto-approved (logged)"
 
-        # Requires confirmation (in real deployment, would prompt user)
+        # Requires confirmation.
+        #
+        # This used to be a permanent denial ("not implemented in auto mode"),
+        # which made the setting `require_approval_for_external_actions` a lie and
+        # made every confirmation-required capability unusable.
+        #
+        # The real control is now the governance gate (ADR-0006/0007): an action
+        # like this is routed to the approval queue, and a human either issues a
+        # parameter-bound grant or rejects it. This method is a legacy ladder —
+        # it reports `False` because it has no approval context, so callers must
+        # consult `genesis.governance.GovernanceGate` rather than treat this as
+        # the final word.
         if permission_level == PermissionLevel.REQUIRES_CONFIRMATION:
-            # For now, deny (in production, would ask user)
-            return False, "Requires user confirmation (not implemented in auto mode)"
+            return False, (
+                "Requires human confirmation. Route through the governance approval "
+                "queue (genesis.governance): it issues a parameter-bound, single-use, "
+                "expiring grant on approval."
+            )
 
         # Requires approval with review
         if permission_level == PermissionLevel.REQUIRES_APPROVAL_WITH_REVIEW:
-            return False, "Requires user approval with review"
+            return False, (
+                "Requires human approval with review. Route through the governance "
+                "approval queue (genesis.governance)."
+            )
 
         return False, "Unknown permission level"
 

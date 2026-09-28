@@ -17,6 +17,15 @@ from genesis.database.models import (
     SharedEvent,
     MetaverseState,
 )
+# Governance control plane (ADR-0006/0007/0008). Imported for its side effect:
+# registering the four tables on Base.metadata so autogenerate and
+# create_all() see them.
+from genesis.database.governance_models import (
+    GovernanceEventRecord,
+    ActionReceiptRecord,
+    ApprovalRequestRecord,
+    PermissionGrantRecord,
+)
 from genesis.config import get_settings
 
 # Alembic Config object

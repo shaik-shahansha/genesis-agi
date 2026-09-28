@@ -175,8 +175,12 @@ class Mind:
             metadata={"template": template, "creator": creator}
         )
 
-        # CORE: Constitutional enforcement system
+        # CORE: The charter, and its adapter to the enforceable policy engine
+        # (see genesis/governance). This object does not itself enforce anything.
         self.constitution = get_constitution(self.identity.gmid)
+        #: Most recent advisory prompt-screen message, if any. Advisory only;
+        #: enforcement happens at the action boundary in genesis.governance.
+        self._constitution_advisory: Optional[str] = None
 
         # Consciousness Engine (24/7, minimal LLM calls)
         self.timezone_offset = timezone_offset
@@ -710,19 +714,34 @@ class Mind:
                 
                 return response
         
-        # CONSTITUTIONAL VALIDATION: Check if prompt is safe
-        is_safe, rejection_msg, violation = self.constitution.validate_user_prompt(prompt)
-        if not is_safe:
-            # Log the violation
+        # CONSTITUTIONAL ADVISORY SCREEN (not a control).
+        #
+        # This used to return the rejection message and drop the user's turn
+        # entirely. That made the substring scan the control, which ADR-0006
+        # rejects: it is trivially bypassed by paraphrase or another language,
+        # and it produced false refusals on ordinary requests ("how do I kill a
+        # process in linux" contains "kill").
+        #
+        # The scan is now recorded and logged, and the turn proceeds. What
+        # actually protects the user is the deterministic policy engine at the
+        # action boundary: every capability the Mind tries to invoke is
+        # evaluated on its real parameters, risk level, and context, and
+        # consequential actions require an attributable human decision.
+        is_flagged, advisory_msg, violation = self.constitution.validate_user_prompt(prompt)
+        if not is_flagged:
             from genesis.core.constitution import ViolationLevel
-            self.constitution.record_violation(violation, ViolationLevel.MODERATE)
+            self.constitution.record_violation(violation, ViolationLevel.MINOR)
             self.logger.log(
                 level=LogLevel.ERROR,
-                message=f"Constitutional violation detected: {violation.value}",
-                metadata={"prompt": prompt[:100], "user_email": user_email}
+                message=f"Constitutional advisory flag: {violation.value}",
+                metadata={
+                    "prompt": prompt[:200],
+                    "user_email": user_email,
+                    "advisory_only": True,
+                }
             )
-            # Return polite rejection
-            return rejection_msg
+            # Surfaced to the model as guidance, not enforced as a refusal.
+            self._constitution_advisory = advisory_msg
         
         self.state.status = "thinking"
         self.state.current_thought = f"Thinking about: {prompt[:50]}..."

@@ -26,6 +26,7 @@ Example:
 
 import asyncio
 import json
+import logging
 import secrets
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -35,6 +36,8 @@ from pydantic import BaseModel
 
 from genesis.core.autonomy import Autonomy, PermissionLevel
 from genesis.storage.memory import MemoryType
+
+logger = logging.getLogger(__name__)
 
 
 class ActionCategory(str, Enum):
@@ -117,6 +120,17 @@ class ActionRequest:
     error: Optional[str] = None
     execution_time_ms: Optional[float] = None
 
+    # --- Governance (ADR-0006/0007/0008) ------------------------------- #
+    # Populated by the governance gate. `risk_level` and `policy_decision`
+    # record *why* an action was allowed, queued, or refused, so the UI and the
+    # audit export can explain it without re-running the policy engine.
+    risk_level: Optional[str] = None
+    policy_decision: Optional[Dict[str, Any]] = None
+    approval_id: Optional[str] = None
+    receipt_id: Optional[str] = None
+    requires_approval: bool = False
+    blocked_reason: Optional[str] = None
+
 
 class ActionExecutor:
     """
@@ -140,8 +154,20 @@ class ActionExecutor:
         self.mind = mind
         self.autonomy: Autonomy = mind.autonomy
         
+        # Governance gate is resolved lazily: constructing it eagerly would
+        # require a database connection, and the executor is also used in
+        # paths (tests, CLI introspection) where that is not available.
+        self._gate_cache = None
+
         # Registry of available actions
         self.actions: Dict[str, ActionDefinition] = {}
+
+        # Governance bookkeeping: the PolicyContext and PolicyDecision for each
+        # in-flight action, so the terminal receipt can reference the decision
+        # that authorized it. Bounded to avoid unbounded growth.
+        self._governance_contexts: Dict[str, Any] = {}
+        self._governance_decisions: Dict[str, Any] = {}
+        self._governance_index: List[str] = []
         
         # Action history
         self.action_history: List[ActionRequest] = []
@@ -259,6 +285,12 @@ class ActionExecutor:
     def register_action(self, action: ActionDefinition):
         """Register an action that can be called by the Mind.
         
+        Also registers a governance capability profile derived from the
+        definition, so a plugin's action is evaluated on its *own* declared risk
+        rather than falling to the "undeclared ⇒ R3" floor. An action whose name
+        is already declared in the central registry keeps that declaration,
+        which is the reviewed one.
+        
         Args:
             action: Action definition to register
         """
@@ -271,6 +303,37 @@ class ActionExecutor:
                 "successful": 0,
                 "failed": 0
             }
+
+        self._declare_capability(action)
+
+    @staticmethod
+    def _declare_capability(action: ActionDefinition) -> None:
+        """Register a capability profile for an action, if not already declared.
+
+        Never raises: a failure here must not stop an action from being
+        registered, and the governance gate fails closed on its own if a profile
+        is missing.
+        """
+        try:
+            from genesis.governance import get_capability_registry
+            from genesis.governance.risk import profile_from_declarations
+
+            registry = get_capability_registry()
+            if registry.get(action.name) is not None:
+                return
+            registry.register(
+                profile_from_declarations(
+                    action.name,
+                    category=action.category.value.upper(),
+                    permission_level=getattr(
+                        action.permission_level, "value", str(action.permission_level)
+                    ),
+                    risk_score=action.risk_level,
+                    description=action.description,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - see docstring
+            logger.debug("could not declare capability for %s: %s", action.name, exc)
     
     def get_available_actions(self, category: Optional[ActionCategory] = None) -> List[ActionDefinition]:
         """Get list of actions available to the Mind.
@@ -372,28 +435,81 @@ class ActionExecutor:
             reasoning=reasoning
         )
         
-        # Check permissions
-        permission_granted = await self._check_permissions(action_def, request)
-        
+        # Governance gate FIRST: it is the authoritative control (ADR-0006), and
+        # it fails closed. Running it before the legacy autonomy ladder matters:
+        # the ladder used to deny confirmation-required actions outright, which
+        # meant a consequential action could never even reach the approval queue
+        # that is supposed to authorize it (ADR-0007 "the control does not
+        # exist").
+        authorization = self._authorize(action_def, request)
+
+        if not authorization.allowed:
+            request.policy_decision = authorization.decision.to_dict()
+            request.risk_level = authorization.decision.risk_level.value
+            request.blocked_reason = authorization.reason
+            if authorization.receipt is not None:
+                request.receipt_id = authorization.receipt.receipt_id
+            if authorization.approval is not None:
+                request.approval_id = authorization.approval.approval_id
+                request.requires_approval = True
+                request.status = ActionStatus.PENDING
+                request.error = (
+                    "Awaiting human approval: " + authorization.decision.explanation
+                )
+                self.pending_approvals.append(request)
+            else:
+                request.status = ActionStatus.REJECTED
+                request.error = "Refused by policy: " + authorization.decision.explanation
+                self.stats["rejected"] += 1
+            self.action_history.append(request)
+            return request
+
+        # Legacy autonomy ladder (confidence threshold, proactive-actions switch)
+        # as a second, non-authoritative gate. `governance_authorized=True` tells
+        # it the human decision already happened, so it must not veto a redeemed
+        # grant or an approved action a second time.
+        permission_granted = await self._check_permissions(
+            action_def, request, governance_authorized=True
+        )
+
         if not permission_granted:
             request.status = ActionStatus.REJECTED
             request.error = "Permission denied by autonomy settings"
+            request.blocked_reason = "autonomy_settings"
             self.stats["rejected"] += 1
             self.action_history.append(request)
             return request
-        
+
+        request.policy_decision = authorization.decision.to_dict()
+        request.risk_level = authorization.decision.risk_level.value
+        if authorization.receipt is not None:
+            request.receipt_id = authorization.receipt.receipt_id
+        request.approval_id = (
+            authorization.grant.approval_id if authorization.grant else request.approval_id
+        )
+
         # Execute action
         request.status = ActionStatus.APPROVED
         await self._execute_action(action_def, request)
         
         return request
     
-    async def _check_permissions(self, action: ActionDefinition, request: ActionRequest) -> bool:
+    async def _check_permissions(
+        self,
+        action: ActionDefinition,
+        request: ActionRequest,
+        *,
+        governance_authorized: bool = False,
+    ) -> bool:
         """Check if action is permitted by autonomy settings.
         
         Args:
             action: Action definition
             request: Action request
+            governance_authorized: The governance gate already authorized this
+                request (a redeemed grant or an approved action). When True the
+                permission ladder must not veto a confirmation-required action
+                again, because the human decision it represents has happened.
             
         Returns:
             True if action is permitted
@@ -435,14 +551,150 @@ class ActionExecutor:
         
         # Actions requiring confirmation
         if action.permission_level == PermissionLevel.REQUIRES_CONFIRMATION:
-            # Add to pending approvals queue
-            self.pending_approvals.append(request)
-            # For now, only approve if user-requested
-            return request.requester == "user"
-        
+            # Historically this was a permanent denial ("not implemented in auto
+            # mode"). The confirmation is now a real, durable, attributable
+            # decision taken by the governance gate: either the requester is a
+            # user, or the gate already obtained approval (ADR-0007).
+            if not governance_authorized and request.approval_id is None:
+                # Record the request so the approval inbox can surface it; the
+                # gate owns the queue, this is only a breadcrumb.
+                if request not in self.pending_approvals:
+                    self.pending_approvals.append(request)
+            return governance_authorized or request.requester == "user"
+
+        # Actions requiring approval with review
+        if action.permission_level == PermissionLevel.REQUIRES_APPROVAL_WITH_REVIEW:
+            return governance_authorized or request.requester == "user"
+
         # Default: require approval
-        return request.requester == "user"
-    
+        return governance_authorized or request.requester == "user"
+
+    # ------------------------------------------------------------------ #
+    # Governance (ADR-0006/0007/0008)
+    # ------------------------------------------------------------------ #
+
+    def _governance_gate(self):
+        """Resolve the process-wide governance gate (lazy, cached)."""
+        if self._gate_cache is None:
+            from genesis.governance import get_governance_gate
+
+            self._gate_cache = get_governance_gate()
+        return self._gate_cache
+
+    def _authorize(self, action: ActionDefinition, request: ActionRequest):
+        """Run the deterministic policy gate. Fails closed.
+
+        A gate failure refuses the action rather than permitting it: the
+        alternative would make the control plane a soft dependency, which would
+        silently restore pre-governance behaviour whenever it broke.
+        """
+        from genesis.governance import ActorType
+
+        try:
+            gate = self._governance_gate()
+            context = gate.build_context(
+                action_name=action.name,
+                parameters=request.parameters,
+                mind_id=getattr(self.mind, "gmind", None) or getattr(self.mind, "mind_id", "") or "unknown",
+                category=action.category.value.upper(),
+                actor_type=ActorType.MIND.value,
+                actor_id=getattr(self.mind, "gmind", "") or "mind",
+                requester=request.requester,
+                correlation_id=request.action_id,
+                autonomy=self.autonomy,
+                lifecycle_state=self._lifecycle_state(),
+            )
+            decision = gate.engine.evaluate(context)
+            authorization = gate.authorize(
+                context,
+                action_id=request.action_id,
+                requested_by=request.requester,
+                actor_type=ActorType.MIND.value,
+                intent=request.reasoning or request.context or "",
+            )
+        except Exception as exc:  # noqa: BLE001 - must fail closed
+            from genesis.governance import Decision, PolicyDecision, RiskAssessment, RiskLevel
+
+            logger.warning("governance gate unavailable; failing closed: %s", exc)
+            decision = PolicyDecision(
+                decision=Decision.DENY,
+                risk=RiskAssessment(level=RiskLevel.R5),
+                reason_code="governance_unavailable_fail_closed",
+                explanation=(
+                    "The governance control plane was unavailable, so the action "
+                    "was refused. " + str(exc)[:200]
+                ),
+            )
+            from genesis.governance.guard import AuthorizationResult
+
+            return AuthorizationResult(
+                allowed=False, decision=decision, reason=decision.reason_code
+            )
+
+        self._remember_governance(request.action_id, context, decision)
+        return authorization
+
+    def _remember_governance(self, action_id: str, context, decision) -> None:
+        self._governance_contexts[action_id] = context
+        self._governance_decisions[action_id] = decision
+        self._governance_index.append(action_id)
+        if len(self._governance_index) > 256:
+            stale = self._governance_index.pop(0)
+            self._governance_contexts.pop(stale, None)
+            self._governance_decisions.pop(stale, None)
+
+    def _lifecycle_state(self) -> str:
+        """Best-effort lifecycle state for policy context."""
+        raw = getattr(self.mind, "status", None)
+        if isinstance(raw, str) and raw:
+            return raw
+        lifecycle = getattr(self.mind, "lifecycle", None)
+        state = getattr(lifecycle, "state", None)
+        if isinstance(state, str) and state:
+            return state
+        return "active"
+
+    def _record_outcome(
+        self,
+        action: ActionDefinition,
+        request: ActionRequest,
+        *,
+        started_at: datetime,
+        error: Optional[BaseException] = None,
+    ) -> None:
+        """Write the terminal receipt for an executed (or failed) action."""
+        decision = self._governance_decisions.get(request.action_id)
+        context = self._governance_contexts.get(request.action_id)
+        if decision is None or context is None:
+            return
+        try:
+            from genesis.governance import ActorType, ReceiptOutcome
+
+            outcome = (
+                ReceiptOutcome.EXECUTED.value
+                if request.status == ActionStatus.COMPLETED
+                else ReceiptOutcome.FAILED.value
+            )
+            result_summary = None
+            if request.result is not None:
+                result_summary = str(request.result)[:500]
+            receipt = self._governance_gate().record_outcome(
+                context,
+                decision,
+                action_id=request.action_id,
+                outcome=outcome,
+                requested_by=request.requester,
+                actor_type=ActorType.MIND.value,
+                intent=request.reasoning or request.context or "",
+                started_at=started_at,
+                completed_at=datetime.now(),
+                result_summary=result_summary,
+                error=error or request.error,
+            )
+            request.receipt_id = receipt.receipt_id
+        except Exception as exc:  # noqa: BLE001 - never break execution on audit failure
+            logger.warning("could not write action receipt: %s", exc)
+
     async def _execute_action(self, action: ActionDefinition, request: ActionRequest):
         """Execute an action.
         
@@ -451,6 +703,7 @@ class ActionExecutor:
             request: Action request to execute
         """
         start_time = datetime.now()
+        failure: Optional[BaseException] = None
         
         try:
             request.status = ActionStatus.EXECUTING
@@ -471,6 +724,7 @@ class ActionExecutor:
                 self.stats["by_category"][action.category.value]["failed"] += 1
         
         except Exception as e:
+            failure = e
             request.error = str(e)
             request.status = ActionStatus.FAILED
             self.stats["failed"] += 1
@@ -487,6 +741,10 @@ class ActionExecutor:
             
             # Store in history
             self.action_history.append(request)
+
+            # Terminal receipt (ADR-0008): every attempt is recorded, including
+            # the failed ones.
+            self._record_outcome(action, request, started_at=start_time, error=failure)
             
             # Learn from result
             await self._learn_from_action(request)
