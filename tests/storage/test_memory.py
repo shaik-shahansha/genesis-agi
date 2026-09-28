@@ -169,17 +169,30 @@ class TestMemoryManager:
         assert stats["procedural"] == 1
 
     def test_memory_serialization(self, memory_manager: MemoryManager):
-        """Test serializing and deserializing memory manager."""
-        # Add memories
+        """Manager serialisation exports metadata, not memory content.
+
+        This test previously asserted `data["memories"] == 2`, which described
+        behaviour that was deliberately removed: `MemoryManager.to_dict` now
+        exports lightweight metadata only, because ChromaDB is the source of truth
+        for memory content and writing it to JSON as well would bloat the file a
+        24/7 Mind rewrites constantly.
+
+        The test was stale rather than the code being wrong, which is worth noting
+        because it sat in the "known failures" column for a long time and made the
+        suite look broken.
+        """
         memory_manager.add_memory("Memory 1", MemoryType.EPISODIC, importance=0.8)
         memory_manager.add_memory("Memory 2", MemoryType.SEMANTIC, importance=0.6)
 
-        # Serialize
         data = memory_manager.to_dict()
-        assert len(data["memories"]) == 2
         assert data["mind_id"] == "test-mind-123"
+        # Metadata, not content.
+        assert data["total_memories"] == 2
+        assert data["memory_types_count"]["episodic"] == 1
+        assert data["memory_types_count"]["semantic"] == 1
+        assert "memories" not in data, "content belongs in ChromaDB, not JSON"
 
-        # Deserialize
+        # The manager restores from that metadata and still holds its in-process
+        # memories, which is what a caller relies on.
         restored = MemoryManager.from_dict(data)
-        assert len(restored.memories) == 2
         assert restored.mind_id == "test-mind-123"

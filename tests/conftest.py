@@ -1,11 +1,69 @@
-"""Pytest configuration and fixtures for Genesis tests."""
+"""Pytest configuration and fixtures for Genesis tests.
 
+**Test isolation (backlog item A2).** The suite previously shared one persistent
+ChromaDB directory per `mind_id` under the real `~/.genesis`, so collections
+accumulated across runs and across tests. That is not a cosmetic problem: it
+produced order-dependent failures such as
+
+    assert memory_manager.vector_store.count() == 1
+    assert 596 == 1
+
+where the test was correct and the environment was not. Those failures were
+misread as pre-existing bugs for as long as they existed, and they hid real ones.
+
+The autouse session fixture below sets `GENESIS_ENV=test` and
+`GENESIS_VECTOR_STORE_MODE=ephemeral` before any settings are constructed, so a
+fresh checkout is isolated by default rather than relying on every test to
+remember. It runs at session scope because `get_settings()` is cached.
+"""
+
+import os
 import pytest
 import asyncio
 from pathlib import Path
 import tempfile
 import shutil
 from typing import Generator, Dict, Any
+
+
+def pytest_configure(config):
+    """Set the test environment before any genesis module reads settings.
+
+    `pytest_configure` runs before collection, so this is early enough to beat
+    the `lru_cache` on `get_settings()`.
+    """
+    os.environ.setdefault("GENESIS_ENV", "test")
+    # Hermetic vectors: in-memory rather than a shared directory on disk.
+    os.environ.setdefault("GENESIS_VECTOR_STORE_MODE", "ephemeral")
+    # The durable governance store is the production default; tests that want it
+    # opt in explicitly (see tests/governance/test_sql_store.py).
+    os.environ.setdefault("GENESIS_GOVERNANCE_STORE", "memory")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolated_vector_store(tmp_path_factory):
+    """Fail loudly if something re-enables a persistent vector store.
+
+    A silent fall back to persistent would reintroduce exactly the
+    order-dependence this fixture exists to remove, and would do so invisibly.
+    """
+    from genesis.config import get_settings
+
+    get_settings.cache_clear()
+    settings = get_settings()
+    # Read the same way `VectorStore` does: the GENESIS_-prefixed environment
+    # variable, not the pydantic field name.
+    mode = os.environ.get("GENESIS_VECTOR_STORE_MODE") or getattr(
+        settings, "vector_store_mode", "persistent"
+    )
+    if mode != "ephemeral":
+        raise RuntimeError(
+            "tests must run with an ephemeral vector store, but "
+            f"GENESIS_VECTOR_STORE_MODE resolved to {mode!r}. Set "
+            "GENESIS_VECTOR_STORE_MODE=ephemeral."
+        )
+    return mode
+
 
 from genesis.config import Settings
 from genesis.core.mind import Mind

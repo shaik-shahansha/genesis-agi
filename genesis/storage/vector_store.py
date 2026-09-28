@@ -1,5 +1,8 @@
 ﻿"""Vector storage using ChromaDB for semantic search."""
 
+import logging
+import os
+
 import chromadb
 from chromadb.config import Settings
 from typing import List, Dict, Any, Optional
@@ -7,30 +10,77 @@ from pathlib import Path
 
 from genesis.config import get_settings
 
+logger = logging.getLogger(__name__)
+
 
 class VectorStore:
     """
     Vector storage for semantic memory using ChromaDB.
 
     Enables semantic search across memories, thoughts, and conversations.
+
+    Two modes, selected by the ``vector_store_mode`` setting:
+
+    * ``persistent`` (default) — a ChromaDB directory per Mind under
+      ``data_dir/chroma/<mind_id>``, surviving restarts.
+    * ``ephemeral`` — an in-memory client. Hermetic, which is what makes the test
+      suite deterministic: a shared persistent collection accumulates across runs,
+      so an assertion like "there is exactly 1 memory" fails against whatever a
+      previous run left behind rather than against the code.
     """
 
-    def __init__(self, mind_id: str):
-        """Initialize vector store for a specific Mind."""
+    def __init__(self, mind_id: str, mode: Optional[str] = None):
+        """Initialize vector store for a specific Mind.
+
+        Args:
+            mind_id: The Mind this store belongs to.
+            mode: Override the configured mode. Used by tests and by callers that
+                need a throwaway store regardless of configuration.
+        """
         self.mind_id = mind_id
         self.settings = get_settings()
 
-        # Create persistent ChromaDB client
-        chroma_path = self.settings.data_dir / "chroma" / mind_id
-        chroma_path.mkdir(parents=True, exist_ok=True)
-
-        self.client = chromadb.PersistentClient(
-            path=str(chroma_path),
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=True,
-            ),
+        # Resolution order: explicit argument, then `GENESIS_VECTOR_STORE_MODE`,
+        # then the `vector_store_mode` setting, then persistent.
+        #
+        # The environment variable is read directly rather than relying on
+        # pydantic-settings to map it. Settings here have no `env_prefix`, so a
+        # field can only be set by an environment variable named exactly after it
+        # (`vector_store_mode` -> `VECTOR_STORE_MODE`), whereas every other
+        # cross-cutting switch in this codebase (`GENESIS_SANDBOX_PROVIDER`,
+        # `GENESIS_GOVERNANCE_STORE`, `GENESIS_SUPERVISOR`) is a `GENESIS_`-prefixed
+        # variable read from `os.environ`. Matching that convention is what makes
+        # `GENESIS_VECTOR_STORE_MODE=ephemeral pytest` work as expected.
+        resolved = (
+            mode
+            or os.environ.get("GENESIS_VECTOR_STORE_MODE")
+            or getattr(self.settings, "vector_store_mode", None)
+            or "persistent"
         )
+        resolved = str(resolved).strip().lower()
+        if resolved not in ("persistent", "ephemeral"):
+            logger.warning(
+                "unknown vector store mode %r; falling back to persistent", resolved
+            )
+            resolved = "persistent"
+        self.mode = resolved
+
+        chroma_settings = Settings(
+            anonymized_telemetry=False,
+            allow_reset=True,
+        )
+
+        if resolved == "ephemeral":
+            self.client = chromadb.EphemeralClient(settings=chroma_settings)
+            self.persist_directory = None
+        else:
+            chroma_path = self.settings.data_dir / "chroma" / mind_id
+            chroma_path.mkdir(parents=True, exist_ok=True)
+            self.persist_directory = chroma_path
+            self.client = chromadb.PersistentClient(
+                path=str(chroma_path),
+                settings=chroma_settings,
+            )
 
         # Create or get collection
         self.collection = self.client.get_or_create_collection(

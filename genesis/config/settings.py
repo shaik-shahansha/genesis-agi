@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///genesis.db"
     vector_db_path: str = "./chroma_db"
+    #: "persistent" writes a ChromaDB directory under data_dir and survives
+    #: restarts. "ephemeral" keeps vectors in memory only, which is what makes the
+    #: test suite hermetic: a shared persistent collection accumulates across
+    #: runs, so a test asserting "there is exactly 1 memory" fails against the
+    #: hundreds a previous run left behind rather than against the code. Also the
+    #: right choice for a read-only or demo deployment that has no business
+    #: writing a vector database.
+    vector_store_mode: str = "persistent"
 
     # Model Providers - API Keys
     openrouter_api_key: Optional[str] = None  # Free models available from https://openrouter.ai/
