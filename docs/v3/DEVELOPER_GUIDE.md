@@ -10,9 +10,9 @@
 |---|---|
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
-| **Last verified** | 2026-09-28, full test suite + container smoke test |
-| **Test suite** | 551 passed, 5 skipped, 12 failed (all 12 pre-existing, reproduce on the pristine tree) |
-| **Container** | Image builds; runs `Up (healthy)`; all 12 governance endpoints verified live |
+| **Last verified** | 2026-09-28 — full suite, container build, live endpoint checks, live sandbox escape tests |
+| **Test suite** | 629 passed, 5 skipped, 11 deselected (quarantined with a printed reason each), 10 known failures |
+| **Container** | Image builds; runs `Up (healthy)`; all 9 governance endpoints verified live in the final image |
 | **Sandbox isolation** | Verified against a real container: 10/10 claims held, 11 escape tests in the suite |
 | **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.1` |
 
@@ -258,12 +258,15 @@ Legend: **✅ implemented and tested** · **⚠️ partial, honestly reported** 
 | Migration-chain guards | `alembic/versions/` | `tests/test_migrations.py` |
 | Durable store (the one production uses) | `genesis/governance/store.py` | `tests/governance/test_sql_store.py` |
 
-**260 governance and migration tests** (229 governance + 31 migration guards). The suite covers:
-the R0–R5 matrix, undeclared-capability flooring, advisory-can't-lower, budget refusal, lifecycle
-halting, tenant blocks and the R2 cap, scope escalation, emergency-stop latching *and* rehydration
-from the journal, grant parameter-mutation/replay/cross-mind/expiry, journal tamper detection and
-splicing, redaction of secret-shaped keys and inline credentials, the full approval-to-redemption
-lifecycle, and end-to-end executor flow including "the handler must not run before approval".
+**587 tests across governance, security and migrations** (305 governance + 251 security + 31
+migration guards). The suite covers the R0–R5 matrix, undeclared-capability flooring,
+advisory-can't-lower, budget refusal, lifecycle halting, tenant blocks and the R2 cap, scope
+escalation, emergency-stop latching *and* rehydration from the journal, grant
+parameter-mutation/replay/cross-mind/expiry, journal tamper detection and splicing, redaction of
+secret-shaped keys and inline credentials, the full approval-to-redemption lifecycle, end-to-end
+executor flow including "the handler must not run before approval", correlation scoping and
+`explain_chain`, the domain journal's two guarantees (no content, never breaks the caller), and the
+commitment state machine including refused illegal transitions and third-party fail-closed defaults.
 
 Two bug classes were found only by going beyond the unit suite, and both now have guards:
 
@@ -293,21 +296,21 @@ Two bug classes were found only by going beyond the unit suite, and both now hav
 | Placeholder signing key (B12) | ✅ **closed** — the app refuses to boot with it outside test/dev, and an unset `GENESIS_ENV` counts as production |
 | `LocalSandboxProvider` honesty | ✅ still reports `is_security_boundary: false`; `factory` refuses to fall back to it when `container` is requested |
 
-What remains in Phase B is developer experience (A2/A4/A6), not a security boundary.
+**Phase B is closed.** The only remaining item is `mypy` cleanliness, which is linting, not a security boundary.
 
 ### 3.3 Developer experience
 
 | Item | State |
 |---|---|
 | Test suite runs without paid API keys | ✅ |
-| 537 governance, migration and security tests | ✅ |
+| 629 passing tests, 5 skipped, 11 quarantined with a printed reason | ✅ |
 | Container sandbox escape tests | ✅ 11 tests, skipped when no runtime/image is present rather than silently passing |
 | Alembic migration for governance tables | ✅ `008_governance_plane`, verified upgrade → downgrade → upgrade → `downgrade base` → upgrade |
 | Migration chain usable from a fresh database | ✅ **fixed** — three earlier revisions created the same index twice (`index=True` *and* an explicit `create_index`), so `alembic upgrade head` aborted partway and every later revision, including the governance one, was unreachable on a new install. Guarded by `tests/test_migrations.py`. |
 | SQL store covered by tests | ✅ **fixed** — every multi-row read raised `DetachedInstanceError` (rows converted after the session closed). Invisible while a table is empty, so it surfaced as `GET /journal/verify` returning 200 then 500. Guarded by `tests/governance/test_sql_store.py`. |
-| CI (lint ratchet, tests, migration up/down) | 🚧 not built (A6) |
+| CI (lint ratchet, tests, migration up/down) | ✅ **built** — `.github/workflows/ci.yml`, three jobs. Verified locally before committing |
 | `mypy genesis` clean | 🚧 not built (A4) |
-| Deterministic per-test isolation of ChromaDB / `~/.genesis` | 🚧 not built (A2) — a cause of order-dependent tests |
+| Deterministic per-test isolation of ChromaDB / `~/.genesis` | ✅ **fixed** (A2) — the vector store takes an explicit mode; the suite runs `GENESIS_VECTOR_STORE_MODE=ephemeral` and an autouse fixture fails the session if it is not. This removed two of the "pre-existing failures" from the failure column: they were the shared ChromaDB, not the code. |
 
 ---
 
@@ -320,7 +323,8 @@ Be careful with these — several are asserted in public material and are not tr
 | "Consciousness" | Not claimed by the code. The mechanism is a periodic cognition loop with awareness levels and budget caps. |
 | "Violations cannot be bypassed via prompt injection" | Was false (a substring scan). The *action* boundary is now enforced deterministically; prompt screening is labelled advisory. |
 | `require_approval_for_external_actions` | Was a lie (the approval path did not exist). It now works — but note the setting itself is still not read by the policy engine; risk classification is the control. |
-| Filesystem-isolated sandbox | Not implemented. See §3.2. |
+| Filesystem-isolated sandbox | **Depends on the provider.** `container` is a real boundary (verified against a real runtime: 10/10 isolation claims held, 11 escape tests). `local` is a resource limiter and says so about itself. Never assume — read `capabilities()` |
+| Network isolation | Verified, not assumed: `verified` requires the host to have egress **and** the namespace to block it. If the probe cannot prove both, the sandbox reports `verified: false` with the reason and the receipt records the fact |
 | Memory as a temporal knowledge graph / bi-temporal store | Not implemented. ChromaDB + a relevance multiplier; cannot express "true from March, superseded in July". ADR-0003/0004 describe the target. |
 | Portable signed identity (DID / verifiable credentials) | Not implemented. `gmid` is a local identifier. |
 | Durable multi-process kernel, checkpoints, resume | Not implemented. |
@@ -347,11 +351,14 @@ playground, and static assets are served behind it. Supported on a small VPS
 (~1 vCPU / 1 GB) for a handful of Minds.
 
 **Verified in the built image**, not just locally: container `Up (healthy)`; built-in JWT login via
-`POST /api/v1/auth/token`; `GET /auth/me`; and all twelve governance endpoints returning 200,
-including `GET /journal/verify` called twice in a row. Note that Firebase is genuinely optional:
-`GET /api/v1/auth/firebase/status` reports it disabled on a default install, and the web workspace
-offers a username/password sign-in that talks to the API directly. Until recently it did not, so a
-Firebase-less install could not be signed into at all.
+`POST /api/v1/auth/token`; `GET /auth/me`; and all nine governance endpoints returning 200,
+including `GET /journal/verify` called twice in a row. Two more facts were checked in that same
+image: requesting `GENESIS_SANDBOX_PROVIDER=container` where no runtime exists **refuses** rather
+than falling back to `local`, and `LocalSandboxProvider.capabilities()` still reports its four
+isolation claims as `false` with the reason, even from inside a container. Note that Firebase is
+genuinely optional: `GET /api/v1/auth/firebase/status` reports it disabled on a default install,
+and the web workspace offers a username/password sign-in that talks to the API directly. Until
+recently it did not, so a Firebase-less install could not be signed into at all.
 
 Full details, including the volume layout and TLS: `docs/v3/DEPLOYMENT_SINGLE_CONTAINER.md`.
 
@@ -390,6 +397,7 @@ alembic downgrade -1      # drops the four governance tables
 | `GENESIS_SUPERVISOR` | `none` | `systemd` delegates Mind daemon lifecycle. `none` returns 501 with the operator command rather than forking from the API |
 | `API_SECRET_KEY` / `SECRET_KEY` | placeholder | The app **refuses to boot** with the placeholder outside test/dev |
 | `DATA_DIR`, `MINDS_DIR`, `LOGS_DIR` | `~/.genesis/*` | Independent settings — do not assume they follow `GENESIS_HOME` |
+| `GENESIS_VECTOR_STORE_MODE` | from settings (`persistent`) | `ephemeral` keeps ChromaDB in memory. Read from the environment, not from `Settings`, because `Settings` has no `env_prefix` — a field named `vector_store_mode` would look for `VECTOR_STORE_MODE`. The test suite requires `ephemeral` |
 
 ---
 
@@ -495,10 +503,11 @@ security; the remaining items are engineering hygiene.
 | **B9** | MCP servers no longer inherit the host environment | ✅ **Done** — base allowlist, secrets refused even when explicitly requested |
 | **B11** | API-tier process spawning removed; lifecycle delegated to a supervisor | ✅ **Done** — default refuses with the operator command rather than silently forking |
 | B12 | Refuse to boot on a placeholder signing key | ✅ **Done** |
-| A2/A4/A6 | Test isolation, CI, `mypy` | 🚧 open |
+| A2 | Test isolation | ✅ **Done** — `GENESIS_VECTOR_STORE_MODE=ephemeral`, enforced by an autouse fixture. This removed two of the "pre-existing" failures: they were the shared ChromaDB, not the code |
+| A6 | CI | ✅ **Done** — tests on 3.11 and 3.12, migration up/down from an empty database, sandbox policy guards |
+| A4 | `mypy` clean | 🚧 open |
 
-**Phase B is functionally closed.** What remains (A2/A4/A6) is developer
-experience, not a security boundary.
+**Phase B is closed.** The remaining item is linting, not a security boundary.
 
 ### Phase C — kernel extraction (behaviour-preserving)
 
@@ -512,27 +521,18 @@ than in Phase L is deliberate: the shape of the actuation seam is what constrain
 the kernel split, and defining it later means reconciling four separate paths
 (chat, voice, workspace, robot). See `EMBODIMENT_ABSTRACTION.md`.
 
-### Phase N — Digital Life State *(promoted above memory V3)*
+### Phase N — Digital Life State *(promoted above memory V3)* — ✅ commitments done
 
-Commitments, responsibilities, projects, habits, assets, calendar. See
-`DIGITAL_LIFE_STATE.md`.
+Commitments are implemented: `genesis/core/life/commitments.py`, with beneficiary,
+deadline, provenance, a refused-illegal-transitions state machine, overdue tracked
+separately from MISSED, third-party creation gated at R3 with a fail-closed
+default, and journalling that deliberately *includes* the obligation text because
+an obligation nobody can read is not an obligation.
 
-**This reverses the previous ordering, and the reasoning is:**
+Still to do in this phase: responsibilities as first-class records, projects,
+habits, assets, calendar, and the workspace surface (N5–N10).
 
-1. Memory V3 makes retrieval *better*. Life state makes the being *reliable*,
-   which is the property a user notices immediately.
-2. Life state defines what memory must serve. Building bi-temporal storage before
-   knowing whether validity intervals are needed for *commitments* (critically)
-   or for *facts* (usefully) risks optimising the wrong axis.
-3. It is far cheaper: two new entities, two upgrades, one consolidation — against
-   replacing the vector store and adding a temporal graph.
-
-The cost of this order is that commitments will later need migrating onto
-bi-temporal storage. That is worth paying.
-
-Confirmed as real gaps before writing it: `commitment.` and `embodiment.` exist
-**only** as event-type prefixes in `governance/models.py`, and
-`role.add_responsibility` stores a plain string.
+See `DIGITAL_LIFE_STATE.md` for the full design and the ordering rationale.
 
 ### Phase O — Relationship intelligence
 
@@ -562,13 +562,15 @@ something already acting on their behalf.
 
 ### Recommended next three, in order
 
-1. **Phase D journal wiring** — cheap now that the store and redaction exist, and
-   it makes the timeline trustworthy before life state lands on top of it.
-2. **Phase N Digital Life State (commitments first)** — the differentiating work,
-   and the thing a user can feel. Start with commitments alone; they are small
-   and they change what the product is.
-3. **A6 CI** — a migration up/down job plus the test suite in CI would have caught
-   both bugs found manually this round.
+1. **Finish Phase N (N5–N10)** — responsibilities, projects, habits, then the
+   workspace surface where a human can see what the being owes. Commitments alone
+   are already differentiating; the rest makes life state coherent.
+2. **Migrate the Mind detail tabs** to the new design primitives. They inherit the
+   correct theme through the compatibility layer, so they are readable, but they
+   keep their original structure — and those are the pages people live in.
+3. **Phase C kernel extraction** — split the ~99 KB `Mind`, and define the `Body`
+   protocol while doing it. This is the gate for forking, multi-process daemons
+   and embodiment.
 
 ---
 
@@ -652,6 +654,8 @@ genesis/
     receipts.py        #   receipt construction + error taxonomy
     estop.py           #   emergency stop with journal rehydration
     guard.py           #   GovernanceGate: the single entry point
+    context.py         #   correlation scope: causal chains across a turn
+    domain_events.py   #   the journalisation helper for domain code
     store.py           #   memory + SQLAlchemy persistence, hash chaining
   sandbox/             # untrusted execution boundary
     base.py            #   SandboxProvider protocol, policy, result types
@@ -665,6 +669,8 @@ genesis/
     supervisor.py      # daemon lifecycle via systemd; no forking from the API
     paths.py           # path containment primitives
     code_executor.py   # routes through SandboxProvider
+    life/
+      commitments.py   # what a Mind owes, to whom, by when (Phase N)
   integrations/
     mcp_integration.py # MCP with a scrubbed environment (SEC-05)
   api/
@@ -673,8 +679,9 @@ genesis/
     governance_models.py   # 4 tables
 alembic/versions/20260928_0800_add_governance_plane.py
 tests/
-  governance/        # 260 tests: policy, approvals, audit, SQL store, gate, API
-  security/          # 246 tests: sandbox, container escapes, MCP env, secrets
+  governance/        # 305 tests: policy, approvals, audit, SQL store, gate, API,
+                     #   correlation, domain events, commitments
+  security/          # 251 tests: sandbox, container escapes, network probe, MCP env, secrets
   test_migrations.py # 31 tests: migration-chain guards
 docs/
   architecture/adr/  # ADR-0001 .. ADR-0008
@@ -694,11 +701,14 @@ docs/
 
 | Issue | Impact | Notes |
 |---|---|---|
-| 12 test failures | Pre-existing | Reproduce on the pristine tree. Mostly environment (`test_emotional_intelligence`, `test_memory`), plus `test_memory_user_scoping` which is order-dependent (fails alone, passes in the suite). |
-| Order-dependent tests | Medium | Root cause is shared ChromaDB / `~/.genesis` state (backlog A2). |
+| 10 test failures (was 12) | Pre-existing | Reproduce on the pristine tree. Mostly environment (`test_emotional_intelligence`, `test_memory`). Two of the original twelve were **not** code faults at all but the shared ChromaDB; they are gone now that the test store is ephemeral (A2). |
+| Order-dependent tests | Low | The ChromaDB half is fixed (A2). `test_memory_user_scoping` fails alone and passes in the suite; the cause is the test, not the store. |
+| CI quarantine list | Low | 11 tests are deselected with a printed reason each (`.github/workflows/ci.yml`). A CI that is red on arrival gets ignored; an honest short list does not. |
 | `sqlite` URL filename is ignored | Low | Both `database/base.py` and `alembic/env.py` resolve a sqlite URL to `genesis_home/genesis.db`, ignoring the path in `DATABASE_URL`. Consistent, but surprising. |
 | `tf-keras` missing from dev env | Low | `deepface` needs it; the multimodal import guard now degrades instead of crashing. |
-| Sandbox lacks FS/PID/net isolation | **High** | Backlog B2b. Read `SandboxProvider.capabilities()` and do not overstate. |
-| MCP servers inherit `os.environ` | High | Backlog B9. |
+| Sandbox FS/PID/net isolation | ✅ **fixed** | Closed by `ContainerSandboxProvider`, verified against a real container. Still read `SandboxProvider.capabilities()` — `local` is a resource limiter and says so. |
+| MCP servers inherit `os.environ` | ✅ **fixed** | Closed by the base allowlist in `mcp_integration.py` (B9). |
 | Prompt keyword scan false positives | Low | Advisory only now, so it no longer blocks turns, but the lists are unreviewed. |
 | `Mind` god-object | Medium | Blocks snapshot/fork/multi-process. Phase C. |
+| `mypy genesis` not clean | Low | A4 — the last Phase B item. |
+| Mind detail tabs still use legacy markup | Low | They inherit the correct theme via `globals.css`'s compatibility layer, so they read correctly, but their structure predates the design system. |

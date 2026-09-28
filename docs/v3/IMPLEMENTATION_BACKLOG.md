@@ -24,11 +24,11 @@
 | ID | Task | Files | Evidence / gate | Status |
 |---|---|---|---|---|
 | A1 | Record discovery, reality matrix, security baseline, dependency inventory, gap analysis, threat model, test baseline | `docs/v3/*` | documents exist and cite file:line | `[x]` |
-| A2 | Make the test suite deterministic (isolate ChromaDB + `~/.genesis` per test) | `tests/conftest.py` | two consecutive runs give identical results | `[ ]` |
+| A2 | Make the test suite deterministic (isolate ChromaDB + `~/.genesis` per test) | `tests/conftest.py` | two consecutive runs give identical results | `[x]` — `GENESIS_VECTOR_STORE_MODE=ephemeral` plus an autouse fixture that fails the session if the mode is not `ephemeral`. Removed two of the twelve "pre-existing" failures; they were the shared ChromaDB, not the code |
 | A3 | Fix dependency declarations | `pyproject.toml` | removed invalid `asyncio`, de-duplicated `pydantic-settings`, moved vision/browser to extras, added `cache` extra | `[x]` |
 | A4 | Fix mypy configuration (`python_version` vs numpy stubs) | `pyproject.toml` | `mypy genesis` runs to completion | `[ ]` |
 | A5 | Commit a lockfile; use `npm ci` | `web-playground/package-lock.json`, `Dockerfile` | lockfile generated; Dockerfile uses `npm ci` | `[x]` |
-| A6 | Add CI (lint ratchet + tests + migration up/down) and `pre-commit` | `.github/workflows/`, `.pre-commit-config.yaml` | CI green on the branch | `[ ]` |
+| A6 | Add CI (lint ratchet + tests + migration up/down) and `pre-commit` | `.github/workflows/`, `.pre-commit-config.yaml` | CI green on the branch | `[x]` — three jobs in `.github/workflows/ci.yml`: tests on 3.11 and 3.12 (with an 11-entry quarantine list that prints each reason), migrations from an empty database with a full round trip, and the sandbox-argv security suite. Replicated locally before committing. `pre-commit` still absent |
 | A7 | Remove `NODE_TLS_REJECT_UNAUTHORIZED=0` | `web-playground/package.json`, `next.config.js` | grep returns no matches in app code | `[x]` |
 | A8 | Create ADRs (0001–0007) | `docs/architecture/adr/` | 7 ADRs present | `[x]` (0008 added too — events/receipts) |
 | A9 | Pin container base image by digest; add non-root `USER` | `Dockerfile` | `USER genesis` present; digest pinned | `[~]` non-root done, digest not pinned |
@@ -107,13 +107,13 @@ Visual or feature work must not start before this passes.
 
 | ID | Task | Status |
 |---|---|---|
-| D1 | `events`, `cognitive_checkpoints`, `objective_runs`, `objective_steps` tables + migrations | `[ ]` |
+| D1 | `events`, `cognitive_checkpoints`, `objective_runs`, `objective_steps` tables + migrations | `[~]` — `events` done (`008_governance_plane`). `cognitive_checkpoints`, `objective_runs`, `objective_steps` not built |
 | D2 | Backfill `mind.born` for existing minds (ids preserved) | `[ ]` |
-| D3 | Correlation + causation IDs through the turn | `[ ]` |
-| D4 | Restart recovery test (pause → restart → resume without identity loss) | `[ ]` |
-| D5 | Heartbeat: commitments, pending approvals, workflow health, retries, budgets — **no LLM unless real work exists** | `[ ]` |
-| D6 | `Experience` produced by the action loop (not just chat) | `[ ]` |
-| D7 | `Commitment` + `GoalStep` entities | `[ ]` |
+| D3 | Correlation + causation IDs through the turn | `[x]` — `genesis/governance/context.py`: `correlation_scope`, `current_correlation_id`, `explain_chain`. Chat turns are scoped; `causation_id` is not yet threaded |
+| D4 | Restart recovery test (pause → restart → resume without identity loss) | `[ ]` — needs checkpoints |
+| D5 | Heartbeat: commitments, pending approvals, workflow health, retries, budgets — **no LLM unless real work exists** | `[ ]` — `CommitmentManager.sweep_overdue` exists and is the right primitive to drive it |
+| D6 | `Experience` produced by the action loop (not just chat) | `[~]` — the action loop now emits journals and receipts; memory-write experiences are still chat-only |
+| D7 | `Commitment` + `GoalStep` entities | `[~]` — `Commitment` done (`genesis/core/life/commitments.py`), classified as Phase N work). `GoalStep` not built |
 
 ---
 
@@ -229,17 +229,17 @@ Visual or feature work must not start before this passes.
 
 | ID | Task | Files | Status |
 |---|---|---|---|
-| N1 | `Commitment` entity: beneficiary (a relationship, not a string), deadline, provenance, status machine (OPEN → IN_PROGRESS → FULFILLED / MISSED / RENEGOTIATED / WITHDRAWN) | `genesis/core/life/commitments.py` (new) | `[ ]` |
-| N2 | **Commitments are exempt from memory decay.** A forgotten obligation is a failure, not a fading fact | `genesis/core/life/commitments.py` | `[ ]` |
-| N3 | `MISSED` is an audit event surfaced in the timeline, not a silent expiry | `genesis/core/life/`, `genesis/governance/audit.py` | `[ ]` |
-| N4 | Declare the governance capabilities: commitment to owner R1, commitment binding a third party R2/R3, withdrawal R2 with receipt | `genesis/governance/risk.py` | `[ ]` |
+| N1 | `Commitment` entity: beneficiary (a relationship, not a string), deadline, provenance, status machine (OPEN → IN_PROGRESS → FULFILLED / MISSED / RENEGOTIATED / WITHDRAWN) | `genesis/core/life/commitments.py` (new) | `[x]` — built. Adds PROPOSED (a cross-Mind proposal needs the owner's approval) and tracks `is_overdue` separately from `MISSED` |
+| N2 | **Commitments are exempt from memory decay.** A forgotten obligation is a failure, not a fading fact | `genesis/core/life/commitments.py` | `[x]` — commitments never enter the vector store, so decay cannot reach them. Durable by construction rather than by exemption |
+| N3 | `MISSED` is an audit event surfaced in the timeline, not a silent expiry | `genesis/core/life/`, `genesis/governance/audit.py` | `[x]` — every transition journals `commitment.*` through `DomainJournal`; `sweep_overdue` marks, it does not expire silently |
+| N4 | Declare the governance capabilities: commitment to owner R1, commitment binding a third party R2/R3, withdrawal R2 with receipt | `genesis/governance/risk.py` | `[x]` — five capabilities: `create_commitment` R1, `create_commitment_cross_mind` R2, `commit_to_third_party` R3, `fulfil_commitment` R1, `withdraw_commitment` R2. Capability registry now reports 41 |
 | N5 | `Responsibility` as a first-class record: scope, owner, review interval, suspendable (upgrade the `role.py` string) | `genesis/core/role.py`, `genesis/core/life/` | `[ ]` |
 | N6 | `Project` entity: goal, commitments, artifacts, timeline, participants | `genesis/core/life/projects.py` (new) | `[ ]` |
 | N7 | Habits: expose the existing circadian routines (`life_activities.py`, `consciousness_v2.py`) as *declarable* habits with an adherence history | `genesis/core/life/habits.py` (new) | `[ ]` |
 | N8 | Assets view: one queryable answer to "what does this being have?" (files, GEN budget, skills, environments, credential *references*) | `genesis/core/life/assets.py` (new) | `[ ]` |
 | N9 | Calendar: one time axis joining commitments, habits and scheduled actions (consolidate `action_scheduler.py` + `tasks.py`) | `genesis/core/life/calendar.py` (new) | `[ ]` |
 | N10 | Workspace surface: commitments visible to a human, with provenance | Phase H | `[ ]` |
-| N11 | Anti-requirement: **no autonomous commitment creation.** A being that invents obligations is a liability | test | `[ ]` |
+| N11 | Anti-requirement: **no autonomous commitment creation.** A being that invents obligations is a liability | test | `[x]` — creation requires an explicit beneficiary and provenance; a cross-Mind beneficiary yields PROPOSED, which the owner must approve. Tested |
 
 ---
 
