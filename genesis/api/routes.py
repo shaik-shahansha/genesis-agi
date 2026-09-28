@@ -17,6 +17,7 @@ from genesis.core.mind import Mind
 from genesis.core.mind_config import MindConfig
 from genesis.core.intelligence import Intelligence
 from genesis.core.autonomy import Autonomy, InitiativeLevel
+from genesis.core.paths import UnsafePathError, ensure_within, safe_filename
 from genesis.storage.memory import MemoryType
 from genesis.api.auth import (
     get_current_user,
@@ -1761,7 +1762,7 @@ async def upload_workspace_file(
     mind_id: str,
     file: UploadFile = File(...),
     user_email: Optional[str] = Form(None),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_write_access),
 ):
     """Upload a file to Mind's workspace with embedding and vector storage.
     
@@ -1783,8 +1784,17 @@ async def upload_workspace_file(
     try:
         import shutil
         
-        # Read file content
-        content = await file.read()
+        # Read file content (SEC-14: bounded, never unbounded)
+        max_bytes = settings.max_upload_size_mb * 1024 * 1024
+        content = await file.read(max_bytes + 1)
+        if len(content) > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"File exceeds the {settings.max_upload_size_mb} MB upload limit. "
+                    "Raise MAX_UPLOAD_SIZE_MB to allow larger files."
+                ),
+            )
         
         # Determine file type
         file_type = "text"
@@ -1800,10 +1810,11 @@ async def upload_workspace_file(
         
         # For text files, decode content
         content_str = ""
-        if file_type == "text" or file_type == "code":
+        is_text_like = file_type in ("text", "code")
+        if is_text_like:
             try:
                 content_str = content.decode('utf-8')
-            except:
+            except (UnicodeDecodeError, LookupError):
                 content_str = content.decode('latin-1')
         
         # Build tags including user_email if provided
@@ -1811,28 +1822,29 @@ async def upload_workspace_file(
         if user_email:
             tags.append(f"user:{user_email}")
         
-        # Create file in workspace
-        mind_file = mind.workspace.create_file(
-            filename=file.filename,
-            content=content_str if content_str else "",
-            file_type=file_type,
-            description=f"Uploaded via chat: {file.filename}" + (f" by {user_email}" if user_email else ""),
-            tags=tags,
-            is_private=True
-        )
-        
-        # For binary files, write content directly to disk
-        if not content_str:
-            file_path = mind.workspace.workspace_path / mind_file.filepath
-            file_path.write_bytes(content)
-            mind_file.size_bytes = len(content)
+        # Create file in workspace.
+        # SEC-02: the filename is validated and containment-asserted inside
+        # WorkspaceManager.create_file, and binary content is written through it
+        # so no caller ever joins `workspace_path` with an untrusted name.
+        try:
+            mind_file = mind.workspace.create_file(
+                filename=file.filename,
+                content=content_str if is_text_like else "",
+                file_type=file_type,
+                description=f"Uploaded via chat: {file.filename}" + (f" by {user_email}" if user_email else ""),
+                tags=tags,
+                is_private=True,
+                raw_bytes=None if is_text_like else content,
+            )
+        except UnsafePathError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid filename: {exc}") from exc
         
         # Process file with Universal File Handler if it has content
         file_summary = ""
         extracted_data = None
         if content_str and hasattr(mind, 'file_handler'):
             try:
-                file_path = mind.workspace.workspace_path / mind_file.filepath
+                file_path = mind.workspace.get_path(mind_file.file_id)
                 processing_result = await mind.file_handler.process_file(
                     file_path=file_path,
                     user_request=f"Extract and understand content from {file.filename}"
@@ -2018,7 +2030,7 @@ async def search_workspace_files(
 async def delete_workspace_file(
     mind_id: str,
     filename: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_write_access),
 ):
     """Delete a file from Mind's workspace and remove its embeddings."""
     mind = await _load_mind(mind_id)
@@ -2412,61 +2424,62 @@ async def get_task_status(mind_id: str, task_id: str):
 @minds_router.get("/{mind_id}/artifacts/download")
 async def download_artifact(
     mind_id: str,
-    filename: str = Query(..., description="Name of the artifact file to download")
+    filename: str = Query(..., description="Bare filename of the artifact to download"),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Download an artifact file generated by a task."""
-    import os
-    
+    """Download an artifact file generated by a task.
+
+    SEC-02 (b): the filename is validated as a bare name, and containment is
+    checked with ``is_relative_to`` rather than a string prefix. The previous
+    ``str(path).startswith(str(dir))`` test is a classic bypass
+    (``/data-evil`` starts with ``/data``) and, combined with ``Path.cwd()``
+    being allow-listed, made arbitrary file read reachable. This endpoint also
+    previously had no authentication at all.
+    """
+    # Validate the name BEFORE touching the registry: cheap checks first, and an
+    # invalid request should not depend on whether the Mind happens to exist.
     try:
-        # Search for the file in multiple locations
-        search_paths = [
-            # Mind's outputs directory
-            settings.data_dir / "outputs" / mind_id / filename,
-            # General outputs directory
-            settings.data_dir / "outputs" / filename,
-            # Mind's data directory
-            settings.data_dir / mind_id / filename,
-            # General data directory
-            settings.data_dir / filename,
-            # Home Genesis directory
-            Path.home() / ".genesis" / "data" / "outputs" / mind_id / filename,
-            Path.home() / ".genesis" / "data" / "outputs" / filename,
+        safe_name = safe_filename(filename)
+    except UnsafePathError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid filename: {exc}") from exc
+
+    mind = await _load_mind(mind_id)
+
+    try:
+        # Search for the file in a fixed set of per-Mind output locations.
+        candidate_dirs = [
+            settings.data_dir / "outputs" / mind_id,
+            settings.data_dir / "outputs",
+            settings.data_dir / mind_id,
+            settings.data_dir,
         ]
-        
+
         resolved_path = None
-        for search_path in search_paths:
-            if search_path.exists() and search_path.is_file():
-                resolved_path = search_path.resolve()
-                break
-        
+        for directory in candidate_dirs:
+            candidate = directory / safe_name
+            if not candidate.is_file():
+                continue
+            # Containment is asserted per-directory, so a symlink pointing out
+            # of the directory is rejected too.
+            try:
+                resolved_path = ensure_within(candidate, directory)
+            except UnsafePathError:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied: File is outside allowed directories",
+                ) from None
+            break
+
         if not resolved_path:
             raise HTTPException(
-                status_code=404, 
-                detail=f"File '{filename}' not found in any output directories"
+                status_code=404,
+                detail=f"File '{filename}' not found in any output directories",
             )
-        
-        # Security: Ensure the path is within allowed directories
-        allowed_dirs = [
-            settings.data_dir.resolve(),
-            (Path.home() / ".genesis").resolve(),
-            Path.cwd().resolve()
-        ]
-        
-        is_allowed = any(
-            str(resolved_path).startswith(str(allowed_dir))
-            for allowed_dir in allowed_dirs
-        )
-        
-        if not is_allowed:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: File is outside allowed directories"
-            )
-        
+
         # Return the file
         return FileResponse(
             path=str(resolved_path),
-            filename=filename,
+            filename=safe_name,
             media_type='application/octet-stream'
         )
         

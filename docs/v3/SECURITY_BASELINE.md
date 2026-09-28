@@ -14,7 +14,7 @@
 | ID | Severity | Finding |
 |---|---|---|
 | SEC-01 | ~~**C**~~ **FIXED** | Unauthenticated WebSocket accepts any `user_email` and falls back to a shared identity |
-| SEC-02 | **C** | Arbitrary host file write via unsanitised `filename` in workspace upload/create |
+| SEC-02 | ~~**C**~~ **FIXED** | Arbitrary host file write via unsanitised `filename` in workspace upload/create |
 | SEC-03 | **C** | Model-generated code executes with no sandbox, no resource limits, no egress control |
 | SEC-04 | **C** | Runtime `pip install` driven by imports found in model-generated code |
 | SEC-05 | **H** | Full host environment (all API keys) inherited by MCP server subprocesses |
@@ -26,7 +26,7 @@
 | SEC-11 | **M** | Permission model cannot satisfy `REQUIRES_CONFIRMATION`; approval setting unwired |
 | SEC-12 | **M** | "Constitution" is a substring keyword blocklist |
 | SEC-13 | **M** | Action audit log is mutable local JSONL with no integrity protection |
-| SEC-14 | **M** | Unbounded memory read on file upload (no size limit) |
+| SEC-14 | ~~**M**~~ **FIXED** | Unbounded memory read on file upload (no size limit) |
 | SEC-15 | **M** | Memory poisoning: LLM-extracted memories written with no provenance/validation |
 | SEC-16 | **M** | Prompt-injection surface: web/file/MCP content shares the instruction context |
 | SEC-17 | **M** | No tenant isolation; shared mutable Mind instances in a process-wide cache |
@@ -259,7 +259,33 @@ the rest of the system is built around.
 
 ---
 
-## 10. File upload risks — SEC-02 (critical), SEC-14
+## 10. File upload risks — SEC-02 (critical), SEC-14 — **FIXED 2026-09-28**
+
+> **Resolution.** A shared path-safety module (`genesis/core/paths.py`) now provides
+> `safe_filename()` (rejects separators, traversal, absolute/UNC paths, drive letters,
+> control characters, device names, over-length, and normalises Unicode) and
+> `ensure_within()` (resolves and asserts containment, so symlink escapes are rejected too).
+> `WorkspaceManager` validates on create and re-validates on **every** read/update/delete,
+> because a persisted registry is also untrusted input. Callers no longer join
+> `workspace_path` themselves: binary uploads go through `create_file(raw_bytes=...)`.
+>
+> Three additional problems were found and fixed while addressing this:
+>
+> 1. **`delete_file` could unlink outside the workspace.** It joined the stored
+>    (attacker-influenced) `filepath` onto the workspace root with no check.
+> 2. **`GET /minds/{id}/artifacts/download` had no authentication at all**, and its
+>    containment check used `str(path).startswith(str(dir))` — a classic prefix bypass
+>    (`/data-evil` starts with `/data`). With `Path.cwd()` allow-listed, arbitrary file
+>    read under the app directory was reachable.
+> 3. **Uploads were read entirely into memory** with no bound; now capped by
+>    `MAX_UPLOAD_SIZE_MB` (default 100) with a 413 response.
+>
+> Coverage: `tests/security/test_workspace_paths.py` (32 tests) plus
+> `deploy/docker/verify_sec02.py`, which replays live traversal and unauthenticated
+> download attempts against the running container (9/9 pass, and a filesystem scan
+> confirms nothing was written outside `/data`).
+
+### Original finding (retained for the record)
 
 `genesis/api/routes.py:1759` `POST /minds/{mind_id}/workspace/upload`:
 

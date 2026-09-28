@@ -14,7 +14,7 @@
 |---|---|
 | A — Repository discovery | `[x]` baseline docs written, tests/lint/types measured |
 | A — Single-container deployment | `[x]` built, running, 10/10 smoke checks pass |
-| B — Security containment | `[~]` **B7 (SEC-01) done**; sandbox, policy, approval, audit outstanding |
+| B — Security containment | `[~]` **B7 (SEC-01) and B8 (SEC-02/SEC-14) done**; sandbox, policy, approval, audit outstanding |
 | C–M | `[ ]` not started |
 
 ---
@@ -56,7 +56,7 @@ Visual or feature work must not start before this passes.
 | ID | Task | Files | Gate | Status |
 |---|---|---|---|---|
 | B7 | **Fix SEC-01**: authenticate *before* `accept()`; derive identity from a verified token only; never trust `user_email`; bind notifications to the verified subject | `genesis/api/routes.py` (`websocket_chat`), `genesis/api/auth.py` | connect without a token is closed; spoofed email is ignored; 17 tests + container smoke check | ✅ **DONE** |
-| B8 | **Fix SEC-02**: reject absolute paths and traversal in workspace writes; canonicalise and assert containment; size cap; type allow-list | `genesis/core/workspace.py`, `genesis/api/routes.py` (upload) | traversal/absolute/symlink/oversize attempts rejected | `[ ]` |
+| B8 | **Fix SEC-02**: reject absolute paths and traversal in workspace writes; canonicalise and assert containment; size cap; type allow-list | `genesis/core/paths.py` (new), `genesis/core/workspace.py`, `genesis/api/routes.py` | traversal/absolute/symlink/oversize attempts rejected; 32 unit tests + live verification | ✅ **DONE** (type allow-list still open) |
 | B9 | Scrub subprocess environments; introduce `SecretReference`; stop passing `os.environ` to MCP servers | `genesis/core/code_executor.py`, `genesis/integrations/mcp_integration.py` | a subprocess printing `os.environ` reveals no key | `[ ]` |
 | B10 | Remove the unenforced `ALLOWED_IMPORTS` claim (or enforce it in the sandbox) | `genesis/plugins/tools.py` | claim matches behaviour | `[ ]` |
 | B11 | Stop API-tier process spawning; move daemon lifecycle to a worker/supervisor | `genesis/api/routes.py`, `genesis/daemon.py` | API cannot signal arbitrary processes | `[ ]` |

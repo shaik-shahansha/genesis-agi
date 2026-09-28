@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     require_approval_for_external_actions: bool = True
     max_autonomous_actions_per_hour: int = 100
 
+    # Uploads
+    max_upload_size_mb: int = 100  # Per-file cap for workspace uploads (SEC-14)
+
     # API Server
     api_host: str = "0.0.0.0"
     api_port: int = 8000

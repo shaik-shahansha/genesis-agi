@@ -33,15 +33,15 @@ does not change them, and putting it on a public VPS makes them reachable.
 | Risk | Detail | Containment for now |
 |---|---|---|
 | ~~**SEC-01 — unauthenticated WebSocket**~~ | ~~`ws /api/v1/minds/{id}/stream` accepted connections before any auth check.~~ | ✅ **FIXED.** The handshake now requires a valid credential and identity is derived server-side. Verified in-container: an unauthenticated handshake is refused with HTTP 403. |
-| **SEC-03/04 — no real sandbox** | The Mind's code executor runs model-generated code in a subprocess **inside this container**, and can `pip install` at runtime. | This container is not a security boundary for generated code. Treat Mind autonomy as untrusted. |
-| **SEC-02 — workspace path traversal** | Uploaded filenames were used unsanitised. | **Not yet fixed** in code; do not enable multi-user file upload. |
+| ~~**SEC-02 — workspace path traversal**~~ | ~~Uploaded filenames were used unsanitised; artifact download had no auth and a prefix-match bypass.~~ | ✅ **FIXED.** Filenames validated, containment asserted on every filesystem operation, download now requires auth, uploads size-capped. Verified in-container: 9/9 escape attempts rejected. |
+| **SEC-03/04 — no real sandbox** | The Mind's code executor runs model-generated code in a subprocess **inside this container**, and can `pip install` at runtime. | **This is the remaining blocker.** The container is not a security boundary for generated code. Treat Mind autonomy as untrusted. |
 | **T-16 — default JWT secret** | The app ships a public default secret. | `docker-compose.yml` **refuses to start** unless `API_SECRET_KEY` is set. |
-| In-container generated code (restricted) | Even restricted, generated code shares the container's network and filesystem with the API. | For stronger isolation, run the executor as a separate container later (the `SandboxProvider` abstraction in Phase B is designed for exactly this). |
+| In-container generated code | Even restricted, generated code shares the container's network and filesystem with the API. | Run the executor as a separate container (`SandboxProvider`, Phase B) before allowing untrusted use. |
 
-**Bottom line:** this container is a good *deployment* unit and a poor *security boundary*.
-Because generated code still runs unsandboxed inside it, do not expose it to untrusted users
-until the sandbox work (Phase B) lands. For personal use on your own VPS, bind it to
-`127.0.0.1` behind a tunnel or restrict it with a firewall allow-list.
+**Bottom line:** the API surface is now authenticated and path-safe, but generated code still runs
+unsandboxed inside this container. Do not expose it to untrusted users until the sandbox work
+lands. For personal use on your own VPS, bind it to `127.0.0.1` behind a tunnel or restrict it with
+a firewall allow-list.
 
 ---
 

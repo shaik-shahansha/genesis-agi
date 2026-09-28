@@ -6,6 +6,8 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
+from genesis.core.paths import UnsafePathError, ensure_within, safe_filename
+
 
 class MindFile(BaseModel):
     """A file owned by a Mind in their workspace."""
@@ -83,6 +85,14 @@ class WorkspaceManager:
         # Create workspace directory
         self.workspace_path.mkdir(parents=True, exist_ok=True)
 
+    def _resolve_file_path(self, stored_path: str) -> Path:
+        """Resolve a stored relative filepath, asserting it stays in the workspace.
+
+        The stored path may originate from a persisted registry, so it is
+        re-validated on every access rather than trusted (defence in depth).
+        """
+        return ensure_within(self.workspace_path / stored_path, self.workspace_path)
+
     def create_file(
         self,
         filename: str,
@@ -90,32 +100,42 @@ class WorkspaceManager:
         file_type: str = "text",
         description: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        is_private: bool = True
+        is_private: bool = True,
+        raw_bytes: Optional[bytes] = None,
     ) -> MindFile:
         """
         Create a new file in the workspace.
 
         Args:
-            filename: Name of the file
-            content: File content
+            filename: Bare filename (no path separators; validated)
+            content: Text content (ignored when raw_bytes is provided)
             file_type: Type of file
             description: Description of the file
             tags: Tags for categorization
             is_private: Whether file is private
+            raw_bytes: Binary content, for non-text uploads
 
         Returns:
             The created MindFile record
-        """
-        filepath = self.workspace_path / filename
 
-        # Write content to file
-        filepath.write_text(content)
-        size_bytes = len(content.encode('utf-8'))
+        Raises:
+            UnsafePathError: if filename is not a safe bare filename
+        """
+        # SEC-02: never join an unvalidated name onto the workspace root.
+        safe_name = safe_filename(filename)
+        filepath = ensure_within(self.workspace_path / safe_name, self.workspace_path)
+
+        if raw_bytes is not None:
+            filepath.write_bytes(raw_bytes)
+            size_bytes = len(raw_bytes)
+        else:
+            filepath.write_text(content, encoding="utf-8")
+            size_bytes = len(content.encode("utf-8"))
 
         # Create file record
         mind_file = MindFile(
             owner_gmid=self.mind_gmid,
-            filename=filename,
+            filename=safe_name,
             filepath=str(filepath.relative_to(self.workspace_path)),
             file_type=file_type,
             size_bytes=size_bytes,
@@ -150,13 +170,20 @@ class WorkspaceManager:
             raise ValueError(f"Access denied to file {file_id}")
 
         # Read content
-        filepath = self.workspace_path / mind_file.filepath
-        content = filepath.read_text()
+        filepath = self._resolve_file_path(mind_file.filepath)
+        content = filepath.read_text(encoding="utf-8")
 
         # Update access count
         mind_file.access_count += 1
 
         return content
+
+    def read_bytes(self, file_id: str) -> bytes:
+        """Read a file's raw bytes (e.g. for download)."""
+        mind_file = self.files.get(file_id)
+        if not mind_file:
+            raise ValueError(f"File {file_id} not found")
+        return self._resolve_file_path(mind_file.filepath).read_bytes()
 
     def update_file(self, file_id: str, content: str) -> MindFile:
         """Update a file's content."""
@@ -164,8 +191,8 @@ class WorkspaceManager:
         if not mind_file:
             raise ValueError(f"File {file_id} not found")
 
-        filepath = self.workspace_path / mind_file.filepath
-        filepath.write_text(content)
+        filepath = self._resolve_file_path(mind_file.filepath)
+        filepath.write_text(content, encoding="utf-8")
 
         mind_file.size_bytes = len(content.encode('utf-8'))
         mind_file.modified_at = datetime.now()
@@ -178,11 +205,18 @@ class WorkspaceManager:
         if not mind_file:
             raise ValueError(f"File {file_id} not found")
 
-        filepath = self.workspace_path / mind_file.filepath
+        filepath = self._resolve_file_path(mind_file.filepath)
         if filepath.exists():
             filepath.unlink()
 
         del self.files[file_id]
+
+    def get_path(self, file_id: str) -> Path:
+        """Return the validated on-disk path for a file."""
+        mind_file = self.files.get(file_id)
+        if not mind_file:
+            raise ValueError(f"File {file_id} not found")
+        return self._resolve_file_path(mind_file.filepath)
 
     def list_files(
         self,
