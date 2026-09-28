@@ -5,6 +5,7 @@ Provides REST API and WebSocket endpoints for web/mobile apps.
 """
 
 import os
+import logging
 import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,8 @@ from genesis.api import routes
 from genesis.api import marketplace_routes
 from genesis.api import environment_routes
 from genesis.api import governance_routes
+
+logger = logging.getLogger(__name__)
 
 # Conditionally import multimodal if not disabled
 DISABLE_MULTIMODAL = os.getenv("DISABLE_MULTIMODAL", "false").lower() == "true"
@@ -63,6 +66,19 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
+
+    # Fail fast on a placeholder signing key (plan item B12). This runs before
+    # any route is mounted, so a misconfigured deployment never becomes
+    # reachable: `docker-compose.yml` already enforced this, but a systemd unit
+    # or a hand-run container did not, and the app silently shipped with a
+    # signing key published in this repository.
+    from genesis.config.settings import InsecureSecretError
+
+    try:
+        settings.assert_secure_secrets()
+    except InsecureSecretError as exc:
+        logger.critical("Refusing to start: %s", exc)
+        raise
 
     app = FastAPI(
         title="Genesis AGI API",

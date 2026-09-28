@@ -1,11 +1,32 @@
 ﻿"""Settings and configuration for Genesis."""
 
+import logging
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+#: The placeholder shipped in `.env.example`. Booting with this means every JWT
+#: in the deployment is forgeable by anyone who has read the repository.
+INSECURE_SECRET_PLACEHOLDER = "your-secret-key-change-this-in-production"
+
+#: Environments where an insecure secret is tolerated, because the app is only
+#: reachable from the developer's own machine and requiring a key on every test
+#: run is friction that leads to people committing a real one.
+_INSECURE_ALLOWED_ENVS = ("test", "development", "dev", "local")
+
+#: Shortest secret accepted as "real". A 32-character secret is the same order as
+#: what `secrets.token_hex(32)` produces for the compose file.
+MINIMUM_SECRET_LENGTH = 32
+
+
+class InsecureSecretError(RuntimeError):
+    """Raised when the app is configured with a placeholder signing key."""
 
 
 class Settings(BaseSettings):
@@ -57,6 +78,16 @@ class Settings(BaseSettings):
     require_approval_for_external_actions: bool = True
     max_autonomous_actions_per_hour: int = 100
 
+    # Process supervision for Mind daemons (plan item B11).
+    #   None      - fall through to the GENESIS_SUPERVISOR environment variable,
+    #               then to "none". The default, so the environment variable is
+    #               authoritative and this field cannot shadow it.
+    #   "none"    - this API will not start or stop daemons; it tells the caller
+    #               what the operator should run instead, because the API tier
+    #               should not hold process-control authority.
+    #   "systemd" - delegate to `systemctl` against genesis-mind@<gmid>.service.
+    supervisor: Optional[str] = None
+
     # Uploads
     max_upload_size_mb: int = 100  # Per-file cap for workspace uploads (SEC-14)
 
@@ -94,6 +125,87 @@ class Settings(BaseSettings):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.minds_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+
+    # ------------------------------------------------------------------ #
+    # Secret validation (plan item B12)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def environment_name() -> str:
+        """The configured environment, normalised."""
+        return (
+            os.environ.get("GENESIS_ENV", "").strip().lower()
+            or os.environ.get("ENVIRONMENT", "").strip().lower()
+            or "production"
+        )
+
+    def insecure_secrets(self) -> list[str]:
+        """Names of signing secrets still set to the shipped placeholder.
+
+        Empty means nothing to complain about.
+        """
+        offenders: list[str] = []
+        if self.api_secret_key == INSECURE_SECRET_PLACEHOLDER:
+            offenders.append("API_SECRET_KEY")
+        if self.secret_key == INSECURE_SECRET_PLACEHOLDER:
+            offenders.append("SECRET_KEY")
+        return offenders
+
+    def short_secrets(self) -> list[str]:
+        """Names of signing secrets that are real but too short to be safe."""
+        offenders: list[str] = []
+        for name, value in (
+            ("API_SECRET_KEY", self.api_secret_key),
+            ("SECRET_KEY", self.secret_key),
+        ):
+            if value and value != INSECURE_SECRET_PLACEHOLDER and len(value) < MINIMUM_SECRET_LENGTH:
+                offenders.append(name)
+        return offenders
+
+    def assert_secure_secrets(self) -> None:
+        """Refuse to run in production with a placeholder or weak signing key.
+
+        `docker-compose.yml` already fails fast on a missing key, but the
+        application did not, so any install that bypassed compose (a systemd
+        unit, a bare `uvicorn`, a container run by hand) silently shipped with a
+        key published in this repository. Every token would be forgeable.
+
+        Raises:
+            InsecureSecretError: outside test/development, if a signing secret is
+                still the shipped placeholder.
+        """
+        environment = self.environment_name()
+        placeholders = self.insecure_secrets()
+
+        if not placeholders:
+            short = self.short_secrets()
+            if short and environment not in _INSECURE_ALLOWED_ENVS:
+                logger.warning(
+                    "Signing secrets %s are shorter than %d characters. Generate one with: "
+                    "python -c \"import secrets; print(secrets.token_hex(32))\"",
+                    ", ".join(short),
+                    MINIMUM_SECRET_LENGTH,
+                )
+            return
+
+        if environment in _INSECURE_ALLOWED_ENVS:
+            logger.warning(
+                "Running with the placeholder signing key (%s) because GENESIS_ENV=%s. "
+                "This must not be reachable from a network.",
+                ", ".join(placeholders),
+                environment,
+            )
+            return
+
+        raise InsecureSecretError(
+            "Refusing to start: "
+            + ", ".join(placeholders)
+            + " is still the placeholder value from .env.example, so every issued token "
+            "would be forgeable by anyone who has read this repository. Generate a real "
+            "one and set it in the environment:\n"
+            '  python -c "import secrets; print(secrets.token_hex(32))"\n'
+            "Set GENESIS_ENV=development to bypass this check for local work."
+        )
 
 
 @lru_cache()

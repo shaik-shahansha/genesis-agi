@@ -2515,18 +2515,30 @@ async def delete_mind(
     if not mind_path:
         raise HTTPException(status_code=404, detail=f"Mind '{mind_id}' not found")
     
-    # Stop daemon if running
-    import psutil
-    for proc in psutil.process_iter(['pid', 'cmdline']):
-        try:
-            cmdline = proc.info['cmdline']
-            if cmdline and 'genesis.daemon' in ' '.join(cmdline):
-                for i, arg in enumerate(cmdline):
-                    if arg == '--mind-id' and i + 1 < len(cmdline) and cmdline[i + 1] == mind_id:
-                        proc.kill()
-                        break
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
+    # Stop the daemon through the supervisor, if one is configured (B11).
+    #
+    # This used to kill by scanning the host process table and calling
+    # proc.kill() (SIGKILL) on any match, which meant a Mind's daemon died
+    # without flushing state or writing a shutdown record. Deleting a Mind is
+    # irreversible enough without also making it unclean.
+    import logging
+    from genesis.core.supervisor import get_supervisor
+
+    supervisor_note = "no supervisor configured; no daemon was running under one"
+    try:
+        supervisor = get_supervisor()
+        if supervisor.name != "none":
+            stop_result = supervisor.stop(mind_id)
+            supervisor_note = stop_result.detail
+            if not stop_result.ok:
+                logging.getLogger(__name__).warning(
+                    "could not stop daemon for %s before delete: %s", mind_id, stop_result.detail
+                )
+    except Exception as exc:  # noqa: BLE001 - deletion must proceed
+        supervisor_note = f"supervisor error (ignored): {type(exc).__name__}"
+        logging.getLogger(__name__).warning(
+            "supervisor error while deleting %s: %s", mind_id, exc
+        )
     
     # Delete mind file
     os.remove(mind_path)
@@ -2536,7 +2548,11 @@ async def delete_mind(
     if mind_data_dir.exists():
         shutil.rmtree(mind_data_dir)
     
-    return {"success": True, "message": f"Mind {mind_id} permanently deleted"}
+    return {
+        "success": True,
+        "message": f"Mind {mind_id} permanently deleted",
+        "daemon": supervisor_note,
+    }
 
 
 # =============================================================================
@@ -2551,11 +2567,46 @@ auth_router.include_router(admin_router, prefix="/admin")
 
 @minds_router.get("/{mind_id}/daemon/status")
 async def get_daemon_status(mind_id: str):
-    """Get daemon status for a specific Mind."""
+    """Get daemon status for a specific Mind.
+
+    Read-only. When a supervisor is configured its view is authoritative; the
+    process-table scan below is retained as a fallback for installs where daemons
+    are run by hand, and is only ever used for *reporting*.
+    """
+    from genesis.core.supervisor import get_supervisor
+
+    try:
+        supervisor = get_supervisor()
+    except Exception as exc:  # pragma: no cover - misconfiguration
+        logger.warning("supervisor unavailable: %s", exc)
+        supervisor = None
+
+    if supervisor is not None and supervisor.name != "none":
+        result = supervisor.status(mind_id)
+        return {
+            "running": bool(result.state.get("running")),
+            "pid": result.state.get("pid"),
+            "status": result.state.get("substate") or ("running" if result.state.get("running") else "stopped"),
+            "uptime_seconds": 0,
+            "uptime_hours": 0.0,
+            "started_at": None,
+            "managed_by": result.backend,
+            "detail": result.detail,
+        }
+
+    return await _scan_daemon_process(mind_id)
+
+
+async def _scan_daemon_process(mind_id: str) -> Dict[str, Any]:
+    """Best-effort read-only view of a hand-started daemon.
+
+    Reporting only: this never signals anything. It is deliberately separate from
+    lifecycle control so that scanning the process table cannot be mistaken for
+    an authorization decision.
+    """
     import psutil
     from datetime import datetime
-    
-    # Find if daemon is running for this Mind
+
     for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time', 'status']):
         try:
             cmdline = proc.info['cmdline']
@@ -2565,7 +2616,6 @@ async def get_daemon_status(mind_id: str):
                     if arg == '--mind-id' and i + 1 < len(cmdline):
                         found_mind_id = cmdline[i + 1]
                         if found_mind_id == mind_id:
-                            # Daemon is running
                             uptime = datetime.now() - datetime.fromtimestamp(proc.info['create_time'])
                             return {
                                 "running": True,
@@ -2574,12 +2624,13 @@ async def get_daemon_status(mind_id: str):
                                 "uptime_seconds": int(uptime.total_seconds()),
                                 "uptime_hours": uptime.total_seconds() / 3600,
                                 "started_at": datetime.fromtimestamp(proc.info['create_time']).isoformat(),
+                                "managed_by": "unmanaged",
+                                "detail": "Detected by process scan; not under a configured supervisor.",
                             }
                         break
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
-    
-    # Daemon not running
+
     return {
         "running": False,
         "pid": None,
@@ -2587,6 +2638,8 @@ async def get_daemon_status(mind_id: str):
         "uptime_seconds": 0,
         "uptime_hours": 0.0,
         "started_at": None,
+        "managed_by": "unmanaged",
+        "detail": "No supervisor is configured, and no daemon process was detected.",
     }
 
 
@@ -2595,57 +2648,44 @@ async def start_daemon(
     mind_id: str,
     current_user: User = Depends(require_write_access),
 ):
-    """Start daemon for a Mind."""
-    import subprocess
-    import sys
-    
-    # Check if already running
-    status = await get_daemon_status(mind_id)
-    if status["running"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Daemon already running with PID {status['pid']}"
-        )
-    
-    # Verify Mind exists
+    """Ask the configured supervisor to start this Mind's daemon.
+
+    The API no longer forks the daemon itself (SEC plan item B11). Starting
+    processes from the web tier gave anything with code execution in the API
+    process-control authority over the host, and the child's stdout/stderr pipes
+    were never drained, so the daemon could block permanently once it had written
+    ~64 KB.
+
+    When no supervisor is configured this returns 501 with the exact operator
+    command instead of silently falling back to the old behaviour.
+    """
+    from genesis.core.supervisor import SupervisorUnavailable, get_supervisor
+
     await _load_mind(mind_id)
-    
-    # Start daemon as background process
+
     try:
-        # Use the same Python interpreter
-        python_exe = sys.executable
-        
-        # Start daemon in background
-        process = subprocess.Popen(
-            [python_exe, "-m", "genesis.daemon", "--mind-id", mind_id],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True,  # Detach from parent
-        )
-        
-        # Give it a moment to start
-        await asyncio.sleep(2)
-        
-        # Check if it's running
-        status = await get_daemon_status(mind_id)
-        
-        if status["running"]:
-            return {
-                "success": True,
-                "message": f"Daemon started successfully",
-                "pid": status["pid"],
-            }
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail="Daemon failed to start"
-            )
-            
-    except Exception as e:
+        supervisor = get_supervisor()
+    except SupervisorUnavailable as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    result = supervisor.start(mind_id)
+    if result.unavailable:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to start daemon: {str(e)}"
+            status_code=501,
+            detail=result.detail,
         )
+    if not result.ok:
+        raise HTTPException(
+            status_code=502,
+            detail=f"The {result.backend} supervisor refused to start the daemon: {result.detail}",
+        )
+
+    return {
+        "success": True,
+        "message": f"Daemon start requested via {result.backend}",
+        "backend": result.backend,
+        "detail": result.detail,
+    }
 
 
 @minds_router.post("/{mind_id}/daemon/stop")
@@ -2653,42 +2693,37 @@ async def stop_daemon(
     mind_id: str,
     current_user: User = Depends(require_write_access),
 ):
-    """Stop daemon for a Mind."""
-    import psutil
-    import signal
-    
-    # Find daemon process
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-        try:
-            cmdline = proc.info['cmdline']
-            if cmdline and 'genesis.daemon' in ' '.join(cmdline):
-                for i, arg in enumerate(cmdline):
-                    if arg == '--mind-id' and i + 1 < len(cmdline):
-                        found_mind_id = cmdline[i + 1]
-                        if found_mind_id == mind_id:
-                            # Send SIGTERM for graceful shutdown
-                            proc.send_signal(signal.SIGTERM)
-                            
-                            # Wait for process to stop
-                            try:
-                                proc.wait(timeout=10)
-                            except psutil.TimeoutExpired:
-                                # Force kill if still running
-                                proc.kill()
-                            
-                            return {
-                                "success": True,
-                                "message": f"Daemon stopped successfully",
-                                "pid": proc.info['pid'],
-                            }
-                        break
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
-    
-    raise HTTPException(
-        status_code=404,
-        detail=f"No running daemon found for Mind {mind_id}"
-    )
+    """Ask the configured supervisor to stop this Mind's daemon.
+
+    Previously this scanned the entire host process table and sent SIGTERM to any
+    match. It now targets only the Mind's own unit through the supervisor, so the
+    API cannot signal a process it does not manage.
+    """
+    from genesis.core.supervisor import SupervisorUnavailable, get_supervisor
+
+    try:
+        supervisor = get_supervisor()
+    except SupervisorUnavailable as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    result = supervisor.stop(mind_id)
+    if result.unavailable:
+        raise HTTPException(
+            status_code=501,
+            detail=result.detail,
+        )
+    if not result.ok:
+        raise HTTPException(
+            status_code=502,
+            detail=f"The {result.backend} supervisor refused to stop the daemon: {result.detail}",
+        )
+
+    return {
+        "success": True,
+        "message": f"Daemon stop requested via {result.backend}",
+        "backend": result.backend,
+        "detail": result.detail,
+    }
 
 
 # Plugin management endpoints

@@ -35,6 +35,7 @@ Example:
 import asyncio
 import json
 import logging
+import os
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
@@ -63,6 +64,111 @@ class MCPServerConfig:
     url: Optional[str] = None  # For HTTP/WS transport
     enabled: bool = True
     timeout: int = 30  # seconds
+    #: Names of *host* environment variables this server is allowed to receive.
+    #: Empty by default: an MCP server gets the base allowlist and nothing else.
+    #: Add a name here only when the server genuinely cannot work without it,
+    #: and prefer passing the value explicitly through ``env`` instead.
+    pass_through_env: List[str] = field(default_factory=list)
+
+
+#: Environment variables every MCP server needs to start at all. Deliberately
+#: minimal, and contains no secrets: these describe the process, not the
+#: deployment. Anything else must be justified per server.
+BASE_ENV_ALLOWLIST: tuple = (
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TZ",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "SYSTEMROOT",  # Windows: required for sockets and DLL resolution
+    "COMSPEC",
+    "PATHEXT",
+    "NODE_OPTIONS",
+    "NODE_PATH",
+    "npm_config_cache",
+)
+
+#: Variable-name fragments that are never passed through, even if a server lists
+#: them explicitly in ``pass_through_env``. This is the belt to the allowlist's
+#: braces: a misconfiguration cannot leak a model provider key, the JWT signing
+#: key, or a database URL into a third-party binary.
+_NEVER_PASS_TOKENS: tuple = (
+    "api_key",
+    "apikey",
+    "token",
+    "secret",
+    "password",
+    "passwd",
+    "credential",
+    "private",
+    "signing",
+    "database_url",
+    "db_url",
+    "dsn",
+    "session",
+    "cookie",
+    "auth",
+)
+
+
+def is_never_passed(name: str) -> bool:
+    """True when a host variable name looks like a secret and is never forwarded."""
+    lowered = name.lower().replace("-", "_")
+    return any(token in lowered for token in _NEVER_PASS_TOKENS)
+
+
+def build_mcp_environment(config: "MCPServerConfig") -> Dict[str, str]:
+    """Build the environment for an MCP server subprocess.
+
+    Replaces ``{**os.environ, **config.env}``, which handed every secret in the
+    API process to a third-party MCP server binary (SEC-05 / plan item B9).
+
+    The rules, in order:
+
+    1. Start from :data:`BASE_ENV_ALLOWLIST` — process basics only, no secrets.
+    2. Add host variables the server explicitly requested via
+       ``pass_through_env``, **unless** the name looks like a secret
+       (:func:`is_never_passed`). A listed-but-forbidden variable is skipped and
+       logged, so a misconfiguration is visible rather than silent.
+    3. Layer ``config.env`` on top. These are values the operator supplied on
+       purpose for this server, so they are honoured verbatim — that is the
+       supported way to give a server a credential it needs, and it keeps the
+       secret out of the host environment entirely.
+
+    Returns:
+        The environment mapping to pass to ``subprocess.Popen``.
+    """
+    environment: Dict[str, str] = {}
+
+    for name in BASE_ENV_ALLOWLIST:
+        value = os.environ.get(name)
+        if value is not None:
+            environment[name] = value
+
+    for name in config.pass_through_env:
+        if name in environment:
+            continue
+        if is_never_passed(name):
+            logger.warning(
+                "MCP server '%s' asked to inherit '%s', which looks like a secret; "
+                "refusing. Pass the value explicitly via the server's env instead.",
+                config.name,
+                name,
+            )
+            continue
+        value = os.environ.get(name)
+        if value is not None:
+            environment[name] = value
+
+    # Explicit per-server values win, and are the supported way to supply a
+    # credential without putting it in the host environment.
+    environment.update({str(key): str(value) for key, value in (config.env or {}).items()})
+
+    return environment
 
 
 class MCPClient:
@@ -94,8 +200,14 @@ class MCPClient:
         """
         try:
             if self.config.transport == MCPTransportType.STDIO:
-                # Start server process with stdio transport
-                env = {**os.environ, **self.config.env}
+                # Start server process with stdio transport.
+                #
+                # SEC-05 / B9: this used to be `{**os.environ, **self.config.env}`,
+                # which handed every secret in the API process (model provider
+                # keys, JWT signing key, database URL) to a third-party MCP
+                # server binary. See `build_mcp_environment` for what is passed
+                # now and why.
+                env = build_mcp_environment(self.config)
 
                 self.process = subprocess.Popen(
                     [self.config.command] + self.config.args,
@@ -425,7 +537,3 @@ class MCPIntegration(Integration):
             },
             "total_tools": len(self.all_tools)
         }
-
-
-# Import os for environment variables
-import os
