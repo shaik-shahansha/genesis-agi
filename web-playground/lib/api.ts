@@ -3,8 +3,9 @@
  */
 
 import { getFirebaseToken } from './firebase';
+import { buildWebSocketUrl } from './urls';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 // Request cache to deduplicate in-flight requests
 interface CacheEntry {
@@ -613,9 +614,12 @@ export class GenesisAPI {
     mindId: string,
     mindName: string
   ): WebSocket {
-    const wsURL = this.baseURL.replace('http', 'ws');
+    // Same-origin aware (see lib/urls.ts): a relative API base is upgraded
+    // from window.location, including to wss:// behind a TLS terminator.
     return new WebSocket(
-      `${wsURL}/api/v1/environments/ws/${envId}?mind_id=${mindId}&mind_name=${mindName}`
+      buildWebSocketUrl(
+        `/api/v1/environments/ws/${envId}?mind_id=${mindId}&mind_name=${mindName}`
+      )
     );
   }
 

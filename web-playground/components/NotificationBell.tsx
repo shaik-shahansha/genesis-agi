@@ -21,7 +21,7 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
   // Prefer the canonical key set by the Firebase auth context, but fall back to legacy
   const userEmail = typeof window !== 'undefined'
     ? (localStorage.getItem('genesis_user_email') || localStorage.getItem('user_email') || 'web_user@genesis.local')

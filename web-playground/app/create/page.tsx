@@ -31,7 +31,7 @@ export default function CreateMindPage() {
     guidance_notes: '',
   });
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   const pluginConfigs = [
     { value: 'minimal', label: 'Minimal', desc: 'Core only (~500 tokens)', emoji: '⚡' },

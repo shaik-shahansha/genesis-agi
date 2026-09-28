@@ -49,7 +49,7 @@ export default function MemoryTab({ mindId }: MemoryTabProps) {
         return;
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
       const response = await fetch(
         `${API_URL}/api/v1/minds/${mindId}/conversations/messages?user_email=${encodeURIComponent(storedEmail)}&limit=200`,
         {

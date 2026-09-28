@@ -4,12 +4,12 @@
   "private": true,
   "description": "Genesis AGI Framework - Web Playground",
   "scripts": {
-    "dev": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 next dev",
-    "build": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 next build",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "dev:win": "set NODE_TLS_REJECT_UNAUTHORIZED=0&& next dev",
-    "build:win": "set NODE_TLS_REJECT_UNAUTHORIZED=0&& next build"
+    "dev:win": "next dev",
+    "build:win": "next build"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",

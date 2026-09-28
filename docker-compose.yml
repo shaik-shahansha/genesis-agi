@@ -1,92 +1,111 @@
-version: '3.8'
+# =============================================================================
+# Genesis Minds — SINGLE-CONTAINER deployment (VPS-friendly)
+#
+#   cp .env.example .env      # then set API_SECRET_KEY + one model API key
+#   docker compose up -d --build
+#
+# Everything runs in ONE container behind ONE port:
+#     nginx :8080  ->  /            Next.js Mind Workspace (:3000)
+#                      /api,/health FastAPI            (:8000)
+#                      redis (optional LLM cache)
+#
+# Persistent state (database, ChromaDB, minds, logs, workspace, redis) is
+# entirely contained in the `genesis-data` volume mounted at /data.
+#
+# The previous multi-service setup (separate redis + api containers) is kept at
+# deploy/docker/docker-compose.split.yml for reference.
+# =============================================================================
 
 services:
-  # Redis for LLM response caching
-  redis:
-    image: redis:7-alpine
-    container_name: genesis-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    networks:
-      - genesis-net
-    command: redis-server --appendonly yes
-    env_file:
-      - .env
+  genesis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Empty => same-origin. Do NOT put a hostname here: NEXT_PUBLIC_* values
+        # are inlined into the browser bundle at build time.
+        NEXT_PUBLIC_API_URL: ""
+        NEXT_PUBLIC_ENVIRONMENT: production
+        # Firebase client config (optional; public by design). Required at BUILD
+        # time if you use Firebase auth.
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:-}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:-}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID:-}
+        NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID:-}
 
-  # Genesis API Server
-  genesis-api:
-    build: .
-    container_name: genesis-api
+    image: genesis-minds:${GENESIS_TAG:-local}
+    container_name: genesis
+    restart: unless-stopped
+
+    # One port. Put your reverse proxy / TLS terminator in front of this.
     ports:
-      - "8000:8000"
-    environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - DEFAULT_REASONING_MODEL=openrouter/deepseek/deepseek-r1-0528:free
-      - DEFAULT_FAST_MODEL=openrouter/deepseek/deepseek-r1-0528:free
-      - REDIS_URL=redis://redis:6379
-      - ENABLE_LLM_CACHE=true
-      - DISABLE_MULTIMODAL=true
-      - FIREBASE_ENABLED=true
-      - CORS_ORIGINS=https://*.genesisagi.in,https://*.shahansha.com,https://playground-genesis-agi.vercel.app,http://localhost:*,http://127.0.0.1:*
+      - "${FRONT_PORT:-8080}:8080"
+
     volumes:
       - genesis-data:/data
-      - ./genesis:/app/genesis
-    restart: unless-stopped
-    depends_on:
-      - redis
-    networks:
-      - genesis-net
+
+    environment:
+      # --- persistent state: all under the /data volume -------------------
+      # NOTE: data_dir/minds_dir/logs_dir are INDEPENDENT settings. Setting only
+      # GENESIS_HOME would leave ChromaDB, mind JSON and logs outside the volume.
+      GENESIS_HOME: /data/.genesis
+      DATA_DIR: /data/.genesis/data
+      MINDS_DIR: /data/.genesis/minds
+      LOGS_DIR: /data/.genesis/logs
+
+      # --- runtime toggles -----------------------------------------------
+      ENABLE_REDIS: "true"
+      # The app self-initialises its schema (create_all). Set true for a
+      # versioned/migrated deployment; see deploy/docker/entrypoint.sh.
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-false}"
+      # Comma-separated GMIDs to run as supervised 24/7 daemons, e.g.
+      #   START_MINDS=GMD-2025-4A7F-9B23
+      START_MINDS: "${START_MINDS:-}"
+      DISABLE_MULTIMODAL: "true"
+
+      # --- security -------------------------------------------------------
+      # Required. Compose aborts if this is missing, because the shipped
+      # default is a public constant (see docs/v3/SECURITY_BASELINE.md SEC-08).
+      # Generate with:  openssl rand -hex 32
+      API_SECRET_KEY: "${API_SECRET_KEY:?API_SECRET_KEY must be set in .env - run: openssl rand -hex 32}"
+
+      # Only needed if the web app is served from a DIFFERENT origin.
+      # Empty is correct for this single-container, same-origin setup.
+      CORS_ORIGINS: "${CORS_ORIGINS:-}"
+
+      # --- model providers (set at least one) -----------------------------
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      DEFAULT_REASONING_MODEL: "${DEFAULT_REASONING_MODEL:-openrouter/meta-llama/llama-3.3-70b-instruct:free}"
+      DEFAULT_FAST_MODEL: "${DEFAULT_FAST_MODEL:-openrouter/meta-llama/llama-3.3-70b-instruct:free}"
+      # Point this at host Ollama if you want fully local models on the VPS:
+      #   OLLAMA_BASE_URL=http://host.docker.internal:11434
+      OLLAMA_BASE_URL: "${OLLAMA_BASE_URL:-http://localhost:11434}"
+
+      # --- firebase admin (optional) --------------------------------------
+      FIREBASE_ENABLED: "${FIREBASE_ENABLED:-false}"
+      FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID:-}"
+
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
-  # Web Playground (disabled for VPS deployment)
-  # web-playground:
-  #   build: ./web-playground
-  #   container_name: genesis-playground
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - NEXT_PUBLIC_API_URL=http://localhost:8000
-  #   depends_on:
-  #     - genesis-api
-  #   restart: unless-stopped
-  #   networks:
-  #     - genesis-net
-
-  # Mind Daemon (optional - uncomment to run a Mind 24/7)
-  # genesis-mind:
-  #   build: .
-  #   container_name: genesis-mind-${MIND_ID}
-  #   environment:
-  #     - MIND_ID=${MIND_ID}
-  #     - GROQ_API_KEY=${GROQ_API_KEY:-}
-  #     - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-  #     - REDIS_URL=redis://redis:6379
-  #   volumes:
-  #     - genesis-data:/data
-  #   depends_on:
-  #     - redis
-  #   restart: unless-stopped
-  #   networks:
-  #     - genesis-net
-  #   command: python -m genesis.daemon --mind-id ${MIND_ID}
+    # Bound log growth: this container runs Minds 24/7.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
-  redis-data:
-    driver: local
   genesis-data:
     driver: local
-
-networks:
-  genesis-net:
-    driver: bridge

@@ -17,31 +17,59 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase (only once)
-let app: FirebaseApp;
-let auth: Auth;
+/**
+ * True when enough Firebase config is present to initialise the SDK.
+ * Requires at least an API key and a project id.
+ */
+export const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey && firebaseConfig.projectId
+);
+
+// Initialize Firebase (only once), and ONLY when it is actually configured.
+//
+// Firebase is optional: a self-hosted deployment can use the built-in JWT /
+// API-key authentication instead. Initialising the SDK with an empty API key
+// throws `auth/invalid-api-key`, and because Next.js prerenders pages at build
+// time that error would fail the entire production build. So configuration is
+// checked first and initialisation is wrapped defensively.
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
 let analytics: Analytics | null = null;
 
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  
-  // Initialize analytics only in browser environment
-  if (typeof window !== 'undefined') {
-    analytics = getAnalytics(app);
+if (isFirebaseConfigured) {
+  try {
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    auth = getAuth(app);
+
+    // Analytics is browser-only.
+    if (typeof window !== 'undefined') {
+      analytics = getAnalytics(app);
+    }
+  } catch (error) {
+    // Optional auth must never break the build or the app shell.
+    console.error('[firebase] initialisation failed; Firebase auth disabled:', error);
+    app = null;
+    auth = null;
+    analytics = null;
   }
-} else {
-  app = getApps()[0];
-  auth = getAuth(app);
+} else if (typeof window !== 'undefined') {
+  console.info(
+    '[firebase] NEXT_PUBLIC_FIREBASE_* not configured - Firebase auth is disabled. ' +
+      'The app will use the built-in JWT / API-key authentication instead.'
+  );
 }
 
 export { app, auth, analytics };
 
 /**
  * Get the current Firebase ID token for API authentication
- * @returns Promise<string | null> - The ID token or null if not authenticated
+ * @returns Promise<string | null> - The ID token, or null when Firebase is
+ *          disabled or the user is not signed in.
  */
 export async function getFirebaseToken(): Promise<string | null> {
+  if (!auth) {
+    return null;
+  }
   try {
     const currentUser = auth.currentUser;
     if (!currentUser) {

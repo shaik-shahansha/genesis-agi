@@ -44,17 +44,10 @@ dependencies = [
     "httpx>=0.26.0",
     "aiofiles>=23.2.1",
     "schedule>=1.2.0",
-    "asyncio>=3.4.3",
     "aiosmtplib>=3.0.0",
     "aioimaplib>=1.0.1",
     "slowapi>=0.1.9",
     "pillow>=10.0.0",
-    "browser-use>=0.1.5",
-    "playwright>=1.40.0",
-    "pydantic-settings>=2.0.0",
-    "opencv-python>=4.8.0",
-    "fer>=22.5.0",
-    "deepface>=0.0.79",
     "requests>=2.31.0",
     "numpy>=1.24.0",
     "psutil>=5.9.0",
@@ -62,6 +55,24 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Optional Redis response cache (genesis/models/cache.py).
+# Installed in the container image; the cache degrades gracefully without it.
+cache = [
+    "redis>=5.0.0",
+]
+# Vision stack. Large (deepface pulls TensorFlow) and lazily imported by the
+# application, so it is NOT part of the default install.
+vision = [
+    "opencv-python>=4.8.0",
+    "deepface>=0.0.79",
+    "fer>=22.5.0",
+]
+# Browser automation. Executes model-directed browsing; treat as high risk and
+# only install where policy allows it.
+browser = [
+    "browser-use>=0.1.5",
+    "playwright>=1.40.0",
+]
 senses = [
     "opencv-python>=4.8.0",
     "pyaudio>=0.2.13",

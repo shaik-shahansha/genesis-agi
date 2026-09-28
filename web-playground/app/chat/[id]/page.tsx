@@ -9,6 +9,7 @@ import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { api } from '@/lib/api';
 import { getFirebaseToken } from '@/lib/firebase';
 import { useMindCache } from '@/lib/MindContext';
+import { buildWebSocketUrl } from '@/lib/urls';
 
 interface Message {
   id?: number;
@@ -130,7 +131,7 @@ export default function ChatPage() {
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   // Cycling loading messages
   useEffect(() => {
@@ -187,7 +188,9 @@ export default function ChatPage() {
   // WebSocket connection for proactive messages
   useEffect(() => {
     if (mindId && userEmail) {  // Only connect after email is set
-      const wsUrl = `${API_URL.replace('http', 'ws')}/api/v1/minds/${mindId}/stream?user_email=${encodeURIComponent(userEmail)}`;
+      const wsUrl = buildWebSocketUrl(
+        `/api/v1/minds/${mindId}/stream?user_email=${encodeURIComponent(userEmail)}`
+      );
       
       console.log('[WebSocket] Connecting with email:', userEmail);
       const ws = new WebSocket(wsUrl);

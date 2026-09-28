@@ -48,6 +48,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [genesisUser, setGenesisUser] = useState<any | null>(null);
 
   useEffect(() => {
+    // Firebase is optional. When it is not configured there is no auth state to
+    // subscribe to, so stop loading immediately and let the app fall back to the
+    // built-in JWT / API-key authentication.
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
     // Listen to auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
@@ -99,6 +107,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signInWithGoogle = async () => {
+    if (!auth) {
+      throw new Error('Firebase authentication is not configured on this deployment.');
+    }
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
@@ -110,6 +121,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signInWithEmail = async (email: string, password: string) => {
+    if (!auth) {
+      throw new Error('Firebase authentication is not configured on this deployment.');
+    }
     try {
       await signInWithEmailAndPassword(auth, email, password);
       // Auth state change handler will manage the rest
@@ -120,6 +134,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signUpWithEmail = async (email: string, password: string) => {
+    if (!auth) {
+      throw new Error('Firebase authentication is not configured on this deployment.');
+    }
     try {
       await createUserWithEmailAndPassword(auth, email, password);
       // Auth state change handler will manage the rest
@@ -130,6 +147,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signOut = async () => {
+    if (!auth) {
+      return;
+    }
     try {
       await firebaseSignOut(auth);
     } catch (error: any) {

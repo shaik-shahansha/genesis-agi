@@ -2,6 +2,8 @@
  * WebSocket Manager for real-time environment interaction
  */
 
+import { buildWebSocketUrl } from './urls';
+
 export type EnvironmentMessage =
   | { type: 'welcome'; environment: any; message: string }
   | { type: 'mind_joined'; mind_id: string; mind_name: string; present_minds: string[]; count: number; timestamp: string }
@@ -36,9 +38,11 @@ export class EnvironmentWebSocket {
   }
 
   connect() {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const wsURL = API_URL.replace('http', 'ws');
-    const url = `${wsURL}/api/v1/environments/ws/${this.envId}?mind_id=${this.mindId}&mind_name=${encodeURIComponent(this.mindName)}`;
+    // Same-origin aware: see lib/urls.ts. WebSocket requires an absolute URL,
+    // so a relative API base is upgraded from window.location.
+    const url = buildWebSocketUrl(
+      `/api/v1/environments/ws/${this.envId}?mind_id=${this.mindId}&mind_name=${encodeURIComponent(this.mindName)}`
+    );
 
     this.ws = new WebSocket(url);
 

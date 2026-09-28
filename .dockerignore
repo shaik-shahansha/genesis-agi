@@ -1,0 +1,59 @@
+# Keep the build context small and the image reproducible.
+# Anything not needed to build or run the container is excluded.
+
+# --- VCS / tooling ---
+.git
+.gitignore
+.github
+.gitmodules
+.gitattributes
+
+# --- Python caches / local state (never ship, never leak) ---
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Local Genesis runtime state (must NEVER be baked into an image) ---
+.genesis/
+data/
+*.db
+*.sqlite
+*.sqlite3
+chroma_db/
+logs/
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Node / Next ---
+web-playground/node_modules
+web-playground/.next
+web-playground/out
+web-playground/tsconfig.tsbuildinfo
+node_modules/
+
+# --- Docs, tests, examples, mobile (not needed at runtime) ---
+docs/
+tests/
+examples/
+mobile-app/
+website/
+*.md
+!README.md
+
+# --- Dev / deploy leftovers ---
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+deploy/docker/docker-compose.split.yml
