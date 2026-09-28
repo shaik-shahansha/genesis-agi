@@ -87,6 +87,15 @@ class EventType:
     GOAL_COMPLETED = "goal.completed"
     GOAL_ABANDONED = "goal.abandoned"
 
+    # Digital life state (Phase N). A commitment is an obligation, so its events
+    # are the record of what the being promised and whether it kept it.
+    COMMITMENT_CREATED = "commitment.created"
+    COMMITMENT_UPDATED = "commitment.updated"
+    COMMITMENT_FULFILLED = "commitment.fulfilled"
+    COMMITMENT_MISSED = "commitment.missed"
+    COMMITMENT_RENEGOTIATED = "commitment.renegotiated"
+    COMMITMENT_WITHDRAWN = "commitment.withdrawn"
+
     ACTION_PROPOSED = "action.proposed"
     ACTION_POLICY_EVALUATED = "action.policy_evaluated"
     ACTION_APPROVAL_REQUESTED = "action.approval_requested"

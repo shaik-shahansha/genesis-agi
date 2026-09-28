@@ -188,6 +188,62 @@ class RiskAssessment:
 # --------------------------------------------------------------------------- #
 
 _CORE_CAPABILITIES: Tuple[CapabilityProfile, ...] = (
+    # --- life state: commitments (Phase N) ---
+    #
+    # Commitments are where "accountable autonomy" becomes concrete: a being that
+    # owes someone something, where the obligation is visible to the person owed.
+    # The tier depends entirely on *who* is bound, which is why there are three
+    # capabilities rather than one.
+    CapabilityProfile(
+        name="create_commitment",
+        # Binding itself to its own owner is reversible and internal: the owner
+        # can cancel it, and nobody outside is affected.
+        risk=RiskLevel.R1,
+        category="RELATIONSHIP",
+        reversible=True,
+        data_sensitivity="internal",
+        notes="the Mind commits itself to its own owner",
+    ),
+    CapabilityProfile(
+        name="create_commitment_cross_mind",
+        # Obligating another Mind reaches outside this being's workspace.
+        risk=RiskLevel.R2,
+        category="RELATIONSHIP",
+        external=True,
+        reversible=True,
+        data_sensitivity="internal",
+        notes="the Mind commits itself to another Mind",
+    ),
+    CapabilityProfile(
+        name="commit_to_third_party",
+        # Binding a human outside the relationship is consequential: someone who
+        # did not ask to be obligated is now relying on this being, and missing it
+        # has real-world cost.
+        risk=RiskLevel.R3,
+        category="RELATIONSHIP",
+        external=True,
+        reversible=False,
+        data_sensitivity="personal",
+        required_scopes=("relationship.commit",),
+        notes="the Mind binds a third party to an obligation",
+    ),
+    CapabilityProfile(
+        name="fulfil_commitment",
+        risk=RiskLevel.R1,
+        category="RELATIONSHIP",
+        reversible=True,
+        notes="marking an obligation as kept",
+    ),
+    CapabilityProfile(
+        name="withdraw_commitment",
+        # Someone was relying on it. Reversible in the sense that it can be
+        # re-opened, but it needs a recorded decision and a receipt.
+        risk=RiskLevel.R2,
+        category="RELATIONSHIP",
+        reversible=True,
+        data_sensitivity="internal",
+        notes="abandoning an obligation; the beneficiary should be told",
+    ),
     # --- memory / introspection (R0-R1) ---
     CapabilityProfile(
         name="add_memory",

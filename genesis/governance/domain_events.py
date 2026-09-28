@@ -85,6 +85,7 @@ class DomainJournal(Protocol):  # pragma: no cover - structural typing
     ) -> None: ...
     def goal_completed(self, *, mind_id: str, goal_id: str, title: str = "") -> None: ...
     def goal_abandoned(self, *, mind_id: str, goal_id: str, reason: str = "") -> None: ...
+    def record_life_event(self, *, mind_id: str, event_type: str, payload: Any) -> None: ...
 
 
 class NullDomainJournal:
@@ -126,6 +127,9 @@ class NullDomainJournal:
         return None
 
     def goal_abandoned(self, *, mind_id: str, goal_id: str, reason: str = "") -> None:
+        return None
+
+    def record_life_event(self, *, mind_id: str, event_type: str, payload: Any) -> None:
         return None
 
 
@@ -314,6 +318,26 @@ class _RecordingDomainJournal(NullDomainJournal):
             EventType.GOAL_ABANDONED,
             mind_id=mind_id,
             build_payload=lambda: {"goal_id": goal_id, "reason": _truncate(reason)},
+        )
+
+    # -- generic ------------------------------------------------------------ #
+    #
+    # An escape hatch for event families that do not warrant a method each, such
+    # as the life-state events (Phase N). Deliberately still routed through
+    # `_record`, so the payload is evaluated inside the guard and a caller cannot
+    # accidentally bypass the "never raises" guarantee.
+    #
+    # It does *not* let a caller choose the redaction policy: `_record` passes the
+    # payload through the same writer as everything else, so the secret-shape
+    # redaction still applies. What a caller can do here is include content, and
+    # that is intentional for this path — a commitment's text is journalled on
+    # purpose, because an obligation nobody can read is not an obligation. Callers
+    # adding new event families should mirror that judgement rather than assume it.
+    def record_life_event(self, *, mind_id: str, event_type: str, payload: Any) -> None:
+        self._record(
+            event_type,
+            mind_id=mind_id,
+            build_payload=lambda: dict(payload) if payload else {},
         )
 
 
