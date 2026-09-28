@@ -11,8 +11,9 @@
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
 | **Last verified** | 2026-09-28, full test suite + container smoke test |
-| **Test suite** | 409 passed, 3 skipped, 12 failed (all 12 pre-existing, reproduce on the pristine tree) |
+| **Test suite** | 551 passed, 5 skipped, 12 failed (all 12 pre-existing, reproduce on the pristine tree) |
 | **Container** | Image builds; runs `Up (healthy)`; all 12 governance endpoints verified live |
+| **Sandbox isolation** | Verified against a real container: 10/10 claims held, 11 escape tests in the suite |
 | **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.1` |
 
 ---
@@ -276,27 +277,34 @@ Two bug classes were found only by going beyond the unit suite, and both now hav
   `tests/governance/test_sql_store.py`, which exercises the real SQLAlchemy store — the in-memory
   store used by every other test cannot reproduce it.
 
-### 3.2 Security containment — ✅ most, ⚠️ two gaps
+### 3.2 Security containment — ✅ Phase B functionally closed
 
 | Item | State |
 |---|---|
 | SEC-01 unauthenticated WebSocket + identity spoofing | ✅ fixed, verified live |
 | SEC-02/SEC-14 path traversal, arbitrary file read/write, unbounded upload | ✅ fixed, 9/9 live checks |
-| SEC-04 runtime `pip install` from model output | ✅ removed |
+| SEC-04 runtime `pip install` from model output | ✅ removed (both providers refuse before starting) |
 | SEC-06 unenforced `ALLOWED_IMPORTS` claim | ✅ claim deleted, not faked |
-| SEC-05 environment inheritance | ⚠️ sandbox scrubs its env; **MCP servers still receive `os.environ`** |
+| SEC-05 environment inheritance | ✅ **closed** — the sandbox scrubs its env, and MCP servers now get a base allowlist with secrets refused even when explicitly requested |
 | Sandbox provider + all 3 execution paths | ✅ `genesis/sandbox/`, AST guard test |
-| Filesystem / PID / network isolation | ⚠️ **not implemented.** `LocalSandboxProvider` enforces env scrubbing, CPU/AS/FSIZE/NPROC rlimits, timeout, output caps, declared-artifact-only export, and no package installs. It reports `filesystem_isolation: false`, `pid_isolation: false` via `capabilities()` — read that, do not assume. Needs `ContainerSandboxProvider` (B2b) in a dedicated sandbox-manager service. |
-| Egress blocking | ⚠️ defaults to network-off; `unshare -rn` unavailable in the current container, so egress is reported as not blocked |
+| Filesystem / PID / network isolation | ✅ **closed** — `ContainerSandboxProvider` provides read-only rootfs with one writable mount, cgroup-scoped PID and memory limits, `--network none`, `--cap-drop ALL`, no-new-privileges, and an optional gVisor/Kata kernel boundary. Verified against a real container: 10/10 isolation claims held, 11 escape tests in the suite. |
+| Egress blocking | ✅ **closed and verified** — isolation is *probed*, not inferred: `verified` requires the host to have egress **and** the namespace to block it. Every execution records `network_isolated` so the receipt states the fact. |
+| API-tier process spawning (B11) | ✅ **closed** — lifecycle delegates to `GENESIS_SUPERVISOR`; the default refuses with the operator command rather than forking. `routes.py` is AST-guarded against spawning or signalling anything. |
+| Placeholder signing key (B12) | ✅ **closed** — the app refuses to boot with it outside test/dev, and an unset `GENESIS_ENV` counts as production |
+| `LocalSandboxProvider` honesty | ✅ still reports `is_security_boundary: false`; `factory` refuses to fall back to it when `container` is requested |
+
+What remains in Phase B is developer experience (A2/A4/A6), not a security boundary.
 
 ### 3.3 Developer experience
 
 | Item | State |
 |---|---|
 | Test suite runs without paid API keys | ✅ |
-| 250 new tests (219 governance + 31 migration guards) | ✅ |
+| 537 governance, migration and security tests | ✅ |
+| Container sandbox escape tests | ✅ 11 tests, skipped when no runtime/image is present rather than silently passing |
 | Alembic migration for governance tables | ✅ `008_governance_plane`, verified upgrade → downgrade → upgrade → `downgrade base` → upgrade |
 | Migration chain usable from a fresh database | ✅ **fixed** — three earlier revisions created the same index twice (`index=True` *and* an explicit `create_index`), so `alembic upgrade head` aborted partway and every later revision, including the governance one, was unreachable on a new install. Guarded by `tests/test_migrations.py`. |
+| SQL store covered by tests | ✅ **fixed** — every multi-row read raised `DetachedInstanceError` (rows converted after the session closed). Invisible while a table is empty, so it surfaced as `GET /journal/verify` returning 200 then 500. Guarded by `tests/governance/test_sql_store.py`. |
 | CI (lint ratchet, tests, migration up/down) | 🚧 not built (A6) |
 | `mypy genesis` clean | 🚧 not built (A4) |
 | Deterministic per-test isolation of ChromaDB / `~/.genesis` | 🚧 not built (A2) — a cause of order-dependent tests |
@@ -372,10 +380,15 @@ alembic downgrade -1      # drops the four governance tables
 
 | Variable | Default | Notes |
 |---|---|---|
-| `GENESIS_ENV` | unset | `test`/`development` required for the non-durable governance store and the fake sandbox |
+| `GENESIS_ENV` | unset | Treats as `production` when unset. `test`/`development` required for the non-durable governance store and the fake sandbox |
 | `GENESIS_GOVERNANCE_STORE` | `sql` | `memory` is refused outside test/dev, because a non-durable journal breaks the accountability guarantee |
-| `GENESIS_SANDBOX_PROVIDER` | `local` | `fake` is refused outside test/dev |
-| `API_SECRET_KEY` | insecure default | Compose refuses to start without a real one |
+| `GENESIS_SANDBOX_PROVIDER` | `local` | `fake` is refused outside test/dev. `container` fails closed if its runtime is unusable — it never falls back to `local` |
+| `GENESIS_SANDBOX_RUNTIME` | daemon default | `runsc` (gVisor) or `kata-runtime` for a kernel boundary. Asking for one that is absent refuses rather than using `runc` |
+| `GENESIS_SANDBOX_REQUIRE_ISOLATION_RUNTIME` | off | Refuse to run at all unless gVisor/Kata is present |
+| `GENESIS_SANDBOX_IMAGE` | `genesis-sandbox:latest` | Pre-baked; nothing is ever installed at runtime |
+| `GENESIS_SANDBOX_EGRESS_PROXY` | unset | Required when a policy enables network access, because plain Docker networking cannot restrict destinations |
+| `GENESIS_SUPERVISOR` | `none` | `systemd` delegates Mind daemon lifecycle. `none` returns 501 with the operator command rather than forking from the API |
+| `API_SECRET_KEY` / `SECRET_KEY` | placeholder | The app **refuses to boot** with the placeholder outside test/dev |
 | `DATA_DIR`, `MINDS_DIR`, `LOGS_DIR` | `~/.genesis/*` | Independent settings — do not assume they follow `GENESIS_HOME` |
 
 ---
@@ -470,57 +483,135 @@ database is unreachable.
 
 ## 7. Plan
 
-Ordering follows V3 §47. Phase B is a gate: it is nearly closed, and the two
-remaining items are the honest blockers.
+Ordering is by what unblocks what. Phase B is a gate that is now closed on
+security; the remaining items are engineering hygiene.
 
-### Phase B — remaining (the gate)
+### Phase B — status
 
-| ID | Task | Why it matters |
+| ID | Item | State |
 |---|---|---|
-| **B2b** | `ContainerSandboxProvider` (gVisor/Kata) in a dedicated sandbox-manager service | Supplies filesystem, PID and network isolation. Today a determined payload inside the sandbox shares the filesystem namespace. **This is the main open security item.** |
-| **B5** | Real egress blocking (allow-listed proxy) | Network is off by default but not provably blocked in this container. |
-| **B9** | Stop passing `os.environ` to MCP servers; introduce `SecretReference` | The sandbox is scrubbed; MCP is not. |
-| **B11** | Remove API-tier process spawning | The API should not signal arbitrary processes. |
-| B12 | Application-level refusal to boot on a default `API_SECRET_KEY` | Compose enforces it; the app does not. |
-| A2/A6/A4 | Test isolation, CI, `mypy` | Currently a source of order-dependent test failures. |
+| **B2b** | `ContainerSandboxProvider` — filesystem, PID, cgroup and network isolation, with an optional gVisor/Kata kernel boundary | ✅ **Done** — verified against Docker with 10/10 isolation claims held, and 11 escape tests in the suite |
+| **B5** | Egress | ✅ **Done** — isolation is now *verified* rather than inferred; each execution records whether egress was actually blocked |
+| **B9** | MCP servers no longer inherit the host environment | ✅ **Done** — base allowlist, secrets refused even when explicitly requested |
+| **B11** | API-tier process spawning removed; lifecycle delegated to a supervisor | ✅ **Done** — default refuses with the operator command rather than silently forking |
+| B12 | Refuse to boot on a placeholder signing key | ✅ **Done** |
+| A2/A4/A6 | Test isolation, CI, `mypy` | 🚧 open |
+
+**Phase B is functionally closed.** What remains (A2/A4/A6) is developer
+experience, not a security boundary.
 
 ### Phase C — kernel extraction (behaviour-preserving)
 
 Split `Mind` (`genesis/core/mind.py`, ~99 KB) into kernel / persona / capability /
 memory / cognition. This is what unlocks snapshotting, forking, multi-process
-daemons and embodiment. It is a large, mechanical refactor and has not started.
+daemons and embodiment.
 
-### Phase D — event journal as the timeline of record
+**Includes the `Body` protocol** (`perceive` non-blocking, `act` refusable,
+`observe` side-effect-free) plus `NullBody` and `WebBody`. Doing this here rather
+than in Phase L is deliberate: the shape of the actuation seam is what constrains
+the kernel split, and defining it later means reconciling four separate paths
+(chat, voice, workspace, robot). See `EMBODIMENT_ABSTRACTION.md`.
 
-Wire the remaining write paths (`memory.*`, `goal.*`, `relationship.*`) into the
-journal now that it exists, and add checkpoints/resume.
+### Phase N — Digital Life State *(promoted above memory V3)*
 
-### Phase E — memory V3
+Commitments, responsibilities, projects, habits, assets, calendar. See
+`DIGITAL_LIFE_STATE.md`.
 
-Bi-temporal memory (ADR-0004), pgvector substrate (ADR-0003), hybrid retrieval
-(dense + exact IDs, dates, names, codes).
+**This reverses the previous ordering, and the reasoning is:**
 
-### Phases F–M — not started
+1. Memory V3 makes retrieval *better*. Life state makes the being *reliable*,
+   which is the property a user notices immediately.
+2. Life state defines what memory must serve. Building bi-temporal storage before
+   knowing whether validity intervals are needed for *commitments* (critically)
+   or for *facts* (usefully) risks optimising the wrong axis.
+3. It is far cheaper: two new entities, two upgrades, one consolidation — against
+   replacing the vector store and adding a temporal graph.
 
-- **F** Portable signed identity (DID, verifiable credentials, export/transfer).
+The cost of this order is that commitments will later need migrating onto
+bi-temporal storage. That is worth paying.
+
+Confirmed as real gaps before writing it: `commitment.` and `embodiment.` exist
+**only** as event-type prefixes in `governance/models.py`, and
+`role.add_responsibility` stores a plain string.
+
+### Phase O — Relationship intelligence
+
+Trust scoped per domain, relational memory, shared history, and **boundaries**
+(what not to mention or share). See `RELATIONSHIP_INTELLIGENCE.md`.
+
+Boundaries are the one piece worth pulling forward into Phase N: they are cheap,
+they only ever *restrict* a being, and they give a user immediate control over
+something already acting on their behalf.
+
+### Phases D–M
+
+- **D** Journal as the timeline of record: wire the remaining write paths, add
+  checkpoints/resume.
+- **E** Memory V3: bi-temporal (ADR-0004), pgvector (ADR-0003), hybrid retrieval.
+- **F** Portable identity. The artifact is specified in
+  `PORTABLE_BEING_FORMAT.md`. The hard half is not the file format — it is signing,
+  which does not exist at all today (`gmid` is a local string).
 - **G** Durable governed autonomy: suspend/resume on approval without spinning.
-- **H** Workspace: the playground surfaces built on the governance API.
+- **H** Workspace — also the surface where commitments become visible to a human.
 - **I** MCP + skills marketplace with risk declared per skill.
 - **J** Realtime voice presence (barge-in, transcript-as-memory).
 - **K** Enterprise controls: tenancy, per-tenant policy, audit export, SSO.
-- **L** Embodiment: `actuate_robot` at R4 with a human in the loop, hardware
-  abstraction, safety-rated stop.
+- **L** Embodiment hardware. **`ROSBody` must refuse rather than actuate** until a
+  physically independent emergency stop exists that fails *safe*.
 - **M** Genesis World.
 
 ### Recommended next three, in order
 
-1. **B2b container sandbox provider** — closes the last real execution-boundary gap.
-2. **Playground revamp** — the governance plane is only valuable if a human can
-   actually see the approval queue, the receipts, and the stop button.
-3. **Phase D journal wiring** — cheap now that the store and redaction exist, and
-   it makes the timeline trustworthy before more features land on top.
+1. **Phase D journal wiring** — cheap now that the store and redaction exist, and
+   it makes the timeline trustworthy before life state lands on top of it.
+2. **Phase N Digital Life State (commitments first)** — the differentiating work,
+   and the thing a user can feel. Start with commitments alone; they are small
+   and they change what the product is.
+3. **A6 CI** — a migration up/down job plus the test suite in CI would have caught
+   both bugs found manually this round.
 
 ---
+
+## 7b. How to read an assessment of this project
+
+This document has been reviewed externally, and the reviews are useful for
+prioritisation. They are not useful as a scorecard, and it is worth saying why.
+
+**They are grading the documentation, not the code.** The review that produced
+scores of "Implementation 7.5/10, Architecture maturity 8/10, Memory 7/10" was
+assessing a document whose own §4 lists: no bi-temporal memory, no filesystem
+isolation (until the same day), MCP leaking the host environment, no portable
+identity, no embodiment, and a `Mind` god-object blocking all of it. Those are not
+7/10 facts. A document that is honest about its gaps will be *scored against its
+own candour* unless the reviewer checks the repository — so a well-written status
+doc reads as a better system than it is.
+
+Concrete corrections, from the code:
+
+| Assessed | Actual |
+|---|---|
+| Robot readiness 5/10 | **No hardware layer exists.** `actuate_robot` is a risk classification with nothing behind it. 1/10. |
+| Governance 9/10 | The plane is ~a day old and has never run under real load. The gate was still open this morning. Promising, unproven. |
+| Memory 7/10 | Decay cannot express supersession ("true until July"). Bi-temporal is Phase E. 5/10. |
+| Research novelty 9/10 | The components are known patterns (policy-as-code, hash-chained audit, HITL approval). The *combination* applied to persistent beings is less common — call it 6/10 novelty, 8/10 usefulness. |
+| "Implementation 7.5/10" | The two bugs found by running the code today were a migration chain that could not execute and every multi-row read raising `DetachedInstanceError`. Neither was found by review. |
+
+**What the reviews got right, and led to plan changes:**
+
+- *Life state is the missing piece.* Correct, and now Phase N — promoted above
+  memory V3.
+- *Embodiment should be an interface before it is hardware.* Correct, and the
+  `Body` protocol moved into Phase C.
+- *Relationships are richer than a typed edge.* Correct, and now Phase O.
+- *Don't build a thousand agents or a marketplace yet.* Agreed; both were already
+  sequenced late and remain so.
+- *Positioning as an operating system rather than a framework.* Already the V3
+  framing.
+
+The useful part of an external review is the **prioritisation**, not the score.
+A score from someone who has not run the code is a sentiment signal; the
+repository, the tests, and the container are the evidence.
+
 
 ## 8. Ground rules for work on this branch
 
@@ -551,7 +642,7 @@ problem in this repository.
 
 ```
 genesis/
-  governance/          # the control plane (new on this branch)
+  governance/          # the control plane
     policy.py          #   PolicyEngine, decisions, PolicyContext
     risk.py            #   R0-R5, capability registry, conservative inference
     constitution_rules.py  # 13 versioned clauses mapped to the charter
@@ -562,21 +653,38 @@ genesis/
     estop.py           #   emergency stop with journal rehydration
     guard.py           #   GovernanceGate: the single entry point
     store.py           #   memory + SQLAlchemy persistence, hash chaining
-  sandbox/             # untrusted execution boundary (all 3 paths routed)
+  sandbox/             # untrusted execution boundary
+    base.py            #   SandboxProvider protocol, policy, result types
+    local.py           #   hardened subprocess + verified network probe
+    container.py       #   filesystem/PID/cgroup/network isolation, gVisor|Kata
+    factory.py         #   provider selection; refuses security downgrades
+    tool_runner.py     #   tool execution; carries isolation facts to receipts
   core/
     action_executor.py # gate -> legacy ladder -> execute -> receipt
     constitution.py    # charter + adapter (no longer the mechanism)
+    supervisor.py      # daemon lifecycle via systemd; no forking from the API
     paths.py           # path containment primitives
     code_executor.py   # routes through SandboxProvider
+  integrations/
+    mcp_integration.py # MCP with a scrubbed environment (SEC-05)
   api/
     governance_routes.py   # 12 endpoints: approvals, receipts, timeline, e-stop
   database/
     governance_models.py   # 4 tables
 alembic/versions/20260928_0800_add_governance_plane.py
-tests/governance/     # 219 tests
+tests/
+  governance/        # 260 tests: policy, approvals, audit, SQL store, gate, API
+  security/          # 246 tests: sandbox, container escapes, MCP env, secrets
+  test_migrations.py # 31 tests: migration-chain guards
 docs/
-  architecture/adr/   # ADR-0001 .. ADR-0008
-  v3/                 # discovery, threat model, gap analysis, backlog, deployment
+  architecture/adr/  # ADR-0001 .. ADR-0008
+  v3/
+    DEVELOPER_GUIDE.md            # this document
+    DIGITAL_LIFE_STATE.md         # Phase N design: commitments, projects, habits
+    RELATIONSHIP_INTELLIGENCE.md  # Phase O design: trust scopes, boundaries
+    EMBODIMENT_ABSTRACTION.md     # Body protocol + ROSBody safety preconditions
+    PORTABLE_BEING_FORMAT.md      # the .genesis export format (Phase F)
+    THREAT_MODEL.md, IMPLEMENTATION_BACKLOG.md, TARGET_ARCHITECTURE.md, ...
   GENESIS_CONSTITUTION.md   # the human-readable charter
 ```
 

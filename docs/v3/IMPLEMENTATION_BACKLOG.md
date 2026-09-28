@@ -212,16 +212,75 @@ Visual or feature work must not start before this passes.
 
 ---
 
-## Phase L — Embodiment
+## Phase N — Digital Life State (**promoted above Phase E**)
+
+> Design: [`DIGITAL_LIFE_STATE.md`](DIGITAL_LIFE_STATE.md).
+>
+> **This phase was promoted ahead of memory V3 after review.** The reasoning:
+> memory V3 makes retrieval better; life state makes the being *reliable*, which
+> is the property a user notices on day one. It is also much cheaper (two new
+> entities, two upgrades, one consolidation — against replacing the vector store
+> and adding a temporal graph). The cost of this ordering is that commitments will
+> later need migrating onto bi-temporal storage, which is worth paying.
+>
+> Verified as genuine gaps before writing this: `commitment.` and `embodiment.`
+> exist **only** as event-type prefixes in `genesis/governance/models.py`, and
+> `add_responsibility` in `core/role.py` stores a plain string.
+
+| ID | Task | Files | Status |
+|---|---|---|---|
+| N1 | `Commitment` entity: beneficiary (a relationship, not a string), deadline, provenance, status machine (OPEN → IN_PROGRESS → FULFILLED / MISSED / RENEGOTIATED / WITHDRAWN) | `genesis/core/life/commitments.py` (new) | `[ ]` |
+| N2 | **Commitments are exempt from memory decay.** A forgotten obligation is a failure, not a fading fact | `genesis/core/life/commitments.py` | `[ ]` |
+| N3 | `MISSED` is an audit event surfaced in the timeline, not a silent expiry | `genesis/core/life/`, `genesis/governance/audit.py` | `[ ]` |
+| N4 | Declare the governance capabilities: commitment to owner R1, commitment binding a third party R2/R3, withdrawal R2 with receipt | `genesis/governance/risk.py` | `[ ]` |
+| N5 | `Responsibility` as a first-class record: scope, owner, review interval, suspendable (upgrade the `role.py` string) | `genesis/core/role.py`, `genesis/core/life/` | `[ ]` |
+| N6 | `Project` entity: goal, commitments, artifacts, timeline, participants | `genesis/core/life/projects.py` (new) | `[ ]` |
+| N7 | Habits: expose the existing circadian routines (`life_activities.py`, `consciousness_v2.py`) as *declarable* habits with an adherence history | `genesis/core/life/habits.py` (new) | `[ ]` |
+| N8 | Assets view: one queryable answer to "what does this being have?" (files, GEN budget, skills, environments, credential *references*) | `genesis/core/life/assets.py` (new) | `[ ]` |
+| N9 | Calendar: one time axis joining commitments, habits and scheduled actions (consolidate `action_scheduler.py` + `tasks.py`) | `genesis/core/life/calendar.py` (new) | `[ ]` |
+| N10 | Workspace surface: commitments visible to a human, with provenance | Phase H | `[ ]` |
+| N11 | Anti-requirement: **no autonomous commitment creation.** A being that invents obligations is a liability | test | `[ ]` |
+
+---
+
+## Phase O — Relationship intelligence
+
+> Design: [`RELATIONSHIP_INTELLIGENCE.md`](RELATIONSHIP_INTELLIGENCE.md).
+>
+> `core/relationships.py` models a typed edge. It cannot express trust, shared
+> history, expectations, or what should not be mentioned — which is the
+> granularity that matters for a being acting with standing authority.
 
 | ID | Task | Status |
 |---|---|---|
+| O1 | **Boundaries** (what not to mention, not to share, when not to contact). Pull these forward with Phase N: cheap, only *restrict*, and give a user immediate control | `[ ]` |
+| O2 | Trust **scoped per domain**, with `none` as a distinct value rather than a low number | `[ ]` |
+| O3 | Relational memory: a `relationship_id` scope on memory writes, resolved as a retrieval filter (not a new store) | `[ ]` |
+| O4 | Shared history: summarised significant exchanges, with retention bounds (boundaries persist; summaries expire) | `[ ]` |
+| O5 | Governance: trust **upward** is R3, a boundary is R1 (the asymmetry is deliberate); relational detail shared with a third party is R4 | `[ ]` |
+| O6 | Scoped export: a relationship involving a third party does not travel without that party's consent | `[ ]` |
+| O7 | Transparency: a person can see what the being believes about them. Anti-requirement: **no private assessment of a person** | `[ ]` |
+
+---
+
+## Phase L — Embodiment
+
+> Design: [`EMBODIMENT_ABSTRACTION.md`](EMBODIMENT_ABSTRACTION.md).
+>
+> **L1 (`Body` protocol) was moved into Phase C**, because the shape of the
+> actuation seam is what constrains the kernel split. Defining it later means
+> four competing paths in (chat, voice, workspace, robot) to reconcile.
+
+| ID | Task | Status |
+|---|---|---|
+| L0 | `Body` protocol (`perceive` non-blocking, `act` refusable, `observe` side-effect-free) + `NullBody` + `WebBody` — **in Phase C** | `[ ]` |
 | L1 | `Embodiment` protocol + manifest (capabilities, sensors, actuators, safety constraints, e-stop) | `[ ]` |
 | L2 | Fake body → simulator adapter (MuJoCo/Isaac) | `[ ]` |
 | L3 | Deterministic safety controller **outside** the LLM (speed, force, joint limits, collision, zones, human proximity, battery, e-stop, command expiry, approval scope) | `[ ]` |
-| L4 | ROS 2 adapter skeleton | `[ ]` |
-| L5 | Hardware with physical emergency stop | `[ ]` |
-| L6 | Physical safety survives LLM failure, network loss, service crash | `[ ]` |
+| L4 | ROS 2 adapter skeleton — **must refuse rather than actuate until L3 and L5 exist** | `[ ]` |
+| L5 | Hardware with a **physically independent** emergency stop that fails *safe* (motion stops) rather than permissive | `[ ]` |
+| L6 | Physical safety survives LLM failure, network loss, service crash (bounded deadman watchdog) | `[ ]` |
+| L7 | Keep `actuate_robot` at R4 once it becomes real — the pressure to relax it will appear exactly then | `[ ]` |
 
 ---
 
