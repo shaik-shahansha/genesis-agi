@@ -279,6 +279,17 @@ Two bug classes were found only by going beyond the unit suite, and both now hav
   Found by running the built container and calling the endpoints. Guarded by
   `tests/governance/test_sql_store.py`, which exercises the real SQLAlchemy store — the in-memory
   store used by every other test cannot reproduce it.
+* **A Mind's creator could not open the Mind they had just created.** `Mind.birth` defaults
+  `creator` to the literal string `"anonymous"` and the create route never passed anything else, so
+  that default was written to `MindRecord.creator` — the column the access check reads. The result
+  was `403 Access denied to this Mind` on your own Mind, with nothing in the response explaining
+  why. Found by creating a Mind through the running app and then opening it. Guarded by
+  `tests/test_mind_ownership.py`, including that the repair path cannot be used to take over a Mind
+  that already has an owner.
+
+Note what these three have in common: two are *defaults* that were never overwritten, and one is a
+resource released before it was read. None of them is a logic error a test of the logic would catch.
+They were all found by exercising the deployed path and looking at what came back.
 
 ### 3.2 Security containment — ✅ Phase B functionally closed
 
@@ -683,6 +694,7 @@ tests/
                      #   correlation, domain events, commitments
   security/          # 251 tests: sandbox, container escapes, network probe, MCP env, secrets
   test_migrations.py # 31 tests: migration-chain guards
+  test_mind_ownership.py # 8 tests: who may access a Mind, and placeholder repair
 docs/
   architecture/adr/  # ADR-0001 .. ADR-0008
   v3/
@@ -711,4 +723,5 @@ docs/
 | Prompt keyword scan false positives | Low | Advisory only now, so it no longer blocks turns, but the lists are unreviewed. |
 | `Mind` god-object | Medium | Blocks snapshot/fork/multi-process. Phase C. |
 | `mypy genesis` not clean | Low | A4 — the last Phase B item. |
-| Mind detail tabs still use legacy markup | Low | They inherit the correct theme via `globals.css`'s compatibility layer, so they read correctly, but their structure predates the design system. |
+| Mind detail tabs still use legacy markup | Low | The highest-traffic ones (Overview, Identity, Conversation, Thinking, Plugins, LLM Calls, Autonomy, Settings, Workspace) are migrated. The rest inherit the correct theme via `globals.css`'s compatibility layer, so they read correctly, but their structure predates the design system. |
+| Ownership is a single string column | Medium | `MindRecord.creator` is compared by equality in one place. There is no notion of a co-owner, a transfer, or an org. Sufficient for now; revisit with multi-tenancy (Phase K). |
