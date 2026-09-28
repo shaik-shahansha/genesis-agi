@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { loginWithPassword, setSession, getSessionToken, loadSessionUser } from '@/lib/session';
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -13,12 +14,40 @@ export default function LoginPage() {
   const { user, signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
   const router = useRouter();
 
-  // Redirect if already logged in
+  // Built-in (non-Firebase) credentials. Kept in a collapsed panel because the
+  // common path is Google/email, but it must exist: the deployment guide treats
+  // Firebase as optional, and without this there is no way to sign in at all on
+  // such an install.
+  const [directOpen, setDirectOpen] = useState(false);
+  const [username, setUsername] = useState('');
+  const [directPassword, setDirectPassword] = useState('');
+
+  // Redirect if already logged in (Firebase user, or a still-valid API session).
   useEffect(() => {
     if (user) {
       router.push('/');
+      return;
+    }
+    if (getSessionToken()) {
+      loadSessionUser().then((session) => {
+        if (session) router.push('/');
+      });
     }
   }, [user, router]);
+
+  const handleDirectSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const token = await loginWithPassword(username, directPassword);
+      setSession(token, username.includes('@') ? username : null);
+      router.push('/');
+    } catch (err: any) {
+      setError(err.message || 'Sign in failed');
+      setLoading(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setError('');
@@ -180,6 +209,65 @@ export default function LoginPage() {
               </>
             )}
           </div>
+        </div>
+
+        <div className="border-t border-gray-200 pt-5">
+          {!directOpen ? (
+            <button
+              type="button"
+              onClick={() => setDirectOpen(true)}
+              className="w-full text-center text-xs text-gray-500 hover:text-gray-700"
+            >
+              Sign in with a username and password instead
+            </button>
+          ) : (
+            <form onSubmit={handleDirectSignIn} className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Framework account</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Use this when Firebase is not configured. It signs in against the API directly.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                  Username or email
+                </label>
+                <input
+                  id="username"
+                  name="username"
+                  required
+                  autoComplete="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                  placeholder="admin"
+                />
+              </div>
+              <div>
+                <label htmlFor="direct-password" className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <input
+                  id="direct-password"
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={directPassword}
+                  onChange={(e) => setDirectPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                  placeholder="••••••••"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full"
+              >
+                {loading ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+          )}
         </div>
 
         <div className="text-center text-xs text-gray-500 mt-6">
