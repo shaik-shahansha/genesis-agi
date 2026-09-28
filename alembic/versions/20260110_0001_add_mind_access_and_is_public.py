@@ -21,7 +21,14 @@ def upgrade() -> None:
     op.add_column('minds', sa.Column('is_public', sa.Boolean, nullable=False, server_default=sa.text('0')))
     op.create_index('ix_minds_is_public', 'minds', ['is_public'])
 
-    # Create mind_access table
+    # Create mind_access table.
+    #
+    # NOTE: the explicit `op.create_index('ix_mind_access_mind_gmid', ...)` call
+    # that used to follow this was removed. `index=True` on the column below
+    # already creates an index with exactly that name, so the second call raised
+    # "index ix_mind_access_mind_gmid already exists" and `alembic upgrade head`
+    # could not complete on a fresh database at all - which made every later
+    # revision unreachable through the documented migration path.
     op.create_table(
         'mind_access',
         sa.Column('id', sa.Integer, primary_key=True, autoincrement=True),
@@ -30,11 +37,9 @@ def upgrade() -> None:
         sa.Column('added_by', sa.String(255), nullable=True),
         sa.Column('added_at', sa.DateTime, nullable=False, server_default=sa.text("(datetime('now'))")),
     )
-    op.create_index('ix_mind_access_mind_gmid', 'mind_access', ['mind_gmid'])
 
 
 def downgrade() -> None:
-    op.drop_index('ix_mind_access_mind_gmid', table_name='mind_access')
     op.drop_table('mind_access')
     op.drop_index('ix_minds_is_public', table_name='minds')
     op.drop_column('minds', 'is_public')

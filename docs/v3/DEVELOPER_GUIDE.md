@@ -11,7 +11,7 @@
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
 | **Last verified** | 2026-09-28, full test suite + container smoke test |
-| **Test suite** | 355 passed, 3 skipped, 12 failed (all 12 pre-existing, reproduce on the pristine tree) |
+| **Test suite** | 399 passed, 3 skipped, 12 failed (all 12 pre-existing, reproduce on the pristine tree) |
 | **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.1` |
 
 ---
@@ -253,13 +253,14 @@ Legend: **✅ implemented and tested** · **⚠️ partial, honestly reported** 
 | Emergency stop | `genesis/governance/estop.py` | `tests/governance/test_gate.py` |
 | Executor integration | `genesis/core/action_executor.py` | `tests/governance/test_action_executor_governance.py` |
 | REST API (12 endpoints) | `genesis/api/governance_routes.py` | `tests/governance/test_governance_api.py` |
+| Migration-chain guards | `alembic/versions/` | `tests/test_migrations.py` |
 
-**219 tests.** The suite specifically covers: the R0–R5 matrix, undeclared-capability
-flooring, advisory-can't-lower, budget refusal, lifecycle halting, tenant blocks and
-the R2 cap, scope escalation, emergency-stop latching *and* rehydration from the
-journal, grant parameter-mutation/replay/cross-mind/expiry, journal tamper detection
-and splicing, redaction of secret-shaped keys and inline credentials, and end-to-end
-executor flow including "handler must not run before approval".
+**250 tests** (219 governance + 31 migration guards). The suite specifically covers: the R0–R5
+matrix, undeclared-capability flooring, advisory-can't-lower, budget refusal, lifecycle halting,
+tenant blocks and the R2 cap, scope escalation, emergency-stop latching *and* rehydration from the
+journal, grant parameter-mutation/replay/cross-mind/expiry, journal tamper detection and splicing,
+redaction of secret-shaped keys and inline credentials, and end-to-end executor flow including
+"handler must not run before approval".
 
 ### 3.2 Security containment — ✅ most, ⚠️ two gaps
 
@@ -279,8 +280,9 @@ executor flow including "handler must not run before approval".
 | Item | State |
 |---|---|
 | Test suite runs without paid API keys | ✅ |
-| 206 → 219 governance tests | ✅ |
-| Alembic migration for governance tables | ✅ `008_governance_plane` |
+| 250 new tests (219 governance + 31 migration guards) | ✅ |
+| Alembic migration for governance tables | ✅ `008_governance_plane`, verified upgrade → downgrade → upgrade → `downgrade base` → upgrade |
+| Migration chain usable from a fresh database | ✅ **fixed** — three earlier revisions created the same index twice (`index=True` *and* an explicit `create_index`), so `alembic upgrade head` aborted partway and every later revision, including the governance one, was unreachable on a new install. Guarded by `tests/test_migrations.py`. |
 | CI (lint ratchet, tests, migration up/down) | 🚧 not built (A6) |
 | `mypy genesis` clean | 🚧 not built (A4) |
 | Deterministic per-test isolation of ChromaDB / `~/.genesis` | 🚧 not built (A2) — a cause of order-dependent tests |
@@ -565,6 +567,7 @@ docs/
 |---|---|---|
 | 12 test failures | Pre-existing | Reproduce on the pristine tree. Mostly environment (`test_emotional_intelligence`, `test_memory`), plus `test_memory_user_scoping` which is order-dependent (fails alone, passes in the suite). |
 | Order-dependent tests | Medium | Root cause is shared ChromaDB / `~/.genesis` state (backlog A2). |
+| `sqlite` URL filename is ignored | Low | Both `database/base.py` and `alembic/env.py` resolve a sqlite URL to `genesis_home/genesis.db`, ignoring the path in `DATABASE_URL`. Consistent, but surprising. |
 | `tf-keras` missing from dev env | Low | `deepface` needs it; the multimodal import guard now degrades instead of crashing. |
 | Sandbox lacks FS/PID/net isolation | **High** | Backlog B2b. Read `SandboxProvider.capabilities()` and do not overstate. |
 | MCP servers inherit `os.environ` | High | Backlog B9. |

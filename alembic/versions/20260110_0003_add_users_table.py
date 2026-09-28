@@ -17,6 +17,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # As in 005: `index=True` on username and email already emits
+    # ix_users_username and ix_users_email, so the explicit create_index calls
+    # that used to follow this table were duplicates that made the migration
+    # chain unusable from scratch.
     op.create_table(
         'users',
         sa.Column('id', sa.Integer, primary_key=True, autoincrement=True),
@@ -27,11 +31,7 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime, nullable=False, server_default=sa.text("(datetime('now'))")),
         sa.Column('last_updated', sa.DateTime, nullable=False, server_default=sa.text("(datetime('now'))")),
     )
-    op.create_index('ix_users_username', 'users', ['username'])
-    op.create_index('ix_users_email', 'users', ['email'])
 
 
 def downgrade() -> None:
-    op.drop_index('ix_users_email', table_name='users')
-    op.drop_index('ix_users_username', table_name='users')
     op.drop_table('users')

@@ -17,6 +17,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # `index=True` on the email column already emits CREATE INDEX
+    # ix_global_admins_email, so the explicit create_index call that used to
+    # follow this table raised "index ix_global_admins_email already exists" and
+    # aborted `alembic upgrade head` on a fresh database.
     op.create_table(
         'global_admins',
         sa.Column('id', sa.Integer, primary_key=True, autoincrement=True),
@@ -24,9 +28,7 @@ def upgrade() -> None:
         sa.Column('added_by', sa.String(255), nullable=True),
         sa.Column('added_at', sa.DateTime, nullable=False, server_default=sa.text("(datetime('now'))")),
     )
-    op.create_index('ix_global_admins_email', 'global_admins', ['email'])
 
 
 def downgrade() -> None:
-    op.drop_index('ix_global_admins_email', table_name='global_admins')
     op.drop_table('global_admins')
