@@ -72,6 +72,21 @@ class EventType:
     CONSTITUTION_RULE_APPLIED = "constitution.rule_applied"
     CONSTITUTION_VIOLATION = "constitution.violation"
 
+    # Domain write paths (plan item D2). Recorded through
+    # `governance/domain_events.py`, which carries identity and metadata but
+    # never content — see that module for why.
+    MEMORY_ACCEPTED = "memory.accepted"
+    MEMORY_FORGOTTEN = "memory.forgotten"
+    MEMORY_CONSOLIDATED = "memory.consolidated"
+
+    RELATIONSHIP_CREATED = "relationship.created"
+    RELATIONSHIP_INTERACTION = "relationship.interaction"
+
+    GOAL_CREATED = "goal.created"
+    GOAL_PROGRESS = "goal.progress"
+    GOAL_COMPLETED = "goal.completed"
+    GOAL_ABANDONED = "goal.abandoned"
+
     ACTION_PROPOSED = "action.proposed"
     ACTION_POLICY_EVALUATED = "action.policy_evaluated"
     ACTION_APPROVAL_REQUESTED = "action.approval_requested"

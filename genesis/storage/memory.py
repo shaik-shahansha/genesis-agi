@@ -1,6 +1,7 @@
 ﻿"""Memory management system for Genesis Minds."""
 
 import uuid
+import logging
 from datetime import datetime
 from enum import Enum
 from typing import List, Dict, Any, Optional
@@ -8,6 +9,8 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 from genesis.storage.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryType(str, Enum):
@@ -256,6 +259,16 @@ class MemoryManager:
         if importance >= 0.7:
             self._add_to_working_memory(memory.id)
 
+        # Journal the acceptance (plan item D2). Identity and metadata only —
+        # the content stays here. Never raises: a journal outage must not fail a
+        # memory write.
+        try:
+            from genesis.governance.domain_events import get_domain_journal
+
+            get_domain_journal().memory_accepted(mind_id=self.mind_id, memory=memory)
+        except Exception as exc:  # noqa: BLE001 - auditing never blocks storage
+            logger.debug("could not journal memory acceptance: %s", exc)
+
         return memory
 
     def get_memory(self, memory_id: str) -> Optional[Memory]:
@@ -264,6 +277,39 @@ class MemoryManager:
         if memory:
             memory.access()
         return memory
+
+    def forget_memory(self, memory_id: str, *, reason: str = "user request") -> bool:
+        """Delete one memory, everywhere it is stored, and journal the removal.
+
+        A "forget" that leaves the memory in the vector store is not a forget, so
+        this removes it from both the index and the vector store, and then records
+        ``memory.forgotten``.
+
+        The journal event deliberately carries only the id and the reason, never
+        the content — a record of a deletion that retained the deleted text would
+        make deletion meaningless, which is the whole reason the domain journal
+        excludes content.
+        """
+        memory = self.memories.pop(memory_id, None)
+        if memory is None:
+            return False
+
+        # Remove from the vector store, so semantic search cannot surface it.
+        try:
+            self.vector_store.delete_memory(memory_id)
+        except Exception as exc:  # noqa: BLE001 - the index removal still counts
+            logger.warning("could not remove %s from the vector store: %s", memory_id, exc)
+
+        try:
+            from genesis.governance.domain_events import get_domain_journal
+
+            get_domain_journal().memory_forgotten(
+                mind_id=self.mind_id, memory_id=memory_id, reason=reason
+            )
+        except Exception as exc:  # noqa: BLE001 - never fail a deletion on auditing
+            logger.debug("could not journal memory deletion: %s", exc)
+
+        return True
 
     def search_memories(
         self,

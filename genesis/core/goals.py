@@ -10,6 +10,7 @@ Enables Minds to:
 """
 
 import secrets
+import logging
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional, List, Dict, Any
@@ -205,6 +206,20 @@ class GoalManager:
         self.goals_abandoned: int = 0
         self.average_completion_time: float = 0.0  # Days
 
+    def _journal(self, method: str, **kwargs) -> None:
+        """Record a goal event, tolerating governance being unavailable.
+
+        Goals are how a Mind explains its own behaviour, so the sequence
+        created -> progressed -> completed is exactly what a user needs when
+        asking why it did something. Journaling never breaks the goal operation.
+        """
+        try:
+            from genesis.governance.domain_events import get_domain_journal
+
+            getattr(get_domain_journal(), method)(mind_id=self.mind_gmid, **kwargs)
+        except Exception as exc:  # noqa: BLE001 - auditing never blocks goals
+            logging.getLogger(__name__).debug("could not journal %s: %s", method, exc)
+
     def generate_goal(
         self,
         goal_type: GoalType,
@@ -236,6 +251,7 @@ class GoalManager:
         )
 
         self.goals[goal.goal_id] = goal
+        self._journal("goal_created", goal=goal)
         return goal
 
     def _generate_goal_content(
@@ -294,6 +310,7 @@ class GoalManager:
         )
 
         self.goals[goal.goal_id] = goal
+        self._journal("goal_created", goal=goal)
         return goal
 
     def create_plan(
@@ -389,6 +406,7 @@ class GoalManager:
             duration = (datetime.now() - goal.started_at).days
             self._update_avg_completion_time(duration)
 
+        self._journal("goal_completed", goal_id=goal_id, title=getattr(goal, "title", ""))
         return goal
 
     def _update_avg_completion_time(self, new_duration: float) -> None:
@@ -409,7 +427,14 @@ class GoalManager:
         if not goal:
             raise ValueError(f"Goal {goal_id} not found")
 
-        return goal.update_progress(progress_increment)
+        progress = goal.update_progress(progress_increment)
+        self._journal(
+            "goal_progress",
+            goal_id=goal_id,
+            progress=progress,
+            status=getattr(getattr(goal, "status", None), "value", str(getattr(goal, "status", ""))),
+        )
+        return progress
 
     def get_active_goals(self) -> List[Goal]:
         """Get all active goals."""

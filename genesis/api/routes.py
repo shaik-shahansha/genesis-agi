@@ -1122,7 +1122,17 @@ async def chat(
             enhanced_message = request.message
         
         try:
-            response = await mind.think(enhanced_message, user_email=user_identifier)
+            # One correlation id for the whole turn (plan item D3).
+            #
+            # Everything this turn causes — memory retrievals and writes, any
+            # action the Mind requests, the policy decision, an approval, the
+            # execution receipt — inherits this id, so `GET /minds/{id}/timeline`
+            # filtered by it returns the complete causal chain. Without a scope
+            # the events are individually correct and collectively unreadable.
+            from genesis.governance.context import correlation_scope
+
+            with correlation_scope(label="chat turn"):
+                response = await mind.think(enhanced_message, user_email=user_identifier)
             print(f"[DEBUG ROUTES] Response from mind.think(): {response[:200] if response else 'None'}...")
         except Exception as think_error:
             print(f"ERROR in mind.think(): {str(think_error)}")

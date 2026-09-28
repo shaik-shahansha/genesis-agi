@@ -153,6 +153,27 @@ class RelationshipManager(BaseModel):
 
     relationships: dict[str, Relationship] = Field(default_factory=dict)
     creator_relationship_id: Optional[str] = None
+    #: The Mind these relationships belong to, so journal events can be
+    #: attributed to it (plan item D2). Optional: a manager constructed without
+    #: it still works, and simply does not journal rather than writing events
+    #: against an empty mind id.
+    mind_id: Optional[str] = None
+
+    def _journal(self):
+        """Resolve the domain journal, or None when unattributable.
+
+        Returning None when `mind_id` is unset is deliberate: an event with an
+        empty mind id would sit in an unowned stream and pollute the timeline of
+        whatever the empty key maps to.
+        """
+        if not self.mind_id:
+            return None
+        try:
+            from genesis.governance.domain_events import get_domain_journal
+
+            return get_domain_journal()
+        except Exception:  # noqa: BLE001 - governance is optional here
+            return None
 
     def create_relationship(
         self,
@@ -180,6 +201,37 @@ class RelationshipManager(BaseModel):
             relationship.closeness = 0.9  # High initial closeness with creator
             relationship.trust_level = 1.0  # Complete trust in creator
 
+        journal = self._journal()
+        if journal is not None:
+            journal.relationship_created(mind_id=str(self.mind_id), relationship=relationship)
+
+        return relationship
+
+    def record_interaction(
+        self, rel_id: str, is_positive: bool = True
+    ) -> Optional[Relationship]:
+        """Record an interaction against a relationship and journal the change.
+
+        A trust change is exactly the kind of thing that should be traceable:
+        "why does this Mind trust this person?" is answered by the sequence of
+        interactions that moved the value.
+        """
+        relationship = self.relationships.get(rel_id)
+        if relationship is None:
+            return None
+
+        previous_trust = relationship.trust_level
+        relationship.record_interaction(is_positive=is_positive)
+        delta = relationship.trust_level - previous_trust
+
+        journal = self._journal()
+        if journal is not None:
+            journal.relationship_interaction(
+                mind_id=str(self.mind_id),
+                relationship_id=rel_id,
+                positive=is_positive,
+                trust_delta=delta,
+            )
         return relationship
 
     def get_relationship(self, rel_id: str) -> Optional[Relationship]:
