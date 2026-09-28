@@ -2,6 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import {
+  EmptyState,
+  LoadingRows,
+  Section,
+  StatusBadge,
+} from '@/components/governance/primitives';
+import { ChevronRightIcon, PlugIcon, PlusIcon, XMarkIcon } from '@/components/shell/icons';
 
 interface PluginsTabProps {
   mindId: string;
@@ -37,7 +44,7 @@ const availablePlugins = [
     name: 'Tasks', 
     category: 'Core',
     description: 'Goal-oriented task management and execution',
-    emoji: '[Done]',
+    emoji: '✅',
     requiresConfig: false,
   },
   { 
@@ -229,101 +236,83 @@ export default function PluginsTab({ mindId }: PluginsTabProps) {
   });
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <LoadingRows rows={3} label="Loading plugins" />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Plugin Management</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Extend your Mind's capabilities with plugins. Add, remove, or configure features.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="btn-primary"
-          >
-            ➕ Add Plugin
+      <Section
+        title="Plugins"
+        description="Capabilities this Mind has. Installing one widens what it can do, so every plugin's actions still pass through the governance gate."
+        actions={
+          <button type="button" onClick={() => setShowAddModal(true)} className="btn-primary">
+            <PlusIcon className="h-4 w-4" />
+            Add plugin
           </button>
-        </div>
-
-        {/* Category Filter */}
-        <div className="flex gap-2">
-          {categories.map(cat => (
+        }
+      >
+        <div className="flex flex-wrap gap-2">
+          {categories.map((cat) => (
             <button
               key={cat}
+              type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              aria-pressed={selectedCategory === cat}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 selectedCategory === cat
-                  ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                  ? 'border-accent bg-accent-soft text-accent'
+                  : 'border-line bg-surface text-fg-muted hover:border-line-strong hover:text-fg'
               }`}
             >
-              {cat === 'all' ? 'All Plugins' : cat}
+              {cat === 'all' ? 'All' : cat}
             </button>
           ))}
         </div>
-      </div>
+      </Section>
 
-      {/* Installed Plugins */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-md font-semibold text-gray-900 mb-4">
-          Installed Plugins ({filteredInstalledPlugins.length})
-        </h3>
-        
+      <Section title={`Installed (${filteredInstalledPlugins.length})`}>
         {filteredInstalledPlugins.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            No plugins installed in this category.
-          </div>
+          <EmptyState
+            title="No plugins in this category"
+            description="Switch the filter, or install one from the catalogue."
+          />
         ) : (
           <div className="space-y-3">
             {filteredInstalledPlugins.map((plugin) => {
-              const pluginInfo = availablePlugins.find(p => p.id === plugin.name.toLowerCase().replace(/\s+/g, '_'));
+              const pluginInfo = availablePlugins.find(
+                (p) => p.id === plugin.name.toLowerCase().replace(/\s+/g, '_')
+              );
+              const busy = actionLoading === plugin.name;
               return (
-                <div
-                  key={plugin.name}
-                  className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className="text-3xl">{pluginInfo?.emoji || '🔌'}</div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-gray-900">{plugin.name}</h4>
-                          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
-                            v{plugin.version}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded ${
-                            plugin.enabled 
-                              ? 'bg-green-100 text-green-700' 
-                              : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {plugin.enabled ? '✓ Enabled' : '○ Disabled'}
-                          </span>
+                <div key={plugin.name} className="card-flat">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <PluginGlyph emoji={pluginInfo?.emoji} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-medium text-fg">{plugin.name}</h3>
+                          <span className="font-mono text-xs text-fg-subtle">v{plugin.version}</span>
+                          <StatusBadge tone={plugin.enabled ? 'success' : 'neutral'}>
+                            {plugin.enabled ? 'Enabled' : 'Disabled'}
+                          </StatusBadge>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">{plugin.description}</p>
+                        <p className="mt-1 text-sm text-fg-muted">{plugin.description}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2 ml-4">
+                    <div className="flex gap-2">
                       <button
+                        type="button"
                         onClick={() => handleTogglePlugin(plugin.name, plugin.enabled)}
-                        disabled={actionLoading === plugin.name}
-                        className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                        disabled={busy}
+                        className="btn-secondary btn-sm"
                       >
-                        {actionLoading === plugin.name ? '...' : plugin.enabled ? 'Disable' : 'Enable'}
+                        {busy ? '…' : plugin.enabled ? 'Disable' : 'Enable'}
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleRemovePlugin(plugin.name)}
-                        disabled={actionLoading === plugin.name}
-                        className="px-3 py-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors disabled:opacity-50"
+                        disabled={busy}
+                        className="btn-ghost btn-sm text-danger"
                       >
                         Remove
                       </button>
@@ -334,136 +323,169 @@ export default function PluginsTab({ mindId }: PluginsTabProps) {
             })}
           </div>
         )}
-      </div>
+      </Section>
 
-      {/* Add Plugin Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Add Plugin</h3>
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setSelectedPlugin(null);
-                    setPluginConfig({});
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-plugin-title"
+        >
+          <div className="card max-h-[80vh] w-full max-w-2xl overflow-y-auto">
+            <div className="mb-4 flex items-center justify-between border-b border-line pb-4">
+              <h3 id="add-plugin-title" className="text-base font-semibold text-fg">
+                {selectedPlugin ? 'Configure and install' : 'Add a plugin'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setSelectedPlugin(null);
+                  setPluginConfig({});
+                }}
+                className="btn-ghost btn-sm"
+                aria-label="Close"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
             </div>
 
-            <div className="p-6">
-              {!selectedPlugin ? (
-                <div className="space-y-3">
-                  {filteredAvailablePlugins.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      All available plugins in this category are already installed.
-                    </div>
-                  ) : (
-                    filteredAvailablePlugins.map((plugin) => (
-                      <div
-                        key={plugin.id}
-                        className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors cursor-pointer"
-                        onClick={() => setSelectedPlugin(plugin)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="text-3xl">{plugin.emoji}</div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-semibold text-gray-900">{plugin.name}</h4>
-                              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                                {plugin.category}
-                              </span>
-                              {plugin.requiresConfig && (
-                                <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">
-                                  Requires Config
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">{plugin.description}</p>
+            {!selectedPlugin ? (
+              <div className="space-y-3">
+                {filteredAvailablePlugins.length === 0 ? (
+                  <EmptyState
+                    title="Nothing left to install"
+                    description="Every plugin in this category is already on this Mind."
+                  />
+                ) : (
+                  filteredAvailablePlugins.map((plugin) => (
+                    <button
+                      key={plugin.id}
+                      type="button"
+                      onClick={() => setSelectedPlugin(plugin)}
+                      className="card-interactive w-full text-left"
+                    >
+                      <div className="flex items-start gap-3">
+                        <PluginGlyph emoji={plugin.emoji} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-medium text-fg">{plugin.name}</h4>
+                            <StatusBadge tone="info">{plugin.category}</StatusBadge>
+                            {plugin.requiresConfig && (
+                              <StatusBadge tone="warning">Needs configuration</StatusBadge>
+                            )}
                           </div>
-                          <div className="text-gray-400">→</div>
+                          <p className="mt-1 text-sm text-fg-muted">{plugin.description}</p>
                         </div>
+                        <ChevronRightIcon className="mt-1 h-4 w-4 flex-shrink-0 text-fg-subtle" />
                       </div>
-                    ))
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <button
-                    onClick={() => setSelectedPlugin(null)}
-                    className="text-sm text-gray-600 hover:text-gray-900 mb-4"
-                  >
-                    ← Back to plugin list
-                  </button>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlugin(null)}
+                  className="btn-ghost btn-sm mb-4"
+                >
+                  ← Back to the list
+                </button>
 
-                  <div className="border border-gray-200 rounded-lg p-4 mb-6">
-                    <div className="flex items-start gap-3">
-                      <div className="text-4xl">{selectedPlugin.emoji}</div>
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900">{selectedPlugin.name}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{selectedPlugin.description}</p>
-                        <div className="flex gap-2 mt-2">
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                            {selectedPlugin.category}
-                          </span>
-                        </div>
+                <div className="card-flat mb-6">
+                  <div className="flex items-start gap-3">
+                    <PluginGlyph emoji={selectedPlugin.emoji} />
+                    <div>
+                      <h4 className="font-medium text-fg">{selectedPlugin.name}</h4>
+                      <p className="mt-1 text-sm text-fg-muted">{selectedPlugin.description}</p>
+                      <div className="mt-2">
+                        <StatusBadge tone="info">{selectedPlugin.category}</StatusBadge>
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {selectedPlugin.requiresConfig && selectedPlugin.configFields && (
-                    <div className="space-y-4 mb-6">
-                      <h5 className="font-semibold text-gray-900">Configuration</h5>
-                      {selectedPlugin.configFields.map((field: any) => (
-                        <div key={field.name}>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            {field.label}
-                            {field.required && <span className="text-red-500 ml-1">*</span>}
-                          </label>
-                          <input
-                            type={field.type || 'text'}
-                            value={pluginConfig[selectedPlugin.id]?.[field.name] || ''}
-                            onChange={(e) => setPluginConfig({
+                {selectedPlugin.requiresConfig && selectedPlugin.configFields && (
+                  <div className="mb-6 space-y-4">
+                    <h5 className="section-title">Configuration</h5>
+                    {selectedPlugin.configFields.map((field: any) => (
+                      <div key={field.name}>
+                        <label
+                          htmlFor={`plugin-${selectedPlugin.id}-${field.name}`}
+                          className="label mb-1.5 block"
+                        >
+                          {field.label}
+                          {field.required && <span className="ml-1 text-danger">*</span>}
+                        </label>
+                        <input
+                          id={`plugin-${selectedPlugin.id}-${field.name}`}
+                          type={field.type || 'text'}
+                          value={pluginConfig[selectedPlugin.id]?.[field.name] || ''}
+                          onChange={(e) =>
+                            setPluginConfig({
                               ...pluginConfig,
                               [selectedPlugin.id]: {
                                 ...pluginConfig[selectedPlugin.id],
                                 [field.name]: e.target.value,
-                              }
-                            })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            placeholder={field.placeholder}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setSelectedPlugin(null)}
-                      className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => handleAddPlugin(selectedPlugin.id)}
-                      disabled={actionLoading === selectedPlugin.id}
-                      className="flex-1 btn-primary disabled:opacity-50"
-                    >
-                      {actionLoading === selectedPlugin.id ? 'Installing...' : 'Install Plugin'}
-                    </button>
+                              },
+                            })
+                          }
+                          className="input"
+                          placeholder={field.placeholder}
+                          autoComplete={field.type === 'password' ? 'new-password' : 'off'}
+                        />
+                      </div>
+                    ))}
+                    <p className="text-xs text-fg-subtle">
+                      Values are sent to this installation only. Secret-shaped fields are redacted in
+                      the audit journal — the journal records that a credential was configured, never
+                      its value.
+                    </p>
                   </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPlugin(null)}
+                    className="btn-secondary flex-1 justify-center"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddPlugin(selectedPlugin.id)}
+                    disabled={actionLoading === selectedPlugin.id}
+                    className="btn-primary flex-1 justify-center"
+                  >
+                    {actionLoading === selectedPlugin.id ? 'Installing…' : 'Install plugin'}
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
+
+/**
+ * The catalogue's glyph for a plugin.
+ *
+ * `availablePlugins` carries emoji for this, but one entry was changed to the
+ * literal text `[Done]` — a placeholder that leaked into the UI and rendered as
+ * grey brackets next to every installed plugin. Rather than trust the data, this
+ * falls back to an icon whenever the value is not a single grapheme.
+ */
+function PluginGlyph({ emoji }: { emoji?: string }) {
+  const usable = typeof emoji === 'string' && emoji.length > 0 && emoji.length <= 4 && !emoji.startsWith('[');
+  return (
+    <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-card bg-surface-3 text-lg">
+      {usable ? emoji : <PlugIcon className="h-4 w-4 text-fg-subtle" />}
+    </div>
+  );
+}
+

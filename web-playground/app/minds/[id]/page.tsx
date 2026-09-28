@@ -6,6 +6,8 @@ import Link from 'next/link';
 import AuthRequired from '@/components/AuthRequired';
 import { api } from '@/lib/api';
 import { useMindCache } from '@/lib/MindContext';
+import PageHeader from '@/components/shell/PageHeader';
+import { LoadingRows, StatusBadge } from '@/components/governance/primitives';
 import OverviewTab from '@/components/mind/OverviewTab';
 import IdentityTab from '@/components/mind/IdentityTab';
 import MemoryTab from '@/components/mind/MemoryTab';
@@ -18,8 +20,29 @@ import LLMCallsTab from '@/components/mind/LLMCallsTab';
 import LogsTab from '@/components/mind/LogsTab';
 import SettingsTab from '@/components/mind/SettingsTab';
 
-type TabType = 'overview' | 'identity' | 'memory' | 'consciousness' | 'thinking' | 'autonomy' | 'workspace' | 'plugins' | 'llm' | 'logs' | 'settings';
+type TabType =
+  | 'overview'
+  | 'identity'
+  | 'memory'
+  | 'consciousness'
+  | 'thinking'
+  | 'autonomy'
+  | 'workspace'
+  | 'plugins'
+  | 'llm'
+  | 'logs'
+  | 'settings';
 
+/**
+ * The Mind detail surface.
+ *
+ * This page previously drew its own header, back-link, status bar and tab strip,
+ * duplicating the app shell around it. `PageHeader` owns that now, and the shell
+ * owns the frame, so the tabs only have to be tabs.
+ *
+ * The tab list is data rather than markup so a new tab cannot forget to render
+ * its own active state.
+ */
 export default function MindDetailPage() {
   const params = useParams();
   const mindId = params.id as string;
@@ -34,20 +57,21 @@ export default function MindDetailPage() {
 
   const loadMind = async () => {
     try {
-      // Try to get from cache first
       const cached = getCachedMind(mindId);
       if (cached) {
         setMind(cached);
         setLoading(false);
-        // Still fetch in background to update cache with fresh data
-        api.getMind(mindId).then((data) => {
-          setMind(data);
-          setCachedMind(mindId, data);
-        }).catch(console.error);
+        // Still refresh in the background; the cache is for first paint only.
+        api
+          .getMind(mindId)
+          .then((data) => {
+            setMind(data);
+            setCachedMind(mindId, data);
+          })
+          .catch(console.error);
         return;
       }
 
-      // Not in cache, fetch from API
       const data = await api.getMind(mindId);
       setMind(data);
       setCachedMind(mindId, data);
@@ -59,35 +83,32 @@ export default function MindDetailPage() {
   };
 
   const handleRefresh = async () => {
-    // Invalidate cache to force fresh data fetch
     invalidateMind(mindId);
     await loadMind();
   };
 
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'identity', label: 'Identity', icon: '🆔' },
-    { id: 'memory', label: 'Memory', icon: '🧠' },
-    { id: 'consciousness', label: 'Consciousness', icon: '✨' },
-    { id: 'thinking', label: 'Thinking', icon: '💭' },
-    { id: 'autonomy', label: 'Autonomy', icon: '🤖' },
-    { id: 'workspace', label: 'Workspace', icon: '📁' },
-    { id: 'plugins', label: 'Plugins', icon: '🔌' },
-    { id: 'llm', label: 'LLM Calls', icon: '📡' },
-    { id: 'logs', label: 'Logs', icon: '📝' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
+  const tabs: { id: TabType; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'identity', label: 'Identity' },
+    { id: 'memory', label: 'Conversation' },
+    { id: 'consciousness', label: 'Consciousness' },
+    { id: 'thinking', label: 'Thinking' },
+    { id: 'autonomy', label: 'Autonomy' },
+    { id: 'workspace', label: 'Workspace' },
+    { id: 'plugins', label: 'Plugins' },
+    { id: 'llm', label: 'LLM Calls' },
+    { id: 'logs', label: 'Logs' },
+    { id: 'settings', label: 'Settings' },
   ];
 
   if (loading) {
     return (
       <AuthRequired>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="flex flex-col items-center gap-6">
-            <div className="spinner-xl"></div>
-            <div className="text-center">
-              <p className="text-gray-300 text-lg font-medium mb-2">Loading mind...</p>
-              <p className="text-gray-500 text-sm">Initializing consciousness</p>
-            </div>
+        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="skeleton h-8 w-56" />
+          <div className="skeleton mt-3 h-4 w-80" />
+          <div className="mt-8">
+            <LoadingRows rows={3} label="Loading this Mind" />
           </div>
         </div>
       </AuthRequired>
@@ -97,93 +118,82 @@ export default function MindDetailPage() {
   if (!mind) {
     return (
       <AuthRequired>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-white mb-4">Mind Not Found</h1>
-            <Link href="/" className="btn-primary">
-              Back to Dashboard
-            </Link>
-          </div>
+        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+          <h1 className="page-title">Mind not found</h1>
+          <p className="mt-2 text-sm text-fg-muted">
+            No Mind with the identifier <span className="font-mono text-xs">{mindId}</span> exists
+            on this installation, or you do not have access to it.
+          </p>
+          <Link href="/" className="btn-primary mt-6">
+            Back to dashboard
+          </Link>
         </div>
       </AuthRequired>
     );
   }
 
+  const statusTone =
+    mind.status === 'active' ? 'success' : mind.status === 'sleeping' ? 'warning' : 'neutral';
+
   return (
     <AuthRequired>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <Link href="/" className="text-sm text-gray-300 hover:text-white mb-2 inline-block">
-            ← Back to Dashboard
+      <PageHeader
+        breadcrumb={
+          <Link href="/" className="hover:text-fg">
+            ← All Minds
           </Link>
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-white">{mind.name}</h1>
-              <p className="text-gray-300 mt-1">GMID: {mind.gmid}</p>
-            </div>
-            <div className="flex gap-2">
-              <Link href={`/chat/${mind.gmid}`} className="btn-primary">
-                💬 Chat
-              </Link>
-              <Link href={`/immersive/${mind.gmid}`} className="btn-ghost">
-                🎭 Immersive Mode
-              </Link>
-            </div>
-          </div>
-        </div>
+        }
+        title={mind.name}
+        description={
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="font-mono text-xs">{mind.gmid}</span>
+            <StatusBadge tone={statusTone}>{mind.status || 'unknown'}</StatusBadge>
+            <span>
+              {mind.age || '—'} · {mind.memory_count ?? 0} memories ·{' '}
+              <span className="capitalize">{mind.current_emotion || 'neutral'}</span>
+            </span>
+          </span>
+        }
+        actions={
+          <>
+            <Link href={`/chat/${mind.gmid}`} className="btn-primary">
+              Chat
+            </Link>
+            <Link href={`/immersive/${mind.gmid}`} className="btn-secondary">
+              Immersive
+            </Link>
+          </>
+        }
+      />
 
-        {/* Status Bar */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div>
-                <span className="text-sm text-gray-400">Status</span>
-                <p className="font-semibold text-white">{mind.status}</p>
-              </div>
-              <div>
-                <span className="text-sm text-gray-400">Age</span>
-                <p className="font-semibold text-white">{mind.age}</p>
-              </div>
-              <div>
-                <span className="text-sm text-gray-400">Emotion</span>
-                <p className="font-semibold text-white">{mind.current_emotion}</p>
-              </div>
-              <div>
-                <span className="text-sm text-gray-400">Memories</span>
-                <p className="font-semibold text-white">{mind.memory_count}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="border-b border-slate-700 mb-6">
-          <div className="flex gap-2 overflow-x-auto">
-            {tabs.map((tab) => (
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav className="mb-6 -mx-1 flex gap-1 overflow-x-auto border-b border-line pb-px">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
-                className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-b-2 border-purple-500 text-purple-400'
-                    : 'text-gray-300 hover:text-white'
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={active ? 'page' : undefined}
+                className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                  active
+                    ? 'border-accent text-fg'
+                    : 'border-transparent text-fg-muted hover:border-line-strong hover:text-fg'
                 }`}
               >
-                <span className="mr-2">{tab.icon}</span>
                 {tab.label}
               </button>
-            ))}
-          </div>
-        </div>
+            );
+          })}
+        </nav>
 
-        {/* Tab Content */}
-        <div className="min-h-[500px]">
+        <div className="min-h-[400px]">
           {activeTab === 'overview' && <OverviewTab mind={mind} onRefresh={handleRefresh} />}
           {activeTab === 'identity' && <IdentityTab mind={mind} />}
           {activeTab === 'memory' && <MemoryTab mindId={mindId} />}
           {activeTab === 'consciousness' && <ConsciousnessTab mindId={mindId} />}
-          {activeTab === 'thinking' && <ThinkingTab mindId={mindId} />}
+          {activeTab === 'thinking' && <ThinkingTab mindId={mindId} mind={mind} />}
           {activeTab === 'autonomy' && <AutonomyTab mindId={mindId} mind={mind} />}
           {activeTab === 'workspace' && <WorkspaceTab mindId={mindId} />}
           {activeTab === 'plugins' && <PluginsTab mindId={mindId} />}
@@ -195,3 +205,4 @@ export default function MindDetailPage() {
     </AuthRequired>
   );
 }
+

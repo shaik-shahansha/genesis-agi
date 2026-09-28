@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { Section, StatusBadge } from '@/components/governance/primitives';
+import { AlertIcon, CheckIcon } from '@/components/shell/icons';
 
 interface SettingsTabProps {
   mind: any;
@@ -114,24 +116,34 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
   return (
     <div className="space-y-6">
       {message && (
-        <div className={`p-4 rounded-lg ${
-          message.includes('Error') 
-            ? 'bg-red-50 text-red-700 border border-red-200' 
-            : 'bg-green-50 text-green-700 border border-green-200'
-        }`}>
-          {message}
+        <div
+          role="status"
+          className={`flex items-start gap-2 rounded-card border p-3 text-sm ${
+            message.toLowerCase().includes('error')
+              ? 'border-danger/40 bg-danger/5 text-fg'
+              : 'border-success/40 bg-success/5 text-fg'
+          }`}
+        >
+          <span className={message.toLowerCase().includes('error') ? 'text-danger' : 'text-success'}>
+            {message.toLowerCase().includes('error') ? (
+              <AlertIcon className="h-4 w-4" />
+            ) : (
+              <CheckIcon className="h-4 w-4" />
+            )}
+          </span>
+          <span>{message}</span>
         </div>
       )}
 
       {/* Basic Information */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h2>
-        <div className="space-y-4">
+      <Section title="Identity fields" description="These are compiled into every prompt, so they shape how the Mind interprets what you say.">
+        <div className="card space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="mind-name" className="label mb-1.5 block">
               Name
             </label>
             <input
+              id="mind-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -141,57 +153,62 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Purpose <span className="text-gray-500 font-normal">(Why does this Mind exist?)</span>
+            <label htmlFor="mind-purpose" className="label mb-1.5 block">
+              Purpose <span className="font-normal text-fg-subtle">— why does this Mind exist?</span>
             </label>
             <textarea
+              id="mind-purpose"
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
-              className="input w-full"
+              className="input w-full resize-y"
               rows={2}
               placeholder="e.g., To teach science to Grade 10 students"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Role <span className="text-gray-500 font-normal">(What is this Mind's specific role?)</span>
+            <label htmlFor="mind-role" className="label mb-1.5 block">
+              Role <span className="font-normal text-fg-subtle">— what is its specific remit?</span>
             </label>
             <textarea
+              id="mind-role"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="input w-full"
+              className="input w-full resize-y"
               rows={2}
               placeholder="e.g., Science Teacher for Grade 10, Section A"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Guidance Notes <span className="text-gray-500 font-normal">(Additional context and information)</span>
+            <label htmlFor="mind-guidance" className="label mb-1.5 block">
+              Guidance notes <span className="font-normal text-fg-subtle">— standing context</span>
             </label>
             <textarea
+              id="mind-guidance"
               value={guidanceNotes}
               onChange={(e) => setGuidanceNotes(e.target.value)}
-              className="input w-full"
+              className="input w-full resize-y font-mono text-xs"
               rows={5}
-              placeholder="e.g., Student list: Alice, Bob, Charlie&#10;Next exam: Physics Chapter 5 on Feb 15&#10;Focus areas: Thermodynamics, Kinematics"
+              placeholder={'e.g., Student list: Alice, Bob, Charlie\nNext exam: Physics Chapter 5 on Feb 15'}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              This information will be included in every prompt to help the Mind maintain context.
+            <p className="mt-1.5 text-xs text-fg-subtle">
+              Included in every prompt. Nothing secret belongs here — it is sent to the model
+              provider with each turn, and it is visible to anyone who can read this Mind.
             </p>
           </div>
         </div>
-      </div>
+      </Section>
 
       {/* Access Control */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">🔒 Access</h2>
-        <p className="text-sm text-gray-600 mb-4">Control who can view and chat with this Mind. Only the creator can add users or make the Mind public.</p>
-
-        <div className="flex items-center gap-4 mb-4">
-          <label className="flex items-center gap-3 cursor-pointer">
+      <Section
+        title="Access"
+        description="Who can see and talk to this Mind. Only the creator can change this."
+      >
+        <div className="card space-y-5">
+          <label htmlFor="mind-public" className="flex cursor-pointer items-start gap-3">
             <input
+              id="mind-public"
               type="checkbox"
               checked={isPublic}
               onChange={async (e) => {
@@ -202,133 +219,160 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
                   await api.setMindPublic(mind.gmid, val);
                   onRefresh();
                 } catch (err: any) {
+                  // Revert, or the checkbox keeps claiming a change that did not happen.
+                  setIsPublic(!val);
                   setMessage(`Error: ${err.message}`);
                 } finally {
                   setSaving(false);
                 }
               }}
-              className="w-5 h-5"
+              className="mt-0.5 h-4 w-4 rounded border-line accent-[rgb(var(--accent))]"
             />
-            <div>
-              <div className="font-medium text-gray-900">Public</div>
-              <div className="text-sm text-gray-600">If public, any authenticated user may see this Mind</div>
-            </div>
+            <span>
+              <span className="block text-sm font-medium text-fg">Public</span>
+              <span className="block text-sm text-fg-muted">
+                Any authenticated user on this installation can read this Mind and see its
+                conversation. It does not let them spend its budget or act on its behalf.
+              </span>
+            </span>
           </label>
-        </div>
 
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Invite User by Email</label>
-          <div className="flex gap-2">
-            <input
-              type="email"
-              placeholder="user@example.com"
-              className="input flex-1"
-              onKeyDown={async (e) => {
-                if (e.key === 'Enter') {
-                  const val = (e.target as HTMLInputElement).value.trim();
+          <div>
+            <label htmlFor="mind-invite" className="label mb-1.5 block">
+              Invite by email
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="mind-invite"
+                type="email"
+                placeholder="user@example.com"
+                className="input flex-1"
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    const val = (e.target as HTMLInputElement).value.trim();
+                    if (!val) return;
+                    setSaving(true);
+                    try {
+                      await api.addMindUser(mind.gmid, val);
+                      setMessage('User added');
+                      onRefresh();
+                      (e.target as HTMLInputElement).value = '';
+                    } catch (err: any) {
+                      setMessage(`Error: ${err.message}`);
+                    } finally {
+                      setSaving(false);
+                    }
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={async () => {
+                  const input = document.getElementById('mind-invite') as HTMLInputElement | null;
+                  const val = input?.value?.trim();
                   if (!val) return;
                   setSaving(true);
                   try {
                     await api.addMindUser(mind.gmid, val);
                     setMessage('User added');
                     onRefresh();
-                    (e.target as HTMLInputElement).value = '';
+                    if (input) input.value = '';
                   } catch (err: any) {
                     setMessage(`Error: ${err.message}`);
                   } finally {
                     setSaving(false);
                   }
-                }
-              }}
-            />
-            <button
-              className="btn"
-              onClick={async () => {
-                const input = (document.querySelector('input[type="email"]') as HTMLInputElement);
-                const val = input?.value?.trim();
-                if (!val) return;
-                setSaving(true);
-                try {
-                  await api.addMindUser(mind.gmid, val);
-                  setMessage('User added');
-                  onRefresh();
-                  input.value = '';
-                } catch (err: any) {
-                  setMessage(`Error: ${err.message}`);
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >Add</button>
+                }}
+              >
+                Add
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Allowed users list fetched from /access */}
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Allowed Users</label>
-          <div className="bg-gray-50 border border-gray-100 rounded p-3">
-            {(allowedUsers && allowedUsers.length > 0) ? (
-              allowedUsers.map((u: string) => (
-                <div key={u} className="flex items-center justify-between py-1">
-                  <div className="text-sm">{u}</div>
-                  <button
-                    className="text-sm text-red-600"
-                    onClick={async () => {
-                      setSaving(true);
-                      try {
-                        await api.removeMindUser(mind.gmid, u);
-                        setMessage('User removed');
-                        onRefresh();
-                      } catch (err: any) {
-                        setMessage(`Error: ${err.message}`);
-                      } finally {
-                        setSaving(false);
-                      }
-                    }}
-                  >Remove</button>
-                </div>
-              ))
+          <div>
+            <p className="label mb-2">Allowed users</p>
+            {allowedUsers && allowedUsers.length > 0 ? (
+              <div className="divide-y divide-[rgb(var(--border))] rounded-card border border-line">
+                {allowedUsers.map((u: string) => (
+                  <div key={u} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <span className="min-w-0 truncate text-sm text-fg">{u}</span>
+                    <button
+                      type="button"
+                      className="btn-ghost btn-sm text-danger"
+                      onClick={async () => {
+                        setSaving(true);
+                        try {
+                          await api.removeMindUser(mind.gmid, u);
+                          setMessage('User removed');
+                          onRefresh();
+                        } catch (err: any) {
+                          setMessage(`Error: ${err.message}`);
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <div className="text-sm text-gray-500">No invited users</div>
+              <p className="text-sm text-fg-subtle">
+                No users invited. This Mind is visible only to you
+                {isPublic ? ' — except that it is marked public, which overrides this list.' : '.'}
+              </p>
             )}
           </div>
         </div>
-      </div>
+      </Section>
 
       {/* Currency */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">💰 Currency (Gens)</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Gens are the internal currency used by Minds for various actions and services.
-        </p>
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Current Balance
-            </label>
-            <input
-              type="number"
-              value={currency}
-              onChange={(e) => setCurrency(parseInt(e.target.value) || 0)}
-              className="input w-full"
-              min="0"
-            />
+      <Section
+        title="Gens"
+        description="The compute budget this Mind may spend on model calls and paid tool calls."
+      >
+        <div className="card">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex-1">
+              <label htmlFor="mind-gens" className="label mb-1.5 block">
+                Balance
+              </label>
+              <input
+                id="mind-gens"
+                type="number"
+                value={currency}
+                onChange={(e) => setCurrency(parseInt(e.target.value) || 0)}
+                className="input w-full"
+                min="0"
+              />
+            </div>
+            <div className="card-flat flex-1">
+              <div className="text-xs text-fg-muted">Current balance</div>
+              <div className="mt-1 text-2xl font-semibold tabular-nums text-fg">
+                {currency.toLocaleString()} Gens
+              </div>
+            </div>
           </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex-1">
-            <div className="text-sm text-blue-700">Current Balance</div>
-            <div className="text-3xl font-bold text-blue-900 mt-1">{currency} Gens</div>
-          </div>
+          <p className="mt-4 text-xs text-fg-subtle">
+            Gens are an internal accounting unit, not a token and not transferable between
+            installations. Raising the number here grants real spending headroom — it is capped by
+            the policy engine's budget rules, not by this field.
+          </p>
         </div>
-      </div>
+      </Section>
+
 
       {/* LLM Configuration */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">🤖 LLM Configuration</h2>
-        
-        {/* Use Ollama Toggle */}
-        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-          <label className="flex items-center gap-3 cursor-pointer">
+      <Section
+        title="Model"
+        description="Which provider and model this Mind thinks with."
+      >
+        <div className="card space-y-4">
+          <label htmlFor="use-ollama" className="flex cursor-pointer items-start gap-3 rounded-card border border-line bg-surface-2 p-3">
             <input
+              id="use-ollama"
               type="checkbox"
               checked={useOllama}
               onChange={(e) => {
@@ -337,140 +381,151 @@ export default function SettingsTab({ mind, onRefresh }: SettingsTabProps) {
                   setProvider('ollama');
                 }
               }}
-              className="w-5 h-5"
+              className="mt-0.5 h-4 w-4 rounded border-line accent-[rgb(var(--accent))]"
             />
-            <div>
-              <div className="font-medium text-gray-900">Use Ollama (Local)</div>
-              <div className="text-sm text-gray-600">Run models locally without API keys</div>
-            </div>
+            <span>
+              <span className="block text-sm font-medium text-fg">Use Ollama (local)</span>
+              <span className="block text-sm text-fg-muted">
+                Runs the model on this machine. No API key, and no prompt text leaves the host.
+              </span>
+            </span>
           </label>
-        </div>
 
-        {useOllama ? (
-          // Ollama Configuration
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ollama URL
-              </label>
-              <input
-                type="text"
-                value={ollamaUrl}
-                onChange={(e) => setOllamaUrl(e.target.value)}
-                className="input w-full"
-                placeholder="http://localhost:11434"
-              />
+          {useOllama ? (
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="ollama-url" className="label mb-1.5 block">
+                  Ollama URL
+                </label>
+                <input
+                  id="ollama-url"
+                  type="text"
+                  value={ollamaUrl}
+                  onChange={(e) => setOllamaUrl(e.target.value)}
+                  className="input w-full"
+                  placeholder="http://localhost:11434"
+                />
+              </div>
+              <div>
+                <label htmlFor="ollama-model" className="label mb-1.5 block">
+                  Model
+                </label>
+                <select
+                  id="ollama-model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="input w-full"
+                >
+                  {providerModels.ollama.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Model
-              </label>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="input w-full"
-              >
-                {providerModels.ollama.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="llm-provider" className="label mb-1.5 block">
+                  Provider
+                </label>
+                <select
+                  id="llm-provider"
+                  value={provider}
+                  onChange={(e) => {
+                    setProvider(e.target.value);
+                    setModel(providerModels[e.target.value]?.[0] || '');
+                  }}
+                  className="input w-full"
+                >
+                  <option value="openrouter">OpenRouter — many free models</option>
+                  <option value="groq">Groq — fast, free tier</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="llm-model" className="label mb-1.5 block">
+                  Model
+                </label>
+                <select
+                  id="llm-model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="input w-full"
+                >
+                  {providerModels[provider]?.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="llm-api-key" className="label mb-1.5 block">
+                  API key
+                </label>
+                <input
+                  id="llm-api-key"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="input w-full"
+                  placeholder="Leave blank to keep the stored key"
+                  autoComplete="new-password"
+                />
+                <p className="mt-1.5 text-xs text-fg-subtle">
+                  Leave blank unless you are replacing it — this field is empty even when a key is
+                  already stored, because the key is never sent back to the browser. Where to get
+                  one:{' '}
+                  {{
+                    openrouter: 'openrouter.ai',
+                    groq: 'console.groq.com',
+                    openai: 'platform.openai.com',
+                    anthropic: 'console.anthropic.com',
+                  }[provider] || 'your provider’s console'}
+                  .
+                </p>
+              </div>
             </div>
+          )}
+
+          <div>
+            <label htmlFor="max-tokens" className="label mb-1.5 block">
+              Max tokens per reply
+            </label>
+            <input
+              id="max-tokens"
+              type="number"
+              min={100}
+              max={100000}
+              step={100}
+              value={maxTokens}
+              onChange={(e) => setMaxTokens(parseInt(e.target.value) || 8000)}
+              className="input w-full"
+              placeholder="8000"
+            />
+            <p className="mt-1.5 text-xs text-fg-subtle">
+              Caps the length of a single model reply, not the length of the conversation. Default
+              8000.
+            </p>
           </div>
-        ) : (
-          // Cloud Provider Configuration
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Provider
-              </label>
-              <select
-                value={provider}
-                onChange={(e) => {
-                  setProvider(e.target.value);
-                  setModel(providerModels[e.target.value]?.[0] || '');
-                }}
-                className="input w-full"
-              >
-                <option value="openrouter">🌟 OpenRouter (Many Free Models - RECOMMENDED)</option>
-                <option value="groq">Groq (Fast & Free)</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic (Claude)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Model
-              </label>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="input w-full"
-              >
-                {providerModels[provider]?.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                API Key
-              </label>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="input w-full"
-                placeholder="Leave blank to keep existing key"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {provider === 'openrouter' && '🌟 Only enter a new API key if you want to update it. Get your API key from openrouter.ai'}
-                {provider === 'groq' && '⚡ Only enter a new API key if you want to update it. Get your API key from groq.com'}
-                {provider === 'openai' && 'Only enter a new API key if you want to update it. Get your API key from platform.openai.com'}
-                {provider === 'anthropic' && 'Only enter a new API key if you want to update it. Get your API key from console.anthropic.com'}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Max Tokens Configuration */}
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Max Tokens
-          </label>
-          <input
-            type="number"
-            min="100"
-            max="100000"
-            step="100"
-            value={maxTokens}
-            onChange={(e) => setMaxTokens(parseInt(e.target.value) || 8000)}
-            className="input w-full"
-            placeholder="8000"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Maximum number of tokens for AI response generation (default: 8000)
-          </p>
         </div>
-      </div>
+      </Section>
 
       {/* Save Button */}
       <div className="flex justify-end gap-3">
-        <button
-          onClick={onRefresh}
-          className="btn-ghost"
-        >
-          Cancel
+        <button type="button" onClick={onRefresh} className="btn-secondary">
+          Discard changes
         </button>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="btn-primary"
-        >
-          {saving ? 'Saving...' : '💾 Save Settings'}
+        <button type="button" onClick={handleSave} disabled={saving} className="btn-primary">
+          {saving ? 'Saving…' : 'Save settings'}
         </button>
       </div>
     </div>
   );
 }
+

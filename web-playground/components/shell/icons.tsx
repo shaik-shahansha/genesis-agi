@@ -217,3 +217,44 @@ export const LockIcon = (p: IconProps) => (
     <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
   </Icon>
 );
+
+export const PlayIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M7 5.5v13l11-6.5z" />
+  </Icon>
+);
+
+export const StopSquareIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="6" y="6" width="12" height="12" rx="1.5" />
+  </Icon>
+);
+
+export const TrashIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M5 7h14M10 7V5.5A1.5 1.5 0 0 1 11.5 4h1A1.5 1.5 0 0 1 14 5.5V7" />
+    <path d="M6.5 7l.8 11.2A1.8 1.8 0 0 0 9.1 20h5.8a1.8 1.8 0 0 0 1.8-1.8L17.5 7" />
+    <path d="M10.5 11v5M13.5 11v5" />
+  </Icon>
+);
+
+export const CoinsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <ellipse cx="12" cy="6.5" rx="6.5" ry="2.8" />
+    <path d="M5.5 6.5v11c0 1.55 2.91 2.8 6.5 2.8s6.5-1.25 6.5-2.8v-11" />
+    <path d="M5.5 12c0 1.55 2.91 2.8 6.5 2.8s6.5-1.25 6.5-2.8" />
+  </Icon>
+);
+
+export const PulseIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 12h4l2-5 3 10 2.5-6 1.5 3h5" />
+  </Icon>
+);
+
+export const SparkIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z" />
+    <path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" />
+  </Icon>
+);

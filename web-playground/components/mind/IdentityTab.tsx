@@ -1,176 +1,147 @@
 'use client';
 
+import { DetailRow, Section, StatusBadge } from '@/components/governance/primitives';
+import { LockIcon } from '@/components/shell/icons';
+
 interface IdentityTabProps {
   mind: any;
 }
 
+/**
+ * The Mind's identity card.
+ *
+ * This used to render a gradient "VERIFIED DIGITAL IDENTITY / official digital
+ * identity credential issued by Genesis Minds" card. None of that is true:
+ * `gmid` is a local identifier with no signature behind it, so nothing here can
+ * be verified by anyone. Presenting a self-issued string as a credential is the
+ * exact class of claim §4 of the developer guide exists to catch, and the fix is
+ * to say what the value actually is.
+ */
 export default function IdentityTab({ mind }: IdentityTabProps) {
-  // Helper function to get initials for avatar
   const getInitials = (name: string) => {
+    if (!name) return '??';
     return name
       .split(' ')
-      .map(word => word[0])
+      .map((word) => word[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
   };
 
-  // Helper function to format date
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
+  const statusTone =
+    mind.status === 'active' ? 'success' : mind.status === 'sleeping' ? 'warning' : 'neutral';
+
+  const traits = mind.personality ? Object.entries(mind.personality).slice(0, 8) : [];
+
   return (
-    <div className="flex items-center justify-center min-h-[600px] p-6">
-      {/* Professional Digital ID Card */}
-      <div className="w-full max-w-4xl">
-        {/* Card Container with gradient border effect */}
-        <div className="relative bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 p-[2px] rounded-2xl shadow-2xl">
-          <div className="bg-white rounded-2xl overflow-hidden">
-            {/* Header Section with gradient background */}
-            <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium opacity-90">GENESIS MINDS</p>
-                  <p className="text-xs opacity-75">Digital Identity Card</p>
-                </div>
-                <div className="text-right">
-                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${
-                    mind.status === 'active' ? 'bg-green-500' :
-                    mind.status === 'sleeping' ? 'bg-yellow-500' :
-                    'bg-gray-500'
-                  }`}>
-                    <span className="inline-block w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                    {mind.status?.toUpperCase() || 'UNKNOWN'}
-                  </div>
-                </div>
-              </div>
+    <div className="space-y-6">
+      <Section title="Identity">
+        <div className="card overflow-hidden">
+          <div className="flex flex-wrap items-start gap-6">
+            <div className="grid h-24 w-24 flex-shrink-0 place-items-center rounded-card bg-surface-3 text-3xl font-semibold text-fg-muted">
+              {getInitials(mind.name)}
             </div>
-
-            {/* Main Content */}
-            <div className="p-8">
-              <div className="flex gap-8">
-                {/* Left: Avatar Section */}
-                <div className="flex-shrink-0">
-                  <div className="w-48 h-48 bg-gradient-to-br from-blue-400 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg">
-                    <span className="text-6xl font-bold text-white">
-                      {getInitials(mind.name)}
-                    </span>
-                  </div>
-                  <div className="mt-4 text-center">
-                    <div className="inline-block px-4 py-2 bg-gray-100 rounded-lg">
-                      <p className="text-xs text-gray-600 font-medium">GMID</p>
-                      <p className="text-sm font-mono font-bold text-gray-900 mt-1">
-                        {mind.gmid}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Personal Information */}
-                <div className="flex-1 space-y-6">
-                  {/* Name Section */}
-                  <div className="border-b pb-4">
-                    <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Full Name</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-1">{mind.name}</p>
-                  </div>
-
-                  {/* Details Grid */}
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Age</p>
-                      <p className="text-lg font-semibold text-gray-900 mt-1">{mind.age}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Current Emotion</p>
-                      <p className="text-lg font-semibold text-gray-900 mt-1 capitalize">
-                        {mind.current_emotion || 'Neutral'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Template</p>
-                      <p className="text-lg font-semibold text-gray-900 mt-1 capitalize">
-                        {mind.template ? mind.template.split('/').pop()?.replace(/_/g, ' ') : 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Model</p>
-                      <p className="text-lg font-semibold text-gray-900 mt-1">{mind.llm_model || 'N/A'}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Creator</p>
-                      <p className="text-lg font-semibold text-gray-900 mt-1">{mind.creator_email || mind.creator || 'N/A'}</p>
-                    </div>
-                    {mind.purpose && (
-                      <div className="col-span-2">
-                        <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Purpose</p>
-                        <p className="text-lg font-semibold text-gray-900 mt-1">{mind.purpose}</p>
-                      </div>
-                    )}
-                    {mind.role && (
-                      <div className="col-span-2">
-                        <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider">Role</p>
-                        <p className="text-lg font-semibold text-gray-900 mt-1">{mind.role}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Personality Traits */}
-                  {mind.personality && (
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-semibold tracking-wider mb-3">Personality Profile</p>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(mind.personality).slice(0, 6).map(([trait, value]: [string, any]) => (
-                          <div
-                            key={trait}
-                            className="px-4 py-2 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg"
-                          >
-                            <p className="text-xs text-gray-600 capitalize">{trait}</p>
-                            <p className="text-sm font-bold text-gray-900">
-                              {typeof value === 'number' ? value.toFixed(2) : value}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <h3 className="text-xl font-semibold text-fg">{mind.name}</h3>
+                <StatusBadge tone={statusTone}>
+                  {mind.status ? mind.status : 'unknown'}
+                </StatusBadge>
               </div>
+              <p className="mt-1 font-mono text-xs text-fg-muted">{mind.gmid}</p>
 
-              {/* Footer with verification info */}
-              <div className="mt-8 pt-6 border-t border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Verified Digital Identity</p>
-                    <p className="text-sm font-semibold text-gray-900">Genesis Minds Network</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Created</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {formatDate(mind.created_at)}
-                  </p>
-                </div>
-              </div>
+              <dl className="mt-4">
+                <DetailRow label="Age">{mind.age || '—'}</DetailRow>
+                <DetailRow label="Emotion">
+                  <span className="capitalize">{mind.current_emotion || 'neutral'}</span>
+                </DetailRow>
+                <DetailRow label="Template">
+                  <span className="capitalize">
+                    {mind.template ? mind.template.split('/').pop()?.replace(/_/g, ' ') : 'N/A'}
+                  </span>
+                </DetailRow>
+                <DetailRow label="Model">{mind.llm_model || 'N/A'}</DetailRow>
+                <DetailRow label="Creator">
+                  {mind.creator_email || mind.creator || 'N/A'}
+                </DetailRow>
+                <DetailRow label="Created">{formatDate(mind.created_at)}</DetailRow>
+              </dl>
             </div>
           </div>
         </div>
+      </Section>
 
-        {/* Additional Info Below Card */}
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>This is an official digital identity credential issued by Genesis Minds</p>
+      {(mind.purpose || mind.role) && (
+        <Section title="Stated purpose">
+          <div className="card space-y-4">
+            {mind.purpose && (
+              <div>
+                <p className="label mb-1">Purpose</p>
+                <p className="max-w-prose text-sm text-fg">{mind.purpose}</p>
+              </div>
+            )}
+            {mind.role && (
+              <div>
+                <p className="label mb-1">Role</p>
+                <p className="max-w-prose text-sm text-fg">{mind.role}</p>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {traits.length > 0 && (
+        <Section
+          title="Personality"
+          description="Trait values as configured. These bias tone and initiative; they are not measured."
+        >
+          <div className="flex flex-wrap gap-2">
+            {traits.map(([trait, value]: [string, any]) => (
+              <div key={trait} className="card-flat min-w-[7rem]">
+                <p className="text-xs capitalize text-fg-muted">{trait.replace(/_/g, ' ')}</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums text-fg">
+                  {typeof value === 'number' ? value.toFixed(2) : String(value)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      <Section title="What this identifier is">
+        <div className="card">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 text-fg-subtle">
+              <LockIcon />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-fg-muted">
+                <span className="font-medium text-fg">{mind.gmid}</span> is a local identifier. It
+                uniquely names this Mind on this installation and nothing more. It is not signed, it
+                is not issued by anyone, and no third party can verify it. Another installation can
+                hand out the same string to a different Mind.
+              </p>
+              <p className="mt-3 text-sm text-fg-muted">
+                Do not treat it as proof of origin, and do not paste it anywhere that would.
+                Portable signed identity — the thing that would make a GMID verifiable across
+                installations — is not built. See {/* keep the reference textual, not a link */}
+                <span className="text-fg-subtle"> PORTABLE_BEING_FORMAT.md</span> for the intended
+                shape.
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      </Section>
     </div>
   );
 }
+

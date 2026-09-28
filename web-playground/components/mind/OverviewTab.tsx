@@ -1,39 +1,55 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { isCreationDisabled, isProduction } from '@/lib/env';
 import { useAuth } from '@/lib/auth-context';
+import { Section, DetailRow, StatusBadge } from '@/components/governance/primitives';
+import {
+  AlertIcon,
+  CoinsIcon,
+  PlayIcon,
+  RefreshIcon,
+  StopSquareIcon,
+  TrashIcon,
+} from '@/components/shell/icons';
 
 interface OverviewTabProps {
   mind: any;
   onRefresh: () => void;
 }
 
+type DaemonState = 'running' | 'stopped' | 'unknown';
+
+/**
+ * The Mind's landing tab.
+ *
+ * The order is deliberate: what the being is *doing* first, then the numbers,
+ * then identity, and the irreversible action last. The danger zone stays
+ * reachable because hiding the button does not remove the endpoint — a user who
+ * cannot find the control assumes deleting is impossible, and the API says
+ * otherwise.
+ */
 export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
-  const [daemonStatus, setDaemonStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
+  const [daemonStatus, setDaemonStatus] = useState<DaemonState>('unknown');
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const router = useRouter();
   const { user, genesisUser } = useAuth();
   const deletionDisabled = isCreationDisabled();
-  const daemonControlDisabled = isProduction(); // Disable daemon controls in production
-  
-  // Check if current user can delete this Mind
+  const daemonControlDisabled = isProduction();
+
   const canDeleteMind = () => {
     if (!user) return false;
-    
-    // Check if user is global admin
+
     if (genesisUser?.is_global_admin) return true;
-    
-    // Check if user is the creator
+
     const userEmail = user.email?.toLowerCase();
     const creatorEmail = (mind.creator_email || mind.creator || '').toLowerCase();
-    
+
     return userEmail === creatorEmail;
   };
+
 
   useEffect(() => {
     checkDaemonStatus();
@@ -77,18 +93,15 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      // Stop daemon first if running
+      // A running daemon holds the mind's files open, so stop it first.
       if (daemonStatus === 'running') {
         await api.stopDaemon(mind.gmid);
       }
-      
-      // Delete the mind
+
       await api.deleteMind(mind.gmid);
-      
-      // Show success message briefly
-      alert('Mind deleted successfully');
-      
-      // Redirect to home and force refresh
+
+      // Full navigation rather than a client route change: the deleted Mind's
+      // data is cached in several providers that have no invalidation hook.
       window.location.href = '/';
     } catch (error: any) {
       alert(`Failed to delete mind: ${error.message}`);
@@ -97,195 +110,179 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
     }
   };
 
+  const daemonLabel =
+    daemonStatus === 'running' ? 'Running' : daemonStatus === 'stopped' ? 'Stopped' : 'Unknown';
+  const daemonTone =
+    daemonStatus === 'running' ? 'success' : daemonStatus === 'stopped' ? 'neutral' : 'warning';
+
   return (
     <div className="space-y-6">
-      {/* Daemon Control */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Daemon Control</h2>
-        {daemonControlDisabled ? (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className={`w-3 h-3 rounded-full ${
-                daemonStatus === 'running' ? 'bg-green-500' : 
-                daemonStatus === 'stopped' ? 'bg-gray-400' : 'bg-yellow-500'
-              }`} />
-              <span className="font-medium text-gray-900">
-                Status: {daemonStatus === 'running' ? 'Running' : daemonStatus === 'stopped' ? 'Stopped' : 'Unknown'}
-              </span>
-            </div>
-            <p className="text-sm text-blue-800">
-              ℹ️ In production mode, the daemon runs 24/7 to ensure continuous autonomous operation. 
-              Start/stop controls are disabled to maintain persistent consciousness.
-            </p>
-            <button
-              onClick={checkDaemonStatus}
-              className="mt-3 btn-ghost text-sm"
-            >
-              🔄 Refresh Status
+      <Section
+        title="Autonomy"
+        description={
+          daemonControlDisabled
+            ? 'Continuous operation is enforced in production.'
+            : 'The daemon is what makes this being act between your messages.'
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <StatusBadge tone={daemonTone}>{daemonLabel}</StatusBadge>
+            <button type="button" onClick={checkDaemonStatus} className="btn-ghost btn-sm">
+              <RefreshIcon className="h-4 w-4" />
+              Refresh
             </button>
           </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full ${
-                  daemonStatus === 'running' ? 'bg-green-500' : 
-                  daemonStatus === 'stopped' ? 'bg-gray-400' : 'bg-yellow-500'
-                }`} />
-                <span className="font-medium text-gray-900">
-                  Status: {daemonStatus === 'running' ? 'Running' : daemonStatus === 'stopped' ? 'Stopped' : 'Unknown'}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 mt-1">
-                The daemon enables autonomous thinking, dreaming, and consciousness updates
+        }
+      >
+        <div className="card">
+          {daemonControlDisabled ? (
+            <p className="max-w-prose text-sm text-fg-muted">
+              Start and stop are disabled here. In production the daemon runs continuously so the
+              Mind keeps thinking, dreaming and updating its state between your messages. Stop it
+              from the host instead — see the deployment guide — because from this screen a Mind
+              whose daemon has died looks exactly like one that is simply idle.
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <p className="max-w-prose text-sm text-fg-muted">
+                Autonomous thinking, dreaming and consciousness updates all run inside the daemon.
+                Stopping it pauses that work; it deletes nothing.
               </p>
-            </div>
-            <div className="flex gap-2">
-              {daemonStatus === 'stopped' || daemonStatus === 'unknown' ? (
-                <button
-                  onClick={handleStartDaemon}
-                  disabled={loading}
-                  className="btn-primary"
-                >
-                  {loading ? 'Starting...' : '▶️ Start Daemon'}
-                </button>
-              ) : (
-                <button
-                  onClick={handleStopDaemon}
-                  disabled={loading}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                >
-                  {loading ? 'Stopping...' : '⏹️ Stop Daemon'}
-                </button>
-              )}
-              <button
-                onClick={checkDaemonStatus}
-                className="btn-ghost"
-              >
-                🔄 Refresh
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-300 rounded-lg p-4">
-          <div className="text-sm text-yellow-700 font-medium">💰 Gens</div>
-          <div className="text-2xl font-bold text-yellow-900 mt-1">{mind.gens !== undefined ? mind.gens : 100}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Memories</div>
-          <div className="text-2xl font-bold text-gray-900 mt-1">{mind.memory_count || 0}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Dreams</div>
-          <div className="text-2xl font-bold text-gray-900 mt-1">{mind.dream_count || 0}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Current Emotion</div>
-          <div className="text-lg font-bold text-gray-900 mt-1">{mind.current_emotion}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Status</div>
-          <div className="text-lg font-bold text-gray-900 mt-1">{mind.status}</div>
-        </div>
-      </div>
-
-      {/* Current State */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Current State</h2>
-        <div className="space-y-3">
-          {mind.current_thought && (
-            <div>
-              <span className="text-sm font-medium text-gray-700">Current Thought:</span>
-              <p className="text-gray-900 mt-1">{mind.current_thought}</p>
+              <div className="flex gap-2">
+                {daemonStatus === 'running' ? (
+                  <button
+                    type="button"
+                    onClick={handleStopDaemon}
+                    disabled={loading}
+                    className="btn-secondary"
+                  >
+                    <StopSquareIcon className="h-4 w-4" />
+                    {loading ? 'Stopping…' : 'Stop daemon'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleStartDaemon}
+                    disabled={loading}
+                    className="btn-primary"
+                  >
+                    <PlayIcon className="h-4 w-4" />
+                    {loading ? 'Starting…' : 'Start daemon'}
+                  </button>
+                )}
+              </div>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            <div>
-              <span className="text-sm font-medium text-gray-700">Age:</span>
-              <p className="text-gray-900">{mind.age}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-gray-700">GMID:</span>
-              <p className="text-gray-900 font-mono text-sm">{mind.gmid}</p>
-            </div>
-          </div>
         </div>
-      </div>
+      </Section>
 
-      {/* Danger Zone - Only shown to creator and global admins */}
+      <Section title="Vitals">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+          <Stat
+            label="Gens"
+            value={mind.gens !== undefined && mind.gens !== null ? mind.gens : 100}
+            icon={<CoinsIcon className="h-4 w-4" />}
+            tone="warning"
+            hint="Compute budget this Mind is allowed to spend"
+          />
+          <Stat label="Memories" value={mind.memory_count || 0} />
+          <Stat label="Dreams" value={mind.dream_count || 0} />
+          <Stat label="Emotion" value={mind.current_emotion || '—'} tone="violet" compact />
+          <Stat label="Status" value={mind.status || '—'} tone="info" compact />
+        </div>
+      </Section>
+
+      <Section title="Current state">
+        <div className="card">
+          {mind.current_thought ? (
+            <div className="mb-4">
+              <p className="label mb-1">Most recent thought</p>
+              <p className="whitespace-pre-wrap text-sm text-fg">{mind.current_thought}</p>
+            </div>
+          ) : (
+            <p className="mb-4 text-sm text-fg-subtle">
+              No thought recorded yet. One appears once the daemon has completed a cognition cycle.
+            </p>
+          )}
+          <dl className="border-t border-line pt-3">
+            <DetailRow label="Age">{mind.age || '—'}</DetailRow>
+            <DetailRow label="GMID">
+              <span className="font-mono text-xs">{mind.gmid}</span>
+            </DetailRow>
+            <DetailRow label="Creator">{mind.creator_email || mind.creator || '—'}</DetailRow>
+          </dl>
+        </div>
+      </Section>
+
       {!deletionDisabled && canDeleteMind() && (
-        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-red-900 mb-2 flex items-center gap-2">
-            ⚠️ Danger Zone
-          </h2>
-          <p className="text-sm text-red-700 mb-4">
-            Once you delete a Mind, there is no going back. All memories, dreams, and consciousness data will be permanently lost.
-          </p>
-          <button
-            onClick={() => setShowDeleteModal(true)}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
-          >
-            🗑️ Delete Mind Permanently
-          </button>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">⚠️ Confirm Deletion</h3>
-            
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-red-800 font-medium mb-3">
-                You are about to permanently delete:
-              </p>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-700">Name:</span>
-                  <span className="font-semibold text-gray-900">{mind.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700">GMID:</span>
-                  <span className="font-mono text-xs text-gray-900">{mind.gmid}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700">Age:</span>
-                  <span className="font-semibold text-gray-900">{mind.age}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700">Memories:</span>
-                  <span className="font-semibold text-gray-900">{mind.memory_count}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700">Dreams:</span>
-                  <span className="font-semibold text-gray-900">{mind.dream_count}</span>
-                </div>
+        <Section title="Danger zone">
+          <div className="rounded-card border border-danger/40 bg-danger/5 p-5">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 text-danger">
+                <AlertIcon />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-fg">Delete this Mind permanently</p>
+                <p className="mt-1 max-w-prose text-sm text-fg-muted">
+                  Every memory, dream and episode of state this Mind has accumulated is destroyed.
+                  There is no export, no archive and no undo.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(true)}
+                  className="btn-danger mt-4"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete Mind…
+                </button>
               </div>
             </div>
+          </div>
+        </Section>
+      )}
 
-            <p className="text-sm text-gray-700 mb-6">
-              <strong className="text-red-600">This action CANNOT be undone.</strong> All data associated with this Mind will be permanently deleted from the system.
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-mind-title"
+        >
+          <div className="card w-full max-w-md shadow-xl">
+            <h3 id="delete-mind-title" className="text-base font-semibold text-fg">
+              Delete this Mind permanently?
+            </h3>
+
+            <dl className="mt-4 rounded-card border border-line bg-surface-2 p-4">
+              <DetailRow label="Name">{mind.name}</DetailRow>
+              <DetailRow label="GMID">
+                <span className="font-mono text-xs">{mind.gmid}</span>
+              </DetailRow>
+              <DetailRow label="Age">{mind.age}</DetailRow>
+              <DetailRow label="Memories">{mind.memory_count}</DetailRow>
+              <DetailRow label="Dreams">{mind.dream_count}</DetailRow>
+            </dl>
+
+            <p className="mt-4 text-sm text-fg-muted">
+              This cannot be undone. If the daemon is running it is stopped first.
             </p>
 
-            <div className="flex gap-3">
+            <div className="mt-6 flex gap-3">
               <button
+                type="button"
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium disabled:opacity-50"
+                className="btn-secondary flex-1 justify-center"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50"
+                className="btn-danger flex-1 justify-center"
               >
-                {deleting ? 'Deleting...' : 'Delete Forever'}
+                {deleting ? 'Deleting…' : 'Delete forever'}
               </button>
             </div>
           </div>
@@ -294,3 +291,50 @@ export default function OverviewTab({ mind, onRefresh }: OverviewTabProps) {
     </div>
   );
 }
+
+/**
+ * One number from the vitals row.
+ *
+ * `compact` exists because two of these hold words rather than counts: an
+ * emotion name is not a number and must not be typeset like one, or the row
+ * reads as five quantities of the same kind when it is not.
+ */
+function Stat({
+  label,
+  value,
+  icon,
+  tone = 'neutral',
+  hint,
+  compact = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon?: React.ReactNode;
+  tone?: string;
+  hint?: string;
+  compact?: boolean;
+}) {
+  const accent: Record<string, string> = {
+    neutral: 'text-fg-subtle',
+    warning: 'text-warning',
+    violet: 'text-violet-500',
+    info: 'text-info',
+  };
+
+  return (
+    <div className="card-flat" title={hint}>
+      <div className={`flex items-center gap-1.5 text-xs text-fg-muted ${accent[tone] || ''}`}>
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div
+        className={`mt-1 truncate font-semibold text-fg ${
+          compact ? 'text-base' : 'text-2xl tabular-nums'
+        }`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+

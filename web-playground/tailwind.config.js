@@ -20,6 +20,8 @@
 /** @param {string} variable */
 const token = (variable) => `rgb(var(${variable}) / <alpha-value>)`;
 
+const defaultTheme = require('tailwindcss/defaultTheme');
+
 module.exports = {
   darkMode: 'class',
   content: [
@@ -72,6 +74,24 @@ module.exports = {
           fg: token('--accent-fg'),
           soft: token('--accent-soft'),
         },
+        // Semantic status. These were defined as CSS variables from the start but
+        // never mapped here, so `text-danger`, `border-danger/40` and friends
+        // generated no CSS at all. The failure is silent and easy to miss: the
+        // surrounding legacy utilities still resolve, so the markup looks
+        // plausible and only the colour is missing.
+        success: token('--success'),
+        warning: token('--warning'),
+        danger: token('--danger'),
+        info: token('--info'),
+        // `text-violet` resolves to the themed token; the stock 50..950 steps are
+        // kept so existing `violet-500` usages keep compiling. Replacing the key
+        // wholesale would delete them.
+        violet: {
+          ...defaultTheme.colors.violet,
+          DEFAULT: token('--violet'),
+          soft: token('--violet-soft'),
+        },
+
         // Risk levels (ADR-0006). Fixed hues: R0..R5 must be distinguishable at a
         // glance, and they must not shift with the theme or a severity could be
         // misread.

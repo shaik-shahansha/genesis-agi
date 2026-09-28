@@ -292,6 +292,18 @@ export class GenesisAPI {
     return this.request(`/api/v1/minds/${mindId}/thoughts?limit=${limit}`);
   }
 
+  /**
+   * Conversation history for the signed-in user.
+   *
+   * No `user_email` is sent: the server derives it from the bearer token, which
+   * is the only trustworthy source. Callers used to pass a value read out of
+   * `localStorage`, which both made the tab depend on a key only the Firebase
+   * flow writes and would let a client ask for anyone's conversation.
+   */
+  async getConversationMessages(mindId: string, limit = 200) {
+    return this.request(`/api/v1/minds/${mindId}/conversations/messages?limit=${limit}`);
+  }
+
   async generateThought(mindId: string) {
     return this.request(`/api/v1/minds/${mindId}/thought`, {
       method: 'POST',
