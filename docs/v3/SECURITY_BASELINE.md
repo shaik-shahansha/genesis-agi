@@ -15,10 +15,10 @@
 |---|---|---|
 | SEC-01 | ~~**C**~~ **FIXED** | Unauthenticated WebSocket accepts any `user_email` and falls back to a shared identity |
 | SEC-02 | ~~**C**~~ **FIXED** | Arbitrary host file write via unsanitised `filename` in workspace upload/create |
-| SEC-03 | **C** | Model-generated code executes with no sandbox, no resource limits, no egress control |
-| SEC-04 | **C** | Runtime `pip install` driven by imports found in model-generated code |
-| SEC-05 | **H** | Full host environment (all API keys) inherited by MCP server subprocesses |
-| SEC-06 | **H** | Advertised import allow-list in tool sandbox is never enforced |
+| SEC-03 | **C** → **MITIGATED (partial)** | Model-generated code executes with no sandbox, no resource limits, no egress control |
+| SEC-04 | ~~**C**~~ **FIXED** | Runtime `pip install` driven by imports found in model-generated code |
+| SEC-05 | **H** → **PARTIAL** | Full host environment inherited by subprocesses: fixed for the sandbox; **MCP servers still inherit `os.environ`** |
+| SEC-06 | ~~**H**~~ **FIXED** | Advertised import allow-list in tool sandbox is never enforced |
 | SEC-07 | **H** | Arbitrary marketplace tool code persisted and later executed |
 | SEC-08 | **H** | In-memory user store, hardcoded default admin password, default JWT secret |
 | SEC-09 | **H** | API process spawns and kills OS processes (daemon control, `psutil`) |
@@ -38,7 +38,39 @@
 
 ---
 
-## 1. Direct code execution
+## 1. Direct code execution — **MITIGATED (partial)** 2026-09-28
+
+> **Resolution.** All three paths now execute through ``SandboxProvider``
+> (`genesis/sandbox/`). Direct process spawning outside that package is blocked by an
+> architectural guard test (`tests/security/test_sandbox_boundary.py`).
+>
+> **Enforced now:** a scrubbed environment with only an explicit allow-list (SEC-05),
+> CPU/address-space/file-size/process limits via a self-limiting runner, wall-clock
+> timeout with process-group kill, bounded stdout/stderr, no runtime package
+> installation (SEC-04), a single private working directory, artifact export restricted to
+> declared names, and honest capability reporting so a receipt can record what was actually
+> enforced.
+>
+> **Not yet enforced:** filesystem isolation, PID-namespace isolation, and network
+> isolation. The local provider is explicitly *not* a security boundary; it reports
+> ``is_security_boundary: False``. Real containment needs the container provider
+> (gVisor/Kata), which requires a Docker endpoint and therefore belongs in a dedicated
+> sandbox-manager service rather than in the API container (ADR-0005).
+>
+> **Also found and fixed while testing:**
+> * ``pids_limit`` defaulted to 64, but ``RLIMIT_NPROC`` is per-*user*, so the API and
+>   nginx threads counted against the sandbox. Numeric libraries (OpenBLAS inside numpy)
+>   failed to create threads and aborted with SIGINT. Default raised to 1024, with BLAS/OMP
+>   thread pools capped to 1 in the sandbox environment.
+> * Wall-clock timeouts were reported as successful completions: the kill sets
+>   ``returncode``, so inferring timeout from ``returncode is None`` afterwards was a race.
+>   ``_drain`` now returns the flag explicitly.
+>
+> **Verification:** `deploy/docker/verify_sandbox.py` — 8/8 checks in the running container,
+> including that provider secrets are invisible to sandboxed code and that the timeout and
+> output caps hold.
+
+### Original finding (retained for the record)
 
 **Three independent execution paths exist, none sandboxed.**
 
@@ -63,15 +95,14 @@
 - The generated wrapper embeds `{tool.code}` verbatim; line ~345 executes
   `eval(input_data)` when no `execute`/`main` symbol is found.
 
-### 1c. `genesis/plugins/tools.py` — `ToolsPlugin._execute_tool_real` (SEC-03, SEC-06)
-- Line ~244: `subprocess.run(["python3", temp_file], capture_output=True, text=True, timeout=self.execution_timeout)`
-  with the comment *"Note: This doesn't fully sandbox - use Docker for production"*.
-- Line ~188 emits `ALLOWED_IMPORTS = {self.allowed_imports}` into the generated wrapper.
-  **This variable is never consulted.** There is no `__import__` hook, no `sys.meta_path`
-  finder, no `__builtins__` restriction. The class docstring claims *"No eval/exec in main
-  process"* and *"Limited imports"* — the import restriction is cosmetic. Verified by
-  searching the file for `import_hook`, `__builtins__`, and any use of `ALLOWED_IMPORTS`
-  beyond the single emission line.
+### 1c. `genesis/plugins/tools.py` — `ToolsPlugin._execute_tool_real` (SEC-03, SEC-06) — **FIXED**
+- Line ~244 previously ran `subprocess.run(["python3", temp_file], ...)` with the comment
+  *"Note: This doesn't fully sandbox - use Docker for production"*.
+- The wrapper emitted `ALLOWED_IMPORTS = {self.allowed_imports}`, which was **never
+  consulted** — no `__import__` hook, no meta-path finder, no `__builtins__` restriction.
+  Name-based import restriction is not a control (`importlib` and `__import__` defeat it),
+  so the constant has been **removed rather than faked**, along with the claim in the
+  plugin's system prompt. Both are now asserted absent by a test.
 
 ### 1d. Platform inconsistency (correctness + security)
 Paths 1b and 1c invoke the literal string `python3`; path 1a invokes `python`. On Windows two

@@ -287,13 +287,15 @@ class ToolManager:
 
     def _execute_tool_code(self, tool: Tool, input_data: Any) -> Any:
         """
-        Execute tool code in a sandboxed subprocess.
+        Execute tool code in the configured sandbox.
 
-        This provides real code execution with security restrictions:
-        - Runs in subprocess with timeout
-        - Limited to safe built-in functions
-        - No file system or network access by default
-        - Memory and CPU limits (if available)
+        SECURITY: execution goes through ``SandboxProvider`` (ADR-0005), which
+        supplies a scrubbed environment, CPU/memory limits, a wall-clock timeout,
+        bounded output and no runtime package installation.
+
+        Previously this method ran ``subprocess.run(['python3', ...])`` with
+        ``preexec_fn=None`` and a comment saying resource limits "could" be added,
+        inheriting the full parent environment (SEC-03/SEC-05).
 
         Args:
             tool: Tool to execute
@@ -303,95 +305,20 @@ class ToolManager:
             Tool execution output
 
         Raises:
-            TimeoutError: If execution exceeds timeout
-            SecurityError: If tool tries unsafe operations
+            TimeoutError: If execution exceeds the timeout
             RuntimeError: If execution fails
         """
-        import subprocess
-        import json
-        import tempfile
-        import os
+        from genesis.sandbox.tool_runner import execute_tool_code_sync
 
-        # Security: Create restricted execution environment
-        execution_timeout = 10  # seconds
+        outcome = execute_tool_code_sync(tool.code, input_data, timeout_s=10)
 
-        # Prepare safe execution wrapper
-        safe_exec_code = f'''
-import sys
-import json
-import signal
+        if outcome.success:
+            return outcome.result
 
-# Timeout handler
-def timeout_handler(signum, frame):
-    raise TimeoutError("Tool execution exceeded timeout")
+        if outcome.exit_reason == "timeout":
+            raise TimeoutError(outcome.error or "Tool execution exceeded timeout")
 
-signal.signal(signal.SIGALRM, timeout_handler)
-signal.alarm({execution_timeout})
-
-try:
-    # Tool code
-    {tool.code}
-
-    # Get input
-    input_data = json.loads(sys.argv[1]) if len(sys.argv) > 1 else None
-
-    # Execute
-    if 'execute' in dir():
-        result = execute(input_data)
-    elif 'main' in dir():
-        result = main(input_data)
-    else:
-        # Try to find the main function in the code
-        result = eval(input_data) if input_data else None
-
-    # Output result
-    print(json.dumps({{"success": True, "result": result}}))
-
-except Exception as e:
-    print(json.dumps({{"success": False, "error": str(e)}}))
-    sys.exit(1)
-finally:
-    signal.alarm(0)
-'''
-
-        try:
-            # Write code to temporary file
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-                f.write(safe_exec_code)
-                temp_file = f.name
-
-            # Execute in subprocess with restrictions
-            result = subprocess.run(
-                ['python3', temp_file, json.dumps(input_data)],
-                capture_output=True,
-                text=True,
-                timeout=execution_timeout,
-                # Security: Limit resources (Linux only)
-                preexec_fn=None,  # Could add resource limits here
-            )
-
-            # Clean up
-            os.unlink(temp_file)
-
-            # Parse result
-            if result.returncode == 0 and result.stdout:
-                output = json.loads(result.stdout)
-                if output.get('success'):
-                    return output.get('result')
-                else:
-                    raise RuntimeError(f"Tool execution failed: {output.get('error')}")
-            else:
-                error_msg = result.stderr or "Unknown error"
-                raise RuntimeError(f"Tool execution failed: {error_msg}")
-
-        except subprocess.TimeoutExpired:
-            if 'temp_file' in locals():
-                os.unlink(temp_file)
-            raise TimeoutError(f"Tool execution exceeded {execution_timeout} seconds")
-        except Exception as e:
-            if 'temp_file' in locals() and os.path.exists(temp_file):
-                os.unlink(temp_file)
-            raise RuntimeError(f"Tool execution error: {str(e)}")
+        raise RuntimeError(f"Tool execution failed: {outcome.error}")
 
     def compose_tools(
         self,

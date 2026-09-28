@@ -78,11 +78,13 @@ COPY genesis ./genesis
 COPY alembic ./alembic
 
 # `cache` extra adds the optional redis client used by genesis/models/cache.py.
+# `tools` extra pre-bakes the data libraries the code-generation agent needs,
+# so sandboxed code has them available WITHOUT a runtime `pip install` (SEC-04).
 # Vision (opencv/deepface/fer) and browser (browser-use/playwright) extras are
 # deliberately NOT installed: they are optional, large (deepface pulls
 # TensorFlow), and unused in production mode (DISABLE_MULTIMODAL=true).
 RUN pip install --upgrade pip setuptools wheel \
- && pip install --no-cache-dir -e ".[cache]"
+ && pip install --no-cache-dir -e ".[cache,tools]"
 
 
 # -----------------------------------------------------------------------------

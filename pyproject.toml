@@ -60,6 +60,22 @@ dependencies = [
 cache = [
     "redis>=5.0.0",
 ]
+# Libraries the code-generation agent commonly needs. Previously these were
+# installed at runtime via `pip install` driven by imports found in
+# model-generated code (SEC-04). Declaring them here, and baking them into the
+# image, preserves the capability without granting a runtime install primitive.
+tools = [
+    "pandas>=2.0.0",
+    "matplotlib>=3.8.0",
+    "openpyxl>=3.1.0",
+    "python-docx>=1.1.0",
+    "python-pptx>=0.6.23",
+    "pypdf>=4.0.0",
+    "pdfplumber>=0.11.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    "tabulate>=0.9.0",
+]
 # Vision stack. Large (deepface pulls TensorFlow) and lazily imported by the
 # application, so it is NOT part of the default install.
 vision = [

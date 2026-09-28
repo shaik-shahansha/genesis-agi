@@ -84,14 +84,18 @@ def run(a, b):
 
         Args:
             execution_timeout: Max execution time in seconds (default: 5)
-            allow_file_access: Allow file system access (default: False - safer)
-            allowed_imports: List of allowed import modules (default: basic math/json)
+            allow_file_access: Retained for configuration compatibility; file
+                access is now governed by the sandbox policy
+            allowed_imports: DEPRECATED and unused. Name-based import restriction
+                is not a security control; containment is the sandbox's job.
             enable_marketplace: Enable tool marketplace (default: True)
             **config: Additional plugin configuration
         """
         super().__init__(**config)
         self.execution_timeout = execution_timeout
         self.allow_file_access = allow_file_access
+        # Kept so existing configuration does not break, but never enforced and
+        # never advertised: see the note in _execute_tool_real.
         self.allowed_imports = allowed_imports or [
             "math", "json", "datetime", "random", "string", "re"
         ]
@@ -120,15 +124,17 @@ def run(a, b):
 
     def _execute_tool_real(self, tool: Tool, input_data: Any) -> Any:
         """
-        Execute tool code in sandboxed subprocess.
+        Execute tool code through the configured sandbox provider.
 
-        This is REAL execution, not fake!
+        SECURITY (ADR-0005): execution happens in the sandbox, which supplies a
+        scrubbed environment, resource limits, a wall-clock timeout, bounded
+        output and no runtime package installation.
 
-        Security:
-        - Runs in subprocess (isolated from main process)
-        - Timeout enforcement
-        - Limited imports
-        - No eval/exec in main process
+        This replaces a subprocess implementation whose docstring claimed
+        "Limited imports" and which emitted an ``ALLOWED_IMPORTS`` constant that
+        was never consulted. Name-based import restriction is not a security
+        control (``importlib`` and ``__import__`` defeat it), so the claim has
+        been removed rather than faked: containment is the sandbox's job.
 
         Args:
             tool: Tool to execute
@@ -140,139 +146,24 @@ def run(a, b):
         Raises:
             ToolExecutionError: If execution fails or times out
         """
-        # Validate code exists
         if not tool.code or not tool.code.strip():
             raise ToolExecutionError("Tool has no code to execute")
 
-        # Build execution wrapper
-        wrapper_code = self._build_execution_wrapper(tool, input_data)
+        from genesis.sandbox.tool_runner import execute_tool_code_sync
 
-        # Execute in subprocess
-        try:
-            result = self._run_in_subprocess(wrapper_code)
-            return result
-        except subprocess.TimeoutExpired:
+        outcome = execute_tool_code_sync(
+            tool.code, input_data, timeout_s=self.execution_timeout
+        )
+
+        if outcome.success:
+            return outcome.result
+
+        if outcome.exit_reason == "timeout":
             raise ToolExecutionError(
                 f"Tool execution timed out after {self.execution_timeout}s"
             )
-        except Exception as e:
-            raise ToolExecutionError(f"Tool execution failed: {str(e)}")
 
-    def _build_execution_wrapper(self, tool: Tool, input_data: Any) -> str:
-        """
-        Build safe execution wrapper for tool code.
-
-        Wraps user code with:
-        - Import restrictions
-        - Input handling
-        - Output serialization
-        - Error handling
-
-        Args:
-            tool: Tool to wrap
-            input_data: Input data
-
-        Returns:
-            Complete Python code to execute
-        """
-        # Serialize input data
-        import json
-        input_json = json.dumps(input_data)
-
-        # Build wrapper
-        wrapper = f"""
-import json
-import sys
-
-# Allowed imports (security restriction)
-ALLOWED_IMPORTS = {self.allowed_imports}
-
-# Input data
-input_data = json.loads('{input_json}')
-
-# User tool code
-{tool.code}
-
-# Execute tool
-try:
-    if 'run' in dir():
-        # Tool has run() function
-        if isinstance(input_data, dict):
-            result = run(**input_data)
-        else:
-            result = run(input_data)
-    elif 'execute' in dir():
-        # Tool has execute() function
-        result = execute(input_data)
-    else:
-        raise Exception("Tool must define run() or execute() function")
-
-    # Output result
-    print("__RESULT__:", json.dumps(result))
-except Exception as e:
-    print("__ERROR__:", str(e), file=sys.stderr)
-    sys.exit(1)
-"""
-        return wrapper
-
-    def _run_in_subprocess(self, code: str) -> Any:
-        """
-        Run code in isolated subprocess.
-
-        Security:
-        - Separate process (isolated)
-        - Timeout enforcement
-        - No file system access (unless allowed)
-        - Capture stdout/stderr
-
-        Args:
-            code: Python code to execute
-
-        Returns:
-            Parsed result from execution
-
-        Raises:
-            ToolExecutionError: If execution fails
-        """
-        # Create temporary file for code
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-            f.write(code)
-            temp_file = f.name
-
-        try:
-            # Run in subprocess
-            result = subprocess.run(
-                ["python3", temp_file],
-                capture_output=True,
-                text=True,
-                timeout=self.execution_timeout,
-                # Security: limit resources
-                # Note: This doesn't fully sandbox - use Docker for production
-            )
-
-            # Check for errors
-            if result.returncode != 0:
-                error_msg = result.stderr or "Unknown error"
-                if "__ERROR__:" in error_msg:
-                    error_msg = error_msg.split("__ERROR__:")[1].strip()
-                raise ToolExecutionError(f"Execution error: {error_msg}")
-
-            # Parse result
-            stdout = result.stdout
-            if "__RESULT__:" in stdout:
-                result_json = stdout.split("__RESULT__:")[1].strip()
-                import json
-                return json.loads(result_json)
-            else:
-                # No structured result, return stdout
-                return {"output": stdout, "success": True}
-
-        finally:
-            # Clean up temp file
-            try:
-                os.unlink(temp_file)
-            except:
-                pass
+        raise ToolExecutionError(f"Tool execution failed: {outcome.error}")
 
     def extend_system_prompt(self, mind: "Mind") -> str:
         """Add tools context to system prompt."""
@@ -288,8 +179,10 @@ except Exception as e:
             "",
             "[Done] You can CREATE tools with Python code",
             "[Done] Tools ACTUALLY EXECUTE (real code execution!)",
-            "⚠️  Execution timeout: {self.execution_timeout}s",
-            f"⚠️  Allowed imports: {', '.join(self.allowed_imports)}",
+            f"⚠️  Execution timeout: {self.execution_timeout}s",
+            "⚠️  Execution is sandboxed: scrubbed environment, resource limits,",
+            "    no runtime package installation. File and network access are",
+            "    governed by the sandbox policy, not by an import allow-list.",
         ]
 
         if self.enable_marketplace:

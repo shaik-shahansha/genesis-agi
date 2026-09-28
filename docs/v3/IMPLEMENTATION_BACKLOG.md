@@ -14,7 +14,7 @@
 |---|---|
 | A — Repository discovery | `[x]` baseline docs written, tests/lint/types measured |
 | A — Single-container deployment | `[x]` built, running, 10/10 smoke checks pass |
-| B — Security containment | `[~]` **B7 (SEC-01) and B8 (SEC-02/SEC-14) done**; sandbox, policy, approval, audit outstanding |
+| B — Security containment | `[~]` **B7, B8, B1/B3/B4/B6/B10 done**; container isolation (B2b), full egress blocking (B5), MCP env scrubbing (B9), policy, approval and audit outstanding |
 | C–M | `[ ]` not started |
 
 ---
@@ -45,20 +45,21 @@ Visual or feature work must not start before this passes.
 ### B1–B3 · Sandboxing
 | ID | Task | Files | Gate | Status |
 |---|---|---|---|---|
-| B1 | Define `SandboxProvider` interface (`create/execute/upload/download/snapshot/restore/terminate`) + in-process fake for tests | `genesis/sandbox/base.py`, `genesis/sandbox/fake.py` | interface tests pass with no Docker | `[ ]` |
-| B2 | Implement the local container provider (non-root, read-only rootfs, single temp dir, cgroup CPU/mem/PID/disk limits, output cap, timeout, no host env/PID/net ns, no devices, no Docker socket) | `genesis/sandbox/container.py` | all limits enforced in tests | `[ ]` |
-| B3 | Route **all three** execution paths through the provider; forbid direct `subprocess` from API/web/cognition/scheduler | `genesis/core/code_executor.py`, `genesis/core/tools.py`, `genesis/plugins/tools.py` | grep shows no execution outside the provider; existing facade preserved | `[ ]` |
-| B4 | Disable runtime package installation; return a typed `CapabilityUnavailable` error; pre-bake tool images | `genesis/core/code_executor.py` | emitting an unknown import makes no network call to PyPI | `[ ]` |
-| B5 | Network **off** by default; allow-listed egress proxy when required | `genesis/sandbox/`, provider config | metadata/loopback/private-IP requests blocked and logged | `[ ]` |
-| B6 | Export only declared artifacts; terminate and clean up after every run | `genesis/sandbox/container.py` | no residual container/files after execution | `[ ]` |
+| B1 | Define `SandboxProvider` interface (`create/execute/upload/download/list_artifacts/snapshot/restore/terminate`) + in-process fake for tests | `genesis/sandbox/base.py`, `genesis/sandbox/fake.py` | interface tests pass with no Docker | ✅ **DONE** |
+| B2 | Implement the local container provider (non-root, read-only rootfs, single temp dir, cgroup CPU/mem/PID/disk limits, output cap, timeout, no host env/PID/net ns, no devices, no Docker socket) | — | all limits enforced in tests | ⚠️ **PARTIAL**: `LocalSandboxProvider` enforces env scrubbing, CPU/AS/FSIZE/NPROC limits, timeout, output caps, artifact control, no installs. **Filesystem/PID/network isolation NOT implemented** — that needs the container provider below |
+| B3 | Route **all three** execution paths through the provider; forbid direct `subprocess` from API/web/cognition/scheduler | `genesis/core/code_executor.py`, `genesis/core/tools.py`, `genesis/plugins/tools.py`, `genesis/sandbox/tool_runner.py` | architectural guard test passes | ✅ **DONE** |
+| B4 | Disable runtime package installation; return a typed `CapabilityUnavailable` error; pre-bake tool images | `genesis/sandbox/local.py`, `pyproject.toml` (`tools` extra), `Dockerfile` | emitting an unknown import makes no network call to PyPI | ✅ **DONE** (guard blocks install commands; caps pre-baked at build time) |
+| B5 | Network **off** by default; allow-listed egress proxy when required | `genesis/sandbox/` | metadata/loopback/private-IP requests blocked and logged | ⚠️ **PARTIAL**: policy defaults `network_enabled=False` and requires named domains, and `unshare -rn` is used when the kernel permits. Detected as unavailable in the current container, so egress is **not** actually blocked there — reported honestly via `capabilities()` |
+| B6 | Export only declared artifacts; terminate and clean up after every run | `genesis/sandbox/` | no residual container/files after execution | ✅ **DONE** |
+| **B2b** | **NEW**: implement `ContainerSandboxProvider` (gVisor/Kata-capable) in a dedicated sandbox-manager service, to supply filesystem, PID and network isolation | — | escape tests fail to escape | `[ ]` **NEW — the main remaining gap** |
 
 ### B7–B8 · Immediate critical fixes (independent of the sandbox)
 | ID | Task | Files | Gate | Status |
 |---|---|---|---|---|
 | B7 | **Fix SEC-01**: authenticate *before* `accept()`; derive identity from a verified token only; never trust `user_email`; bind notifications to the verified subject | `genesis/api/routes.py` (`websocket_chat`), `genesis/api/auth.py` | connect without a token is closed; spoofed email is ignored; 17 tests + container smoke check | ✅ **DONE** |
 | B8 | **Fix SEC-02**: reject absolute paths and traversal in workspace writes; canonicalise and assert containment; size cap; type allow-list | `genesis/core/paths.py` (new), `genesis/core/workspace.py`, `genesis/api/routes.py` | traversal/absolute/symlink/oversize attempts rejected; 32 unit tests + live verification | ✅ **DONE** (type allow-list still open) |
-| B9 | Scrub subprocess environments; introduce `SecretReference`; stop passing `os.environ` to MCP servers | `genesis/core/code_executor.py`, `genesis/integrations/mcp_integration.py` | a subprocess printing `os.environ` reveals no key | `[ ]` |
-| B10 | Remove the unenforced `ALLOWED_IMPORTS` claim (or enforce it in the sandbox) | `genesis/plugins/tools.py` | claim matches behaviour | `[ ]` |
+| B9 | Scrub subprocess environments; introduce `SecretReference`; stop passing `os.environ` to MCP servers | `genesis/core/code_executor.py`, `genesis/integrations/mcp_integration.py` | a subprocess printing `os.environ` reveals no key | ⚠️ **PARTIAL**: the sandbox now scrubs its environment (verified). **MCP servers still receive `os.environ`** — outstanding |
+| B10 | Remove the unenforced `ALLOWED_IMPORTS` claim (or enforce it in the sandbox) | `genesis/plugins/tools.py` | claim matches behaviour | ✅ **DONE** (claim and constant removed; asserted absent by test) |
 | B11 | Stop API-tier process spawning; move daemon lifecycle to a worker/supervisor | `genesis/api/routes.py`, `genesis/daemon.py` | API cannot signal arbitrary processes | `[ ]` |
 | B12 | Fail fast on default secrets; generate/document `API_SECRET_KEY`; rate-limit the token endpoint | `genesis/config/settings.py`, `genesis/api/auth.py`, `docker-compose.yml` | startup/config fails with default secret | `[~]` compose already enforces; app-level check outstanding |
 

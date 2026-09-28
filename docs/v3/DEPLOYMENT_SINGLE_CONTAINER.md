@@ -34,14 +34,18 @@ does not change them, and putting it on a public VPS makes them reachable.
 |---|---|---|
 | ~~**SEC-01 — unauthenticated WebSocket**~~ | ~~`ws /api/v1/minds/{id}/stream` accepted connections before any auth check.~~ | ✅ **FIXED.** The handshake now requires a valid credential and identity is derived server-side. Verified in-container: an unauthenticated handshake is refused with HTTP 403. |
 | ~~**SEC-02 — workspace path traversal**~~ | ~~Uploaded filenames were used unsanitised; artifact download had no auth and a prefix-match bypass.~~ | ✅ **FIXED.** Filenames validated, containment asserted on every filesystem operation, download now requires auth, uploads size-capped. Verified in-container: 9/9 escape attempts rejected. |
-| **SEC-03/04 — no real sandbox** | The Mind's code executor runs model-generated code in a subprocess **inside this container**, and can `pip install` at runtime. | **This is the remaining blocker.** The container is not a security boundary for generated code. Treat Mind autonomy as untrusted. |
+| ~~**SEC-04 — runtime `pip install`**~~ | ~~Imports found in model output could install arbitrary packages.~~ | ✅ **FIXED.** Installation removed and blocked; common libraries are pre-baked at build time via the `tools` extra. |
+| ~~**SEC-06 — fake import allow-list**~~ | ~~`ALLOWED_IMPORTS` was emitted into generated code but never enforced.~~ | ✅ **FIXED.** The claim and the constant were removed rather than faked. |
+| **SEC-03 — no filesystem/PID/network isolation** | Generated code now runs under a sandbox with a **scrubbed environment, CPU/memory/file/process limits, a wall-clock timeout, bounded output, no installs, and declared-artifact-only export** — but the local provider has **no filesystem, PID or network isolation**, and reports `is_security_boundary: False`. | **This is the remaining blocker.** Generated code can still read files the runtime user can read, and egress is not blocked where the kernel refuses `unshare`. Real containment needs the container provider (gVisor/Kata) in a dedicated sandbox-manager service. |
+| **SEC-05 — inherited environment (partial)** | Fixed for the sandbox (verified: provider API keys are invisible to sandboxed code). **MCP server subprocesses still receive `os.environ`.** | Do not configure untrusted MCP servers. |
 | **T-16 — default JWT secret** | The app ships a public default secret. | `docker-compose.yml` **refuses to start** unless `API_SECRET_KEY` is set. |
 | In-container generated code | Even restricted, generated code shares the container's network and filesystem with the API. | Run the executor as a separate container (`SandboxProvider`, Phase B) before allowing untrusted use. |
 
-**Bottom line:** the API surface is now authenticated and path-safe, but generated code still runs
-unsandboxed inside this container. Do not expose it to untrusted users until the sandbox work
-lands. For personal use on your own VPS, bind it to `127.0.0.1` behind a tunnel or restrict it with
-a firewall allow-list.
+**Bottom line:** the API surface is authenticated and path-safe, and untrusted code now runs under
+real resource, environment and output controls with no install primitive. But without filesystem,
+PID and network isolation it is still not safe to run untrusted code *from untrusted users*. Keep
+the port bound to `127.0.0.1` behind a tunnel, or restrict it with a firewall allow-list, until the
+container provider lands.
 
 ---
 
@@ -223,7 +227,9 @@ needed for that.
 | `docker-compose.yml` | Single-service deployment, `/data` volume, healthcheck, log caps |
 | `deploy/docker/entrypoint.sh` | Supervisor: starts/supervises all processes, runs migrations |
 | `deploy/docker/nginx.conf` | One front door; WebSocket upgrade handling; no response buffering |
-| `deploy/docker/smoke_test.py` | 9-check deployment verification (works from host or inside the container) |
+| `deploy/docker/smoke_test.py` | 10-check deployment verification (works from host or inside the container) |
+| `deploy/docker/verify_sec02.py` | Replays live path-traversal and unauthenticated-download attempts |
+| `deploy/docker/verify_sandbox.py` | 8-check sandbox verification: secrets invisible, install refused, timeout and output caps, artifact control, pre-baked libraries |
 | `.dockerignore` | Keeps the build context small; excludes local state and secrets |
 | `deploy/docker/docker-compose.split.yml` | The previous redis+api setup, preserved for reference |
 
