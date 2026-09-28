@@ -96,20 +96,37 @@ export async function loginWithPassword(
 }
 
 /**
+ * How long to wait for the API to confirm a session before giving up.
+ *
+ * Without a bound, an API that accepts the connection and then never answers
+ * leaves every guarded page on the "Checking your session…" spinner forever —
+ * no error, no retry, no way forward, and no clue that the API is the problem
+ * rather than the browser. A timeout turns that into an ordinary failure.
+ */
+const SESSION_CHECK_TIMEOUT_MS = 8000;
+
+/**
  * Validate the stored token and fetch the identity it belongs to.
  *
- * Returns `null` when there is no token, or when the API rejects it. A network
- * failure also returns `null` rather than throwing: the caller treats an
- * unverifiable session as no session, which is the fail-closed direction for a
- * UI that decides whether to show protected data.
+ * Returns `null` when there is no token, when the API rejects it, or when the
+ * check cannot complete. A network failure also returns `null` rather than
+ * throwing: the caller treats an unverifiable session as no session, which is
+ * the fail-closed direction for a UI that decides whether to show protected
+ * data. The cost of that choice is that a transient outage signs the user out,
+ * which is the right trade only because the alternative is showing data on the
+ * strength of an unverified token.
  */
 export async function loadSessionUser(): Promise<SessionUser | null> {
   const token = getSessionToken();
   if (!token) return null;
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SESSION_CHECK_TIMEOUT_MS);
+
   try {
     const response = await fetch(apiUrl('/api/v1/auth/me'), {
       headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     });
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) clearSession();
@@ -125,5 +142,7 @@ export async function loadSessionUser(): Promise<SessionUser | null> {
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }

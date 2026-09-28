@@ -535,6 +535,22 @@
     @apply relative overflow-hidden rounded-md;
     background-color: rgb(var(--surface-3));
   }
+
+  /* --- Scrollable strips -------------------------------------------------
+     A tab or chip row that overflows needs to scroll, but the default
+     scrollbar on Windows is 17px tall and reads as a grey bar sitting under
+     the tabs - it looks like a broken progress indicator. Hiding it is safe
+     here because the strip is navigated by click, and on a trackpad or with
+     shift+wheel the overflow is still reachable. A visible affordance is
+     preserved by the partially-cut-off tab at the edge. */
+  .scroll-strip {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scroll-strip::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* --------------------------------------------------------------------------

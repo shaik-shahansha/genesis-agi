@@ -19,6 +19,13 @@ from genesis.database.models import (
     GenTransaction,
 )
 
+# The value `Mind.__init__` uses when no creator is supplied. It is also what was
+# written to `MindRecord.creator` by the creation path before it started taking
+# the identifier from the authenticated request. Named here because two places
+# need to agree on it: the repair in `register_mind`, and the access check in
+# `is_user_allowed_for_mind`.
+PLACEHOLDER_CREATOR = "anonymous"
+
 
 class MetaverseDB:
     """
@@ -62,6 +69,18 @@ class MetaverseDB:
             # If mind already exists, return existing one
             existing = session.query(MindRecord).filter_by(gmid=gmid).first()
             if existing:
+                # Repair a placeholder creator. Minds registered before the
+                # creation path started recording the authenticated user have
+                # `creator == "anonymous"`, which made them permanently
+                # inaccessible to the person who made them: ownership is checked
+                # against this column. Once a real identifier is known, adopt it.
+                #
+                # Only the placeholder is replaced, and only by a non-placeholder,
+                # so this cannot reassign a Mind that already has a real owner.
+                if existing.creator in (None, "", PLACEHOLDER_CREATOR) and creator not in (None, "", PLACEHOLDER_CREATOR):
+                    existing.creator = creator
+                    session.commit()
+
                 session.refresh(existing)
                 session.expunge(existing)
                 return existing
@@ -89,6 +108,37 @@ class MetaverseDB:
             session.refresh(mind)
             session.expunge(mind)
             return mind
+
+    def reconcile_mind_creator(self, gmid: str, creator: Optional[str]) -> bool:
+        """Replace a placeholder creator on an existing record.
+
+        Minds registered before the creation path took its identifier from the
+        authenticated request have ``creator == "anonymous"``. Ownership is
+        checked against that column, so those Minds were inaccessible to the
+        person who created them - a 403 on their own Mind, with nothing in the
+        response explaining why.
+
+        The Mind's own identity file does carry the real address, so it can be
+        adopted the next time the Mind is loaded. Returns whether a repair was
+        made.
+
+        Only the placeholder is replaced, and only by a real value. A record
+        that already names an owner is never touched, so this cannot be used to
+        take over an existing Mind.
+        """
+        if not creator or creator == PLACEHOLDER_CREATOR:
+            return False
+
+        with get_session() as session:
+            mind = session.query(MindRecord).filter_by(gmid=gmid).first()
+            if not mind:
+                return False
+            if mind.creator not in (None, "", PLACEHOLDER_CREATOR):
+                return False
+
+            mind.creator = creator
+            session.commit()
+            return True
 
     def get_mind(self, gmid: str) -> Optional[MindRecord]:
         """Get Mind by GMID."""
@@ -228,8 +278,11 @@ class MetaverseDB:
             if user_identifier and session.query(GlobalAdmin).filter_by(email=user_identifier).first():
                 return True
 
-            # Creator match
-            if mind.creator == user_identifier:
+            # Creator match. `creator` is the identifier written at registration.
+            # Minds registered before the creation path recorded the
+            # authenticated user carry the placeholder instead, so a placeholder
+            # is never treated as a match - otherwise anyone could claim them.
+            if user_identifier and mind.creator == user_identifier:
                 return True
 
             # Public flag

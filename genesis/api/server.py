@@ -92,9 +92,26 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Add CORS middleware with preflight caching
+    #
+    # An empty allowlist is a legitimate configuration (the single-container
+    # deployment serves the API and the web app from one origin, so the browser
+    # never makes a cross-origin request). It is also exactly what a
+    # misconfiguration looks like, and the browser's only symptom is a preflight
+    # 400 with no explanation - every request fails while `curl` keeps working,
+    # which sends people looking at auth instead of at CORS. So: say it out loud.
+    cors_origins = settings.cors_origins_list
+    if not cors_origins:
+        logger.warning(
+            "CORS_ORIGINS is empty, so no cross-origin request will be accepted. "
+            "This is correct when the web app is served from the same origin as the API "
+            "(the single-container deployment). It is wrong if you run the playground dev "
+            "server on another port or host the web app separately - set CORS_ORIGINS to "
+            "that origin, e.g. CORS_ORIGINS=http://localhost:3100."
+        )
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

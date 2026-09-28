@@ -68,3 +68,4 @@ htmlcov/
 
 # MyPy
 .mypy_cache/
+web-playground/tsconfig.tsbuildinfo

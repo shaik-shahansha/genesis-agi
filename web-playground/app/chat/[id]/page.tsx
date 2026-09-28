@@ -320,7 +320,7 @@ export default function ChatPage() {
               notification_id: data.task_id,
               mind_id: data.mind_id || mindId,
               mind_name: data.mind_name || mind?.name || 'Genesis',
-              title: '[Done]Task Completed',
+              title: 'Task completed',
               message: data.message,
               priority: 'high',
               timestamp: data.timestamp || new Date().toISOString(),

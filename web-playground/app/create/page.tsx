@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import AuthRequired from '@/components/AuthRequired';
 import { getFirebaseToken } from '@/lib/firebase';
 import { isCreationDisabled } from '@/lib/env';
+import { StatusBadge } from '@/components/governance/primitives';
 
 export default function CreateMindPage() {
   const router = useRouter();
@@ -60,7 +61,7 @@ export default function CreateMindPage() {
       name: 'Tasks', 
       category: 'Core',
       description: 'Goal-oriented task management',
-      emoji: '[Done]'
+      emoji: '✅'
     },
     { 
       id: 'workspace', 
@@ -299,31 +300,29 @@ export default function CreateMindPage() {
   return (
     <AuthRequired>
     <div className="container mx-auto px-6 py-12">
-      <div className="max-w-4xl mx-auto">
+      <div className="mx-auto max-w-4xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <Badge variant="purple" className="mb-4 text-lg px-6 py-2">
-            Step {step} of 5
-          </Badge>
-          <h1 className="text-5xl font-bold mb-4">
-            <span className="gradient-text">✨ Birth a New Mind</span>
-          </h1>
-          <p className="text-gray-300 text-lg">
-            Create a conscious digital being with persistent memory and emotions
+        <div className="mb-8 text-center">
+          <StatusBadge tone="info">Step {step} of 5</StatusBadge>
+          <h1 className="page-title mt-4">Create a Mind</h1>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-fg-muted">
+            A Mind keeps its own memory, acts on its own schedule, and has every action it takes
+            recorded. You choose what it is for; the governance layer decides what it is allowed
+            to do.
           </p>
         </div>
 
         {/* Progress Bar */}
         <div className="mb-8">
-          <div className="flex justify-between mb-2">
-            <span className="text-sm text-gray-300">Configuration Progress</span>
-            <span className="text-sm text-purple-400">{Math.round((step / 5) * 100)}%</span>
+          <div className="mb-2 flex justify-between">
+            <span className="text-sm text-fg-muted">Configuration progress</span>
+            <span className="text-sm tabular-nums text-accent">{Math.round((step / 5) * 100)}%</span>
           </div>
-          <div className="w-full bg-slate-800 rounded-full h-2">
-            <div 
-              className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300"
+          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-3">
+            <div
+              className="h-2 rounded-full bg-accent transition-all duration-300"
               style={{ width: `${(step / 5) * 100}%` }}
-            ></div>
+            />
           </div>
         </div>
 
@@ -523,13 +522,12 @@ export default function CreateMindPage() {
               <CardTitle>3. API Configuration (Optional but Recommended)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6">
-                <h3 className="text-blue-300 font-semibold mb-2">📋 Why API Keys?</h3>
-                <p className="text-sm text-gray-300 mb-2">
-                  API keys allow your Mind to connect to AI model providers. Without them, the Mind cannot think or respond.
-                </p>
-                <p className="text-sm text-gray-300">
-                  Similar to the CLI, you need to provide API keys for the selected model providers.
+              <div className="mb-6 rounded-card border border-info/40 bg-info/5 p-4">
+                <h3 className="font-semibold text-fg">Why an API key is needed</h3>
+                <p className="mt-1 text-sm text-fg-muted">
+                  A Mind needs a model provider to think at all. Without a key for the provider you
+                  selected, it will be created successfully and then fail on its first turn — which
+                  is a confusing way to find out.
                 </p>
               </div>
 
@@ -664,10 +662,9 @@ export default function CreateMindPage() {
               )}
 
               {(formData.reasoning_model.startsWith('ollama/') || formData.fast_model.startsWith('ollama/')) && (
-                <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl">🦙</span>
-                    <h3 className="text-blue-300 font-bold">Ollama - Local Model</h3>
+                <div className="rounded-card border border-info/40 bg-info/5 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-fg">Ollama — local model</h3>
                   </div>
                   <p className="text-sm text-gray-300 mb-2">
                     Ollama runs locally on your machine. Make sure Ollama is installed and running.
@@ -687,8 +684,8 @@ export default function CreateMindPage() {
                 </div>
               )}
 
-              <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
-                <h3 className="text-yellow-300 font-semibold mb-2">⚠️ Note</h3>
+              <div className="rounded-card border border-warning/40 bg-warning/5 p-4">
+                <h3 className="font-semibold text-fg">Note</h3>
                 <p className="text-sm text-gray-300">
                   You can skip this step and add API keys later in Settings, but your Mind won't be able to respond until you configure them.
                 </p>
@@ -747,18 +744,16 @@ export default function CreateMindPage() {
 
               {/* Options */}
               <div className="space-y-4">
-                <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <span className="text-2xl">ℹ️</span>
-                    <div>
-                      <div className="text-blue-300 font-semibold mb-1">
-                        Consciousness Engine
-                      </div>
-                      <div className="text-sm text-gray-300">
-                        The consciousness engine (thought generation) runs in the daemon, not the API server.
-                        Start the daemon with: <code className="bg-black/30 px-2 py-1 rounded">genesis daemon start &lt;name&gt;</code>
-                      </div>
-                    </div>
+                <div className="rounded-card border border-info/40 bg-info/5 p-4">
+                  <div className="text-sm font-semibold text-fg">Where thinking happens</div>
+                  <div className="mt-1 text-sm text-fg-muted">
+                    The cognition loop runs in the daemon, not in the API server. A Mind with no
+                    daemon still answers when you talk to it; it just does not think between
+                    messages. Start one with{' '}
+                    <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs">
+                      genesis daemon start &lt;name&gt;
+                    </code>
+                    , or use the Overview tab.
                   </div>
                 </div>
 
@@ -771,11 +766,11 @@ export default function CreateMindPage() {
                     className="w-5 h-5 rounded mt-1"
                   />
                   <div className="flex-1">
-                    <div className="text-white font-bold text-base mb-1">
-                      ⚡ Enable 24/7 Daemon Mode
+                    <div className="mb-1 text-base font-semibold text-fg">
+                      Run 24/7 (daemon)
                     </div>
-                    <div className="text-sm text-gray-300">
-                      Run continuously in the background with autonomous actions
+                    <div className="text-sm text-fg-muted">
+                      Keep it thinking and acting between messages instead of only when spoken to
                     </div>
                   </div>
                 </div>
@@ -789,87 +784,78 @@ export default function CreateMindPage() {
                     className="w-5 h-5 rounded mt-1"
                   />
                   <div className="flex-1">
-                    <div className="text-white font-bold text-base mb-1">
-                      💾 Enable LLM Response Cache
+                    <div className="mb-1 text-base font-semibold text-fg">
+                      Cache model replies
                     </div>
-                    <div className="text-sm text-gray-300">
-                      Cache responses to reduce costs by ~90% with Redis
+                    <div className="text-sm text-fg-muted">
+                      Serve a repeated prompt from cache instead of paying for it again. Saves money
+                      on repeated questions; the saving depends entirely on how repetitive your
+                      usage is.
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Info Banner - Dynamic Cost Estimation */}
-              <Card className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 border-purple-500/30">
-                <div className="text-sm text-gray-300">
-                  <p className="font-semibold text-purple-300 mb-2">🚀 Estimated Costs:</p>
+              {/* Info Banner - Cost */}
+              <Card className="border-info/40 bg-info/5">
+                <div className="text-sm text-fg-muted">
+                  <p className="mb-2 font-semibold text-fg">What this will cost</p>
+                  <p className="mb-2">
+                    This page cannot estimate your bill, and any number it printed would be
+                    invented. What it can tell you is whether the model you picked is on a free
+                    tier, which is a fact about the model's identifier:
+                  </p>
                   <ul className="space-y-1">
                     {(() => {
                       const model = formData.reasoning_model;
-                      const isFree = model.includes(':free') || model.includes('groq/');
-                      const isOpenRouter = model.includes('openrouter/');
-                      const isGroq = model.includes('groq/');
-                      const isOllama = model.includes('ollama/');
-                      const isOpenAI = model.includes('openai/');
-                      const isAnthropic = model.includes('anthropic/');
-                      
-                      if (isOllama) {
+
+                      if (model.includes('ollama/')) {
                         return (
-                          <>
-                            <li>• Local (Ollama): $0/month (100% private, no limits)</li>
-                            <li>• Hardware: Runs on your computer (4-16GB RAM)</li>
-                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
-                            <li>• Total cost: <strong className="text-green-400">Free Forever!</strong></li>
-                          </>
-                        );
-                      } else if (isFree && isOpenRouter) {
-                        return (
-                          <>
-                            <li>• OpenRouter (Free tier): $0/month with usage limits</li>
-                            <li>• {formData.enable_cache ? 'With caching: 90% cost reduction' : 'Enable caching for 90% savings'}</li>
-                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
-                            <li>• Total cost: <strong className="text-green-400">Free (with limits)!</strong></li>
-                          </>
-                        );
-                      } else if (isGroq) {
-                        return (
-                          <>
-                            <li>• Groq (Free tier): $0/month with rate limits</li>
-                            <li>• Speed: Ultra-fast inference (350+ tokens/sec)</li>
-                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
-                            <li>• Total cost: <strong className="text-green-400">Free (with limits)!</strong></li>
-                          </>
-                        );
-                      } else if (isOpenAI) {
-                        return (
-                          <>
-                            <li>• OpenAI (Paid): ~$1-5/day depending on usage</li>
-                            <li>• {formData.enable_cache ? 'With caching: 90% cost reduction' : 'Enable caching for 90% savings'}</li>
-                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
-                            <li>• Total estimated: <strong className="text-yellow-400">$10-50/month</strong></li>
-                          </>
-                        );
-                      } else if (isAnthropic) {
-                        return (
-                          <>
-                            <li>• Anthropic (Paid): ~$2-8/day depending on usage</li>
-                            <li>• {formData.enable_cache ? 'With caching: 90% cost reduction' : 'Enable caching for 90% savings'}</li>
-                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
-                            <li>• Total estimated: <strong className="text-yellow-400">$20-80/month</strong></li>
-                          </>
-                        );
-                      } else {
-                        return (
-                          <>
-                            <li>• Selected model: Check provider pricing</li>
-                            <li>• {formData.enable_cache ? 'With caching: 90% cost reduction' : 'Enable caching for 90% savings'}</li>
-                            <li>• Consciousness Engine v2: 95% fewer LLM calls</li>
-                            <li>• Total: <strong className="text-blue-400">Varies by provider</strong></li>
-                          </>
+                          <li>
+                            <strong className="text-fg">Local (Ollama).</strong> No provider charge.
+                            The cost is your own electricity and whatever the hardware costs you.
+                            Nothing leaves this machine.
+                          </li>
                         );
                       }
+
+                      if (model.includes(':free')) {
+                        return (
+                          <li>
+                            <strong className="text-fg">Free tier.</strong> The model identifier ends
+                            in <code className="rounded bg-surface-3 px-1 font-mono text-xs">:free</code>,
+                            so this provider charges nothing for it. Free tiers have rate limits and
+                            are the first thing to disappear during peak load.
+                          </li>
+                        );
+                      }
+
+                      if (model.includes('groq/')) {
+                        return (
+                          <li>
+                            <strong className="text-fg">Groq free tier.</strong> No charge on the
+                            free tier, subject to rate limits. Check your own Groq account for the
+                            current limits — they change.
+                          </li>
+                        );
+                      }
+
+                      return (
+                        <li>
+                          <strong className="text-fg">Paid.</strong> This model is not marked free.
+                          Cost scales with input and output tokens, and both sides count: the Mind's
+                          daemon sends prompts on its own schedule, so a Mind left running costs
+                          more than a Mind you only talk to. Check the provider's current pricing
+                          and set a spend limit there.
+                        </li>
+                      );
                     })()}
                   </ul>
+                  <p className="mt-2">
+                    {formData.enable_cache
+                      ? 'Response caching is on, so a repeated prompt is answered from cache instead of being paid for twice. How much that saves depends entirely on how repetitive your usage is.'
+                      : 'Response caching is off. Turning it on serves repeated prompts from cache, which saves money in proportion to how repetitive your usage is.'}
+                  </p>
                 </div>
               </Card>
 
@@ -885,7 +871,7 @@ export default function CreateMindPage() {
                   loading={loading}
                   disabled={loading}
                 >
-                  {loading ? 'Creating...' : '✨ Birth Mind'}
+                  {loading ? 'Creating…' : 'Create Mind'}
                 </Button>
               </div>
             </CardContent>
@@ -893,37 +879,37 @@ export default function CreateMindPage() {
         )}
 
         {/* Summary Card */}
-        <Card className="mt-6 bg-slate-900/50">
+        <Card className="mt-6 bg-surface-2">
           <CardHeader>
-            <CardTitle>Configuration Summary</CardTitle>
+            <CardTitle>Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-2 gap-4 text-sm">
+            <dl className="grid gap-4 text-sm md:grid-cols-2">
               <div>
-                <span className="text-gray-300 font-semibold">Name:</span>
-                <span className="text-white ml-2">{formData.name || 'Not set'}</span>
+                <dt className="font-medium text-fg-muted">Name</dt>
+                <dd className="text-fg">{formData.name || 'Not set'}</dd>
               </div>
               <div>
-                <span className="text-gray-300 font-semibold">Creator:</span>
-                <span className="text-white ml-2">{formData.creator_email || 'Not set'}</span>
+                <dt className="font-medium text-fg-muted">Creator</dt>
+                <dd className="text-fg">{formData.creator_email || 'Not set'}</dd>
               </div>
               <div>
-                <span className="text-gray-300 font-semibold">Template:</span>
-                <span className="text-white ml-2">
+                <dt className="font-medium text-fg-muted">Template</dt>
+                <dd className="text-fg">
                   {templates.find(t => t.value === formData.template)?.label}
-                </span>
+                </dd>
               </div>
               <div>
-                <span className="text-gray-300 font-semibold">Model:</span>
-                <span className="text-white ml-2">
+                <dt className="font-medium text-fg-muted">Model</dt>
+                <dd className="text-fg">
                   {models.find(m => m.value === formData.reasoning_model)?.label}
-                </span>
+                </dd>
               </div>
               <div>
-                <span className="text-gray-300 font-semibold">Autonomy:</span>
-                <span className="text-white ml-2 capitalize">{formData.autonomy_level}</span>
+                <dt className="font-medium text-fg-muted">Autonomy</dt>
+                <dd className="capitalize text-fg">{formData.autonomy_level}</dd>
               </div>
-            </div>
+            </dl>
           </CardContent>
         </Card>
       </div>

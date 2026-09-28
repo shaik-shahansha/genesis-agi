@@ -647,6 +647,15 @@ async def create_mind(
     # Birth the Mind
     try:
         # NOTE: Never start consciousness in API server - it should run in daemon
+        #
+        # `creator` is taken from the verified token, not from the request body.
+        # It previously defaulted to the literal string "anonymous", which was
+        # then written to MindRecord.creator - the column `is_user_allowed_for_mind`
+        # checks. The result was that the person who had just created a Mind was
+        # denied access to it, with a 403 and no explanation. The identity that
+        # owns a Mind has to come from the credential, because a client-supplied
+        # field would let anyone claim ownership.
+        creator_identifier = current_user.email or current_user.username
         mind = Mind.birth(
             name=request.name,
             intelligence=intelligence,
@@ -654,7 +663,8 @@ async def create_mind(
             template=request.template,
             start_consciousness=False,  # Always False - consciousness runs in daemon
             config=mind_config,
-            creator_email=request.creator_email,
+            creator=creator_identifier,
+            creator_email=request.creator_email or current_user.email,
             purpose=request.purpose,
             role=request.role,
             guidance_notes=request.guidance_notes,
@@ -4015,6 +4025,26 @@ async def _load_mind(mind_id: str) -> Mind:
                                 print(f"[DEBUG] Synced is_public from database: {db_is_public}")
                         except Exception as sync_error:
                             print(f"[WARNING] Could not sync is_public from database: {sync_error}")
+
+                        # Repair a placeholder owner. Minds registered by an
+                        # older build recorded the literal "anonymous" as their
+                        # creator, which is the column the access check reads -
+                        # so the creator of such a Mind got a 403 on it. The
+                        # identity file knows the real address; adopt it once.
+                        try:
+                            identity_creator = (
+                                getattr(loaded_mind.identity, 'creator_email', None)
+                                or loaded_mind.identity.creator
+                            )
+                            if metaverse_db.reconcile_mind_creator(
+                                loaded_mind.identity.gmid, identity_creator
+                            ):
+                                print(
+                                    f"[INFO] Repaired creator for "
+                                    f"{loaded_mind.identity.gmid}"
+                                )
+                        except Exception as repair_error:
+                            print(f"[WARNING] Could not repair mind creator: {repair_error}")
                 except Exception as reg_error:
                     print(f"[ERROR] Could not register mind in database: {reg_error}")
                     import traceback

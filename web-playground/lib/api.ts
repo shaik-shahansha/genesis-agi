@@ -3,6 +3,7 @@
  */
 
 import { getFirebaseToken } from './firebase';
+import { getSessionToken } from './session';
 import { buildWebSocketUrl } from './urls';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
@@ -36,6 +37,10 @@ export class GenesisAPI {
 
   clearToken() {
     this.token = null;
+    // Drop cached responses too. The cache key is method+path with no identity
+    // in it, so anything still in flight when a user signs out would otherwise
+    // be served to whoever signs in next within the 2s deduplication window.
+    this.requestCache.clear();
     if (typeof window !== 'undefined') {
       localStorage.removeItem('genesis_token');
       localStorage.removeItem('genesis_firebase_token');
@@ -63,10 +68,17 @@ export class GenesisAPI {
       ...options.headers,
     };
 
-    // Try to get Firebase token first, then fall back to legacy token
+    // Try to get Firebase token first, then fall back to legacy token.
+    //
+    // The stored token is read HERE, not only in the constructor. `api` is a
+    // module-level singleton, so its constructor runs on first import - which is
+    // before anyone has signed in. Reading localStorage only there meant that a
+    // built-in JWT login stored the token successfully and then every subsequent
+    // request was still unauthenticated: the sign-in appeared to work and the
+    // next page 401'd. The credential has to be resolved per request.
     const firebaseToken = await getFirebaseToken();
-    const authToken = firebaseToken || this.token;
-    
+    const authToken = firebaseToken || this.token || getSessionToken();
+
     if (authToken) {
       headers['Authorization'] = `Bearer ${authToken}`;
     }

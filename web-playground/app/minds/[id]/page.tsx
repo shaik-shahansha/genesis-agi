@@ -167,7 +167,7 @@ export default function MindDetailPage() {
       />
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-        <nav className="mb-6 -mx-1 flex gap-1 overflow-x-auto border-b border-line pb-px">
+        <nav className="scroll-strip mb-6 -mx-1 flex gap-1 overflow-x-auto border-b border-line pb-px">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
             return (

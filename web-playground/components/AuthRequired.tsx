@@ -19,36 +19,64 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSessionToken, loadSessionUser, type SessionUser } from '@/lib/session';
 
+/**
+ * Whether we know, yet, that this visitor is signed in.
+ *
+ * This is a three-state value rather than two booleans, and that is the whole
+ * point. The previous version kept `checkingSession` and `session` separately,
+ * started the check in one effect and redirected in a second effect. Both
+ * effects run in the same commit, so the redirect effect read
+ * `checkingSession === false` from the render *before* the check had begun and
+ * pushed to `/login` immediately - racing the fetch, which was then aborted.
+ * The visible symptom was a signed-in user being unable to open any guarded
+ * page: the redirect fired every time, and because the request was cancelled
+ * there was not even a failed request to look at.
+ *
+ * Starting at `checking` and only ever leaving it inside the effect removes the
+ * race by construction: there is no render in which "not authenticated" is
+ * concluded before the question has actually been asked.
+ */
+type Status = 'checking' | 'authenticated' | 'anonymous';
+
 export default function AuthRequired({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [checkingSession, setCheckingSession] = useState(false);
   const [session, setSession] = useState<SessionUser | null>(null);
+  const [status, setStatus] = useState<Status>('checking');
 
   useEffect(() => {
-    if (loading || user) return;
+    // Still resolving Firebase; we know nothing yet and must keep waiting.
+    if (loading) return;
 
-    // No Firebase user: fall back to the built-in token, if one is stored.
-    if (!getSessionToken()) return;
+    // A Firebase user is sufficient on its own.
+    if (user) {
+      setStatus('authenticated');
+      return;
+    }
+
+    if (!getSessionToken()) {
+      setStatus('anonymous');
+      return;
+    }
 
     let cancelled = false;
-    setCheckingSession(true);
+    setStatus('checking');
     loadSessionUser().then((resolved) => {
       if (cancelled) return;
       setSession(resolved);
-      setCheckingSession(false);
+      setStatus(resolved ? 'authenticated' : 'anonymous');
     });
+
     return () => {
       cancelled = true;
     };
   }, [loading, user]);
 
   useEffect(() => {
-    if (loading || checkingSession) return;
-    if (!user && !session) router.push('/login');
-  }, [user, session, loading, checkingSession, router]);
+    if (status === 'anonymous') router.push('/login');
+  }, [status, router]);
 
-  if (loading || checkingSession) {
+  if (status === 'checking') {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -59,7 +87,7 @@ export default function AuthRequired({ children }: { children: React.ReactNode }
     );
   }
 
-  if (!user && !session) {
+  if (status === 'anonymous') {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-6">
         <div className="max-w-md text-center">

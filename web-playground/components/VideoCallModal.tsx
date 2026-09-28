@@ -94,7 +94,7 @@ export default function VideoCallModal({
     if (callState === 'calling') {
       const timeout = setTimeout(() => {
         setCallState('connected');
-        console.log('[Done]Call connected!');
+        console.log('[video] call connected');
       }, 2000);
       return () => clearTimeout(timeout);
     }
@@ -121,7 +121,7 @@ export default function VideoCallModal({
       console.log('📹 Setting video source in useEffect...');
       localVideoRef.current.srcObject = localStream;
       localVideoRef.current.play().then(() => {
-        console.log('[Done]Video playing from effect');
+        console.log('[video] playing from effect');
       }).catch((err) => {
         console.error('❌ Video play error from effect:', err);
       });
@@ -152,7 +152,7 @@ export default function VideoCallModal({
         throw new Error(error);
       }
 
-      console.log('[Done]MediaDevices API available');
+      console.log('[video] MediaDevices API available');
 
       const constraints = {
         audio: {
@@ -170,7 +170,7 @@ export default function VideoCallModal({
       console.log('📞 Requesting getUserMedia with constraints:', constraints);
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
-      console.log('[Done]Media stream obtained:', {
+      console.log('[video] media stream obtained:', {
         id: stream.id,
         active: stream.active,
         audioTracks: stream.getAudioTracks().length,
@@ -205,14 +205,14 @@ export default function VideoCallModal({
         localVideoRef.current.srcObject = stream;
         try {
           await localVideoRef.current.play();
-          console.log('[Done]Video element playing');
+          console.log('[video] element playing');
         } catch (playError) {
           console.error('❌ Video play error:', playError);
         }
       }
 
       if (callType === 'audio') {
-        console.log('[Done]Audio call ready, microphone active');
+        console.log('[video] audio call ready, microphone active');
       }
 
       setMediaError(null);

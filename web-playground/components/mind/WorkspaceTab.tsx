@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
+import {
+  EmptyState,
+  LoadingRows,
+  Section,
+  StatusBadge,
+} from '@/components/governance/primitives';
+import { TrashIcon } from '@/components/shell/icons';
 
 interface WorkspaceTabProps {
   mindId: string;
@@ -131,29 +138,16 @@ export default function WorkspaceTab({ mindId }: WorkspaceTabProps) {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
-  const getFileIcon = (fileType: string): string => {
-    const icons: Record<string, string> = {
-      'text': '📄',
-      'code': '💻',
-      'data': '📊',
-      'image': '🖼️',
-      'document': '📑',
-      'pdf': '📕',
-      'xlsx': '📗',
-      'csv': '📊',
-    };
-    return icons[fileType] || '📄';
-  };
-
   const displayFiles = searchResults !== null ? searchResults : files;
 
   return (
     <div className="space-y-6">
       {/* Upload Section */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">📤 Upload Files</h3>
-        
-        <div className="space-y-4">
+      <Section
+        title="Upload"
+        description="Files are parsed, embedded and indexed, so the Mind can retrieve them by meaning later."
+      >
+        <div className="card space-y-4">
           <input
             ref={fileInputRef}
             type="file"
@@ -162,172 +156,200 @@ export default function WorkspaceTab({ mindId }: WorkspaceTabProps) {
             className="hidden"
             id="file-upload"
           />
-          
-          <div className="flex gap-2">
-            <label
-              htmlFor="file-upload"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition"
-            >
-              Choose Files
+
+          <div className="flex flex-wrap gap-2">
+            <label htmlFor="file-upload" className="btn-secondary cursor-pointer">
+              Choose files
             </label>
-            
+
             {selectedFiles.length > 0 && (
               <button
+                type="button"
                 onClick={handleUpload}
                 disabled={uploading}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="btn-primary"
               >
-                {uploading ? 'Uploading...' : `Upload ${selectedFiles.length} file(s)`}
+                {uploading
+                  ? 'Uploading…'
+                  : `Upload ${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'}`}
               </button>
             )}
           </div>
 
-          {/* Selected Files Preview */}
           {selectedFiles.length > 0 && (
-            <div className="space-y-2">
+            <ul className="space-y-2">
               {selectedFiles.map((file, index) => (
-                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                  <span className="text-sm text-gray-700">
-                    {file.name} ({formatFileSize(file.size)})
+                <li
+                  key={`${file.name}-${index}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-2 p-2"
+                >
+                  <span className="min-w-0 truncate text-sm text-fg">
+                    {file.name}{' '}
+                    <span className="text-fg-subtle">({formatFileSize(file.size)})</span>
                   </span>
                   {uploadProgress[file.name] !== undefined && (
-                    <span className="text-sm">
-                      {uploadProgress[file.name] ? '✅' : '⏳'}
-                    </span>
+                    <StatusBadge tone={uploadProgress[file.name] ? 'success' : 'warning'}>
+                      {uploadProgress[file.name] ? 'Uploaded' : 'Pending'}
+                    </StatusBadge>
                   )}
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-
-          <p className="text-xs text-gray-500">
-            💡 Files are automatically processed, embedded, and indexed for semantic search
-          </p>
         </div>
-      </div>
+      </Section>
 
       {/* Search Section */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">🔍 Search Files</h3>
-        
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search by content, description, or filename..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleSearch}
-            disabled={!searchQuery.trim()}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            Search
-          </button>
-          {searchResults !== null && (
+      <Section
+        title="Search"
+        description="Search by meaning, not just by filename — matches come from the embedded content."
+      >
+        <div className="card">
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="Search by content, description or filename…"
+              className="input min-w-0 flex-1"
+              aria-label="Search workspace files"
+            />
             <button
-              onClick={clearSearch}
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+              type="button"
+              onClick={handleSearch}
+              disabled={!searchQuery.trim()}
+              className="btn-primary"
             >
-              Clear
+              Search
             </button>
+            {searchResults !== null && (
+              <button type="button" onClick={clearSearch} className="btn-secondary">
+                Clear
+              </button>
+            )}
+          </div>
+
+          {searchResults !== null && (
+            <p className="mt-3 rounded-lg border border-info/40 bg-info/5 px-3 py-2 text-sm text-fg-muted">
+              {searchResults.length} {searchResults.length === 1 ? 'file' : 'files'} matched{' '}
+              <span className="font-medium text-fg">“{searchQuery}”</span>
+            </p>
           )}
         </div>
-
-        {searchResults !== null && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-            <p className="text-sm text-blue-900">
-              Found {searchResults.length} file(s) matching "{searchQuery}"
-            </p>
-          </div>
-        )}
-      </div>
+      </Section>
 
       {/* Files List */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          📁 {searchResults !== null ? 'Search Results' : 'All Files'} ({displayFiles.length})
-        </h3>
-
+      <Section title={`${searchResults !== null ? 'Search results' : 'Files'} (${displayFiles.length})`}>
         {loading ? (
-          <div className="text-center py-8 text-gray-500">
-            <div className="spinner mx-auto mb-2"></div>
-            Loading files...
-          </div>
+          <LoadingRows rows={2} label="Loading workspace files" />
         ) : displayFiles.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <div className="text-4xl mb-2">📂</div>
-            <p>{searchResults !== null ? 'No files found' : 'No files uploaded yet'}</p>
-            <p className="text-sm mt-2">
-              {searchResults !== null
-                ? 'Try a different search query'
-                : 'Upload files using the section above'}
-            </p>
-          </div>
+          <EmptyState
+            title={searchResults !== null ? 'No matches' : 'No files yet'}
+            description={
+              searchResults !== null
+                ? 'Try different words, or clear the search to see everything.'
+                : 'Upload a file above and the Mind will be able to retrieve it by meaning.'
+            }
+          />
         ) : (
           <div className="space-y-3">
             {displayFiles.map((file) => (
-              <div
-                key={file.file_id}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xl">{getFileIcon(file.file_type)}</span>
-                    <span className="font-medium text-gray-900">{file.filename}</span>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                      {file.file_type}
-                    </span>
-                  </div>
-                  
-                  <div className="text-sm text-gray-600 ml-8">
-                    <p>{file.description}</p>
-                    <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-                      <span>Size: {formatFileSize(file.size_bytes)}</span>
-                      <span>Created: {formatDate(file.created_at)}</span>
-                      {file.tags && file.tags.length > 0 && (
-                        <span>Tags: {file.tags.join(', ')}</span>
-                      )}
+              <div key={file.file_id} className="card-flat">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <FileGlyph kind={file.file_type} />
+                      <span className="min-w-0 truncate font-medium text-fg">{file.filename}</span>
+                      <StatusBadge tone="neutral">{file.file_type}</StatusBadge>
                     </div>
-                    
-                    {file.relevance_score !== undefined && (
-                      <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                        <span className="font-semibold">Relevance: {(file.relevance_score * 100).toFixed(0)}%</span>
-                        {file.match_reason && (
-                          <p className="mt-1 text-gray-600">{file.match_reason}</p>
+
+                    <div className="mt-2 pl-9">
+                      {file.description && (
+                        <p className="text-sm text-fg-muted">{file.description}</p>
+                      )}
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-subtle">
+                        <span>{formatFileSize(file.size_bytes)}</span>
+                        <span>{formatDate(file.created_at)}</span>
+                        {file.tags && file.tags.length > 0 && (
+                          <span>Tags: {file.tags.join(', ')}</span>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                <button
-                  onClick={() => handleDelete(file.filename)}
-                  className="ml-4 px-3 py-2 text-red-600 hover:bg-red-50 rounded transition"
-                  title="Delete file"
-                >
-                  🗑️
-                </button>
+                      {file.relevance_score !== undefined && (
+                        <div className="mt-2 rounded-lg border border-info/40 bg-info/5 p-2 text-xs">
+                          <span className="font-medium text-fg">
+                            Relevance {(file.relevance_score * 100).toFixed(0)}%
+                          </span>
+                          {file.match_reason && (
+                            <p className="mt-0.5 text-fg-muted">{file.match_reason}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(file.filename)}
+                    className="btn-ghost btn-sm text-danger"
+                    title={`Delete ${file.filename}`}
+                    aria-label={`Delete ${file.filename}`}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Section>
 
       {/* Info Section */}
-      <div className="bg-gradient-to-br from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">✨ Smart Workspace Features</h3>
-        <ul className="space-y-2 text-sm text-gray-700">
-          <li>[Done]<strong>Universal File Support:</strong> PDF, DOCX, XLSX, CSV, images, code files, and more</li>
-          <li>[Done]<strong>Automatic Processing:</strong> Files are intelligently parsed and analyzed</li>
-          <li>[Done]<strong>Vector Embeddings:</strong> Content is embedded using ChromaDB for semantic search</li>
-          <li>[Done]<strong>Memory Integration:</strong> Mind remembers all uploaded files</li>
-          <li>[Done]<strong>Semantic Search:</strong> Find files by meaning, not just filename</li>
-          <li>[Done]<strong>Chat Integration:</strong> Reference files in conversations</li>
-        </ul>
-      </div>
+      <Section title="What the workspace does">
+        <div className="card">
+          <dl className="grid gap-3 sm:grid-cols-2">
+            {[
+              ['Parses', 'PDF, DOCX, XLSX, CSV, images and source files are read into text.'],
+              ['Embeds', 'Content is vectorised so retrieval works on meaning, not keywords.'],
+              ['Tags', 'Uploader and type are attached, and each upload is journalled.'],
+              ['Recalls', 'Files become retrievable context in later conversations.'],
+            ].map(([term, meaning]) => (
+              <div key={term}>
+                <dt className="text-sm font-medium text-fg">{term}</dt>
+                <dd className="mt-0.5 text-sm text-fg-muted">{meaning}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </Section>
     </div>
   );
 }
+
+/**
+ * File-type glyph.
+ *
+ * `formatFileType` used to return emoji per type from a small map. It rendered
+ * fine, but the two placeholder strings in this file — the feature list's
+ * `[Done]` prefixes — showed what happens when a glyph is treated as data: it
+ * leaks. This keeps the mapping in code and falls back deliberately.
+ */
+function FileGlyph({ kind }: { kind: string }) {
+  const icons: Record<string, string> = {
+    text: '📄',
+    code: '💻',
+    data: '📊',
+    image: '🖼',
+    document: '📑',
+    pdf: '📕',
+    xlsx: '📗',
+    csv: '📊',
+  };
+  return (
+    <span className="grid h-7 w-7 flex-shrink-0 place-items-center rounded bg-surface-3 text-sm">
+      {icons[kind] || '📄'}
+    </span>
+  );
+}
+
