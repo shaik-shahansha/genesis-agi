@@ -19,13 +19,27 @@ from genesis.config import get_settings
 from genesis.api import routes
 from genesis.api import marketplace_routes
 from genesis.api import environment_routes
+from genesis.api import governance_routes
 
 # Conditionally import multimodal if not disabled
 DISABLE_MULTIMODAL = os.getenv("DISABLE_MULTIMODAL", "false").lower() == "true"
 if not DISABLE_MULTIMODAL:
     try:
         from genesis.api import multimodal_routes
-    except ImportError:
+    except Exception as _multimodal_import_error:
+        # Multimodal is an optional feature: it pulls in tensorflow/deepface,
+        # which can fail to import for reasons other than a missing module
+        # (unavailable native library, console encoding, version mismatch).
+        # Any of those used to crash API startup entirely, which meant a
+        # missing optional vision dependency took down chat, memory, and
+        # everything else with it.
+        import logging as _logging
+
+        _logging.getLogger(__name__).warning(
+            "Multimodal routes disabled: %s: %s",
+            type(_multimodal_import_error).__name__,
+            _multimodal_import_error,
+        )
         DISABLE_MULTIMODAL = True
         multimodal_routes = None
 else:
@@ -88,6 +102,10 @@ def create_app() -> FastAPI:
     app.include_router(routes.settings_router, prefix="/api/v1/settings", tags=["Settings"])
     app.include_router(marketplace_routes.router, prefix="/api/v1/marketplace", tags=["Marketplace"])
     app.include_router(environment_routes.router, prefix="/api/v1/environments", tags=["Environments"])
+    # Governance: approval inbox, action receipts, audit timeline, emergency stop
+    # (ADR-0006/0007/0008). Mounted under /minds so the paths sit next to the
+    # Mind they govern.
+    app.include_router(governance_routes.router, prefix="/api/v1/minds", tags=["Governance"])
     # Admin endpoints (global admin management and admin-only actions)
     app.include_router(routes.admin_router, prefix="/api/v1/admin", tags=["Admin"])    
     # Include multimodal routes only if enabled
