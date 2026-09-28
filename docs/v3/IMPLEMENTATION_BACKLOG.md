@@ -14,7 +14,7 @@
 |---|---|
 | A — Repository discovery | `[x]` baseline docs written, tests/lint/types measured |
 | A — Single-container deployment | `[x]` built, running, 10/10 smoke checks pass |
-| B — Security containment | `[~]` **B7, B8, B1/B3/B4/B6/B10 done**; container isolation (B2b), full egress blocking (B5), MCP env scrubbing (B9), policy, approval and audit outstanding |
+| B — Security containment | `[~]` **B1, B3, B4, B6, B7, B8, B10, B13, B14, B15, B16 done**; container isolation (B2b), full egress blocking (B5), MCP env scrubbing (B9), API-tier process spawning (B11) outstanding |
 | C–M | `[ ]` not started |
 
 ---
@@ -30,7 +30,7 @@
 | A5 | Commit a lockfile; use `npm ci` | `web-playground/package-lock.json`, `Dockerfile` | lockfile generated; Dockerfile uses `npm ci` | `[x]` |
 | A6 | Add CI (lint ratchet + tests + migration up/down) and `pre-commit` | `.github/workflows/`, `.pre-commit-config.yaml` | CI green on the branch | `[ ]` |
 | A7 | Remove `NODE_TLS_REJECT_UNAUTHORIZED=0` | `web-playground/package.json`, `next.config.js` | grep returns no matches in app code | `[x]` |
-| A8 | Create ADRs (0001–0007) | `docs/architecture/adr/` | 7 ADRs present | `[ ]` |
+| A8 | Create ADRs (0001–0007) | `docs/architecture/adr/` | 7 ADRs present | `[x]` (0008 added too — events/receipts) |
 | A9 | Pin container base image by digest; add non-root `USER` | `Dockerfile` | `USER genesis` present; digest pinned | `[~]` non-root done, digest not pinned |
 | A10 | Fix / document the `/data` volume coverage | `docker-compose.yml` | `DATA_DIR`/`MINDS_DIR`/`LOGS_DIR` set explicitly | `[x]` |
 | A11 | Correct unsupported public claims (consciousness, 16 emotions, 90% savings, "cannot be bypassed") | `README.md`, `website/`, `genesisagi.in` content | claims replaced with precise terminology | `[ ]` |
@@ -66,10 +66,10 @@ Visual or feature work must not start before this passes.
 ### B13–B16 · Governance control plane
 | ID | Task | Files | Gate | Status |
 |---|---|---|---|---|
-| B13 | `PolicyService`: deterministic R0–R5 risk classification and allow / allow_with_receipt / require_approval / deny / emergency_stop; model classifier advisory only | `genesis/governance/policy.py` | table-driven policy tests; classifier cannot override | `[ ]` |
-| B14 | `ApprovalService`: `PROPOSED→POLICY_EVALUATED→WAITING_FOR_APPROVAL→APPROVED/REJECTED/EXPIRED→EXECUTING→COMPLETED/FAILED/ROLLED_BACK`; grants bound to parameter hash + scope + expiry; non-transferable | `genesis/governance/approval.py` | parameter change invalidates approval; replay produces no duplicate side effect | `[ ]` |
-| B15 | `AuditService` + append-only event journal + immutable `ActionReceipt` for allowed, blocked, failed, cancelled and rolled-back attempts | `genesis/governance/audit.py`, `genesis/events/journal.py`, migrations | receipts appear in the workspace UI; tampering breaks integrity verification | `[ ]` |
-| B16 | Convert `constitution.py` from keyword blocklist into versioned enforceable rules; keep the human-readable charter text | `genesis/core/constitution.py`, `genesis/governance/` | rules are data, versioned, and tested | `[ ]` |
+| B13 | `PolicyService`: deterministic R0–R5 risk classification and allow / allow_with_receipt / require_approval / deny / emergency_stop; model classifier advisory only | `genesis/governance/policy.py`, `genesis/governance/risk.py` | table-driven policy tests; classifier cannot override | ✅ **DONE** — pure/deterministic, fails closed, advisory can only ratchet up; undeclared capability floors at R3 |
+| B14 | `ApprovalService`: `PROPOSED→POLICY_EVALUATED→WAITING_FOR_APPROVAL→APPROVED/REJECTED/EXPIRED→EXECUTING→COMPLETED/FAILED/ROLLED_BACK`; grants bound to parameter hash + scope + expiry; non-transferable | `genesis/governance/approval.py` | parameter change invalidates approval; replay produces no duplicate side effect | ✅ **DONE** — illegal transitions refused; single-use grants; 5 tests cover binding/replay/expiry |
+| B15 | `AuditService` + append-only event journal + immutable `ActionReceipt` for allowed, blocked, failed, cancelled and rolled-back attempts | `genesis/governance/audit.py`, `genesis/governance/models.py`, migrations | receipts appear in the workspace UI; tampering breaks integrity verification | ✅ **DONE** (service + journal + receipts + API + migration 008). Workspace UI lands with the playground revamp |
+| B16 | Convert `constitution.py` from keyword blocklist into versioned enforceable rules; keep the human-readable charter text | `genesis/core/constitution.py`, `genesis/governance/constitution_rules.py` | rules are data, versioned, and tested | ✅ **DONE** — 13 versioned clauses; `validate_user_prompt` is advisory and no longer drops the user's turn; `validate_action` delegates to the engine; a test fails if any `ConstitutionalViolation` lacks a clause |
 
 ### B17–B19 · Observability, evals, tests
 | ID | Task | Files | Gate | Status |
