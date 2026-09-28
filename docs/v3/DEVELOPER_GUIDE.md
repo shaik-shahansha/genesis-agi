@@ -11,7 +11,8 @@
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
 | **Last verified** | 2026-09-28, full test suite + container smoke test |
-| **Test suite** | 399 passed, 3 skipped, 12 failed (all 12 pre-existing, reproduce on the pristine tree) |
+| **Test suite** | 409 passed, 3 skipped, 12 failed (all 12 pre-existing, reproduce on the pristine tree) |
+| **Container** | Image builds; runs `Up (healthy)`; all 12 governance endpoints verified live |
 | **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.1` |
 
 ---
@@ -254,13 +255,26 @@ Legend: **✅ implemented and tested** · **⚠️ partial, honestly reported** 
 | Executor integration | `genesis/core/action_executor.py` | `tests/governance/test_action_executor_governance.py` |
 | REST API (12 endpoints) | `genesis/api/governance_routes.py` | `tests/governance/test_governance_api.py` |
 | Migration-chain guards | `alembic/versions/` | `tests/test_migrations.py` |
+| Durable store (the one production uses) | `genesis/governance/store.py` | `tests/governance/test_sql_store.py` |
 
-**250 tests** (219 governance + 31 migration guards). The suite specifically covers: the R0–R5
-matrix, undeclared-capability flooring, advisory-can't-lower, budget refusal, lifecycle halting,
-tenant blocks and the R2 cap, scope escalation, emergency-stop latching *and* rehydration from the
-journal, grant parameter-mutation/replay/cross-mind/expiry, journal tamper detection and splicing,
-redaction of secret-shaped keys and inline credentials, and end-to-end executor flow including
-"handler must not run before approval".
+**260 governance and migration tests** (229 governance + 31 migration guards). The suite covers:
+the R0–R5 matrix, undeclared-capability flooring, advisory-can't-lower, budget refusal, lifecycle
+halting, tenant blocks and the R2 cap, scope escalation, emergency-stop latching *and* rehydration
+from the journal, grant parameter-mutation/replay/cross-mind/expiry, journal tamper detection and
+splicing, redaction of secret-shaped keys and inline credentials, the full approval-to-redemption
+lifecycle, and end-to-end executor flow including "the handler must not run before approval".
+
+Two bug classes were found only by going beyond the unit suite, and both now have guards:
+
+* **The migration chain could not be applied to a fresh database** (three revisions created the
+  same index twice). Found by running `alembic upgrade head` against a scratch database, not by
+  the tests. Guarded by `tests/test_migrations.py`.
+* **Every multi-row read on the durable store raised `DetachedInstanceError`**, because rows were
+  converted to dataclasses after the session had closed. Invisible while a table is empty, so it
+  surfaced as `GET /journal/verify` returning 200 and then 500 once its own event was written.
+  Found by running the built container and calling the endpoints. Guarded by
+  `tests/governance/test_sql_store.py`, which exercises the real SQLAlchemy store — the in-memory
+  store used by every other test cannot reproduce it.
 
 ### 3.2 Security containment — ✅ most, ⚠️ two gaps
 
@@ -323,6 +337,13 @@ docker compose up -d --build
 Then open `http://<host>:8080`. nginx is the front door; the API, the built
 playground, and static assets are served behind it. Supported on a small VPS
 (~1 vCPU / 1 GB) for a handful of Minds.
+
+**Verified in the built image**, not just locally: container `Up (healthy)`; built-in JWT login via
+`POST /api/v1/auth/token`; `GET /auth/me`; and all twelve governance endpoints returning 200,
+including `GET /journal/verify` called twice in a row. Note that Firebase is genuinely optional:
+`GET /api/v1/auth/firebase/status` reports it disabled on a default install, and the web workspace
+offers a username/password sign-in that talks to the API directly. Until recently it did not, so a
+Firebase-less install could not be signed into at all.
 
 Full details, including the volume layout and TLS: `docs/v3/DEPLOYMENT_SINGLE_CONTAINER.md`.
 
