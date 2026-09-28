@@ -20,7 +20,7 @@
 | SEC-05 | **H** → **PARTIAL** | Full host environment inherited by subprocesses: fixed for the sandbox; **MCP servers still inherit `os.environ`** |
 | SEC-06 | ~~**H**~~ **FIXED** | Advertised import allow-list in tool sandbox is never enforced |
 | SEC-07 | **H** | Arbitrary marketplace tool code persisted and later executed |
-| SEC-08 | **H** | In-memory user store, hardcoded default admin password, default JWT secret |
+| SEC-08 | **H** → **PARTIAL** | In-memory user store, hardcoded default admin password, default JWT secret. The password and the secret are closed; the in-memory store is not |
 | SEC-09 | **H** | API process spawns and kills OS processes (daemon control, `psutil`) |
 | SEC-10 | **H** | CORS default `*` combined with `allow_credentials=True` |
 | SEC-11 | **M** | Permission model cannot satisfy `REQUIRES_CONFIRMATION`; approval setting unwired |

@@ -332,7 +332,8 @@ Be careful with these — several are asserted in public material and are not tr
 | Claim / feature | Reality |
 |---|---|
 | "Consciousness" | Not claimed by the code. The mechanism is a periodic cognition loop with awareness levels and budget caps. |
-| "Violations cannot be bypassed via prompt injection" | Was false (a substring scan). The *action* boundary is now enforced deterministically; prompt screening is labelled advisory. |
+| "Violations cannot be bypassed via prompt injection" | Was false (a substring scan). The *action* boundary is now enforced deterministically; prompt screening is labelled advisory. Note that injection through *content* was a real gap until recently — see the markdown renderer row below. |
+| Model output is safe to render | It was not. `MarkdownRenderer` passed message bodies to `dangerouslySetInnerHTML` without escaping, so a reply containing `<img onerror=…>` executed in the reader's browser, and `[x](javascript:…)` produced a working link. Escaping now happens before formatting, and link schemes are allowlisted. |
 | `require_approval_for_external_actions` | Was a lie (the approval path did not exist). It now works — but note the setting itself is still not read by the policy engine; risk classification is the control. |
 | Filesystem-isolated sandbox | **Depends on the provider.** `container` is a real boundary (verified against a real runtime: 10/10 isolation claims held, 11 escape tests). `local` is a resource limiter and says so about itself. Never assume — read `capabilities()` |
 | Network isolation | Verified, not assumed: `verified` requires the host to have egress **and** the namespace to block it. If the probe cannot prove both, the sandbox reports `verified: false` with the reason and the receipt records the fact |
@@ -351,8 +352,9 @@ Be careful with these — several are asserted in public material and are not tr
 
 ```bash
 cp .env.example .env
-# REQUIRED: compose fails fast without a real key
-python -c "import secrets; print(secrets.token_hex(32))"   # -> API_SECRET_KEY
+# REQUIRED: compose fails fast without these two
+python -c "import secrets; print(secrets.token_hex(32))"      # -> API_SECRET_KEY
+python -c "import secrets; print(secrets.token_urlsafe(24))"   # -> GENESIS_ADMIN_PASSWORD
 # and at least one model provider key, e.g. OPENROUTER_API_KEY
 docker compose up -d --build
 ```
@@ -384,8 +386,16 @@ export GENESIS_ENV=development                       # PowerShell: $env:GENESIS_
 export GENESIS_GOVERNANCE_STORE=memory
 
 pytest tests/governance -q
-uvicorn genesis.api.server:app --reload
+
+# `server.py` exposes a FACTORY, not a module-level `app`, so --factory is required.
+uvicorn genesis.api.server:create_app --factory --reload
 ```
+
+In development the API seeds `admin` / `genesis-admin-2026` for convenience. That
+password is in this repository, so a process running in development mode must not
+be reachable from a network — which is also the reason it is not seeded anywhere
+else. To use a real one locally, set `GENESIS_ADMIN_PASSWORD` and it takes
+precedence.
 
 Migrations:
 
@@ -407,6 +417,8 @@ alembic downgrade -1      # drops the four governance tables
 | `GENESIS_SANDBOX_EGRESS_PROXY` | unset | Required when a policy enables network access, because plain Docker networking cannot restrict destinations |
 | `GENESIS_SUPERVISOR` | `none` | `systemd` delegates Mind daemon lifecycle. `none` returns 501 with the operator command rather than forking from the API |
 | `API_SECRET_KEY` / `SECRET_KEY` | placeholder | The app **refuses to boot** with the placeholder outside test/dev |
+| `GENESIS_ADMIN_PASSWORD` | unset | Bootstraps the first admin account. **Required by `docker-compose.yml`.** Minimum 12 characters; a shorter value is refused and no account is created. There is no default — the published development password is seeded only in test/development. See §4 |
+| `GENESIS_ADMIN_EMAIL` | `admin@genesis.local` | Address recorded for the bootstrap admin on first start |
 | `DATA_DIR`, `MINDS_DIR`, `LOGS_DIR` | `~/.genesis/*` | Independent settings — do not assume they follow `GENESIS_HOME` |
 | `GENESIS_VECTOR_STORE_MODE` | from settings (`persistent`) | `ephemeral` keeps ChromaDB in memory. Read from the environment, not from `Settings`, because `Settings` has no `env_prefix` — a field named `vector_store_mode` would look for `VECTOR_STORE_MODE`. The test suite requires `ephemeral` |
 
@@ -692,7 +704,8 @@ alembic/versions/20260928_0800_add_governance_plane.py
 tests/
   governance/        # 305 tests: policy, approvals, audit, SQL store, gate, API,
                      #   correlation, domain events, commitments
-  security/          # 251 tests: sandbox, container escapes, network probe, MCP env, secrets
+  security/          # 261 tests: sandbox, container escapes, network probe, MCP env,
+                     #   secrets, the bootstrap admin boundary
   test_migrations.py # 31 tests: migration-chain guards
   test_mind_ownership.py # 8 tests: who may access a Mind, and placeholder repair
 docs/
@@ -722,6 +735,8 @@ docs/
 | MCP servers inherit `os.environ` | ✅ **fixed** | Closed by the base allowlist in `mcp_integration.py` (B9). |
 | Prompt keyword scan false positives | Low | Advisory only now, so it no longer blocks turns, but the lists are unreviewed. |
 | `Mind` god-object | Medium | Blocks snapshot/fork/multi-process. Phase C. |
+| Users live in process memory | **High** | `USERS_DB` is a module-level dict. Accounts created through the admin panel are lost on restart, and the seeded admin was historically the only one that survived — which is why the default-credential issue mattered as much as it did. Moving users to the database is the next piece of work here. |
+| No brute-force protection on the token endpoint | Medium | Rate limiting applies to `/` and `/health` only. `POST /api/v1/auth/token` is unthrottled, so a configured admin password can be guessed at speed. |
 | `mypy genesis` not clean | Low | A4 — the last Phase B item. |
 | Mind detail tabs still use legacy markup | Low | The highest-traffic ones (Overview, Identity, Conversation, Thinking, Plugins, LLM Calls, Autonomy, Settings, Workspace) are migrated. The rest inherit the correct theme via `globals.css`'s compatibility layer, so they read correctly, but their structure predates the design system. |
 | Ownership is a single string column | Medium | `MindRecord.creator` is compared by equality in one place. There is no notion of a co-owner, a transfer, or an org. Sufficient for now; revisit with multi-tenancy (Phase K). |

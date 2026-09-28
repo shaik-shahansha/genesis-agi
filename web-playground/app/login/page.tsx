@@ -4,7 +4,21 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { loginWithPassword, setSession, getSessionToken, loadSessionUser } from '@/lib/session';
+import { isFirebaseConfigured } from '@/lib/firebase';
+import { AlertIcon } from '@/components/shell/icons';
 
+/**
+ * Sign-in page.
+ *
+ * Firebase is optional in this product, and this page used to render the Google
+ * and Firebase-email controls unconditionally. On an install without Firebase
+ * those controls were all there was, in the primary position, and every one of
+ * them failed — which is the dead end the deployment guide's "Firebase is
+ * optional" claim was silently contradicting.
+ *
+ * When Firebase is not configured the form shown is the one that works, and the
+ * page says why the others are absent rather than hiding them without comment.
+ */
 export default function LoginPage() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -14,11 +28,10 @@ export default function LoginPage() {
   const { user, signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
   const router = useRouter();
 
-  // Built-in (non-Firebase) credentials. Kept in a collapsed panel because the
-  // common path is Google/email, but it must exist: the deployment guide treats
-  // Firebase as optional, and without this there is no way to sign in at all on
-  // such an install.
-  const [directOpen, setDirectOpen] = useState(false);
+  // Built-in (non-Firebase) credentials. The panel is open by default when
+  // Firebase is absent, because then it is the only path and collapsing it would
+  // recreate the dead end.
+  const [directOpen, setDirectOpen] = useState(!isFirebaseConfigured);
   const [username, setUsername] = useState('');
   const [directPassword, setDirectPassword] = useState('');
 
@@ -81,203 +94,184 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-lg">
+    <div className="flex min-h-screen items-center justify-center bg-bg p-4">
+      <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Genesis AGI
-          </h1>
-          <h2 className="text-2xl font-semibold text-gray-700 mb-2">
-            Web Playground
-          </h2>
-          <p className="text-sm text-gray-600">
-            Sign in to access your autonomous AI minds
+          <h1 className="page-title">Genesis</h1>
+          <p className="mt-2 text-sm text-fg-muted">
+            Sign in to reach the Minds on this installation.
           </p>
         </div>
-        
+
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-card border border-danger/40 bg-danger/5 p-3 text-sm text-fg"
+          >
+            <span className="mt-0.5 text-danger">
+              <AlertIcon className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 break-words">{error}</span>
           </div>
         )}
-        
-        <div className="space-y-4">
-          {/* Google Sign-In Button */}
-          <button
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              />
-            </svg>
-            <span className="text-sm font-medium text-gray-700">
-              {loading ? 'Signing in...' : 'Continue with Google'}
-            </span>
-          </button>
 
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">or</span>
-            </div>
-          </div>
+        <div className="card space-y-4">
+          {isFirebaseConfigured ? (
+            <>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="btn-secondary w-full justify-center"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                {loading ? 'Signing in…' : 'Continue with Google'}
+              </button>
 
-          {/* Email/Password Form */}
-          <form onSubmit={handleEmailAuth} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="you@example.com"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="••••••••"
-                minLength={6}
-              />
-            </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-line" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-surface px-2 text-xs text-fg-subtle">or</span>
+                </div>
+              </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? 'Processing...' : mode === 'signup' ? 'Sign Up' : 'Sign In'}
-            </button>
-          </form>
-
-          {/* Toggle Sign In/Sign Up */}
-          <div className="text-center text-sm text-gray-600">
-            {mode === 'signin' ? (
-              <>
-                Don't have an account?{' '}
-                <button
-                  onClick={() => setMode('signup')}
-                  className="text-blue-600 hover:underline font-medium"
-                >
-                  Sign up
+              <form onSubmit={handleEmailAuth} className="space-y-4">
+                <div>
+                  <label htmlFor="firebase-email" className="label mb-1.5 block">
+                    Email address
+                  </label>
+                  <input
+                    id="firebase-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="input w-full"
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="firebase-password" className="label mb-1.5 block">
+                    Password
+                  </label>
+                  <input
+                    id="firebase-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="input w-full"
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                    required
+                  />
+                </div>
+                <button type="submit" disabled={loading} className="btn-primary w-full justify-center">
+                  {loading ? 'Working…' : mode === 'signup' ? 'Create account' : 'Sign in'}
                 </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{' '}
-                <button
-                  onClick={() => setMode('signin')}
-                  className="text-blue-600 hover:underline font-medium"
-                >
-                  Sign in
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+              </form>
 
-        <div className="border-t border-gray-200 pt-5">
-          {!directOpen ? (
+              <p className="text-center text-sm text-fg-muted">
+                {mode === 'signup' ? 'Already have an account?' : 'Need an account?'}{' '}
+                <button
+                  type="button"
+                  onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
+                  className="text-accent underline underline-offset-2"
+                >
+                  {mode === 'signup' ? 'Sign in' : 'Sign up'}
+                </button>
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-fg-muted">
+              This installation is not configured with Firebase, so there is no Google or
+              account-based sign-in to offer. Use the administrator credentials below — they are
+              the ones set when this instance was deployed.
+            </p>
+          )}
+
+          {isFirebaseConfigured && !directOpen && (
             <button
               type="button"
               onClick={() => setDirectOpen(true)}
-              className="w-full text-center text-xs text-gray-500 hover:text-gray-700"
+              className="btn-ghost w-full justify-center text-xs"
             >
               Sign in with a username and password instead
             </button>
-          ) : (
-            <form onSubmit={handleDirectSignIn} className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-gray-700">Framework account</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  Use this when Firebase is not configured. It signs in against the API directly.
-                </p>
-              </div>
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-                  Username or email
-                </label>
-                <input
-                  id="username"
-                  name="username"
-                  required
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
-                  placeholder="admin"
-                />
-              </div>
-              <div>
-                <label htmlFor="direct-password" className="block text-sm font-medium text-gray-700 mb-1">
-                  Password
-                </label>
-                <input
-                  id="direct-password"
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={directPassword}
-                  onChange={(e) => setDirectPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
-                  placeholder="••••••••"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn-primary w-full"
-              >
-                {loading ? 'Signing in…' : 'Sign in'}
-              </button>
-            </form>
+          )}
+
+          {directOpen && (
+            <div className={isFirebaseConfigured ? 'space-y-3 border-t border-line pt-4' : 'space-y-3'}>
+              {isFirebaseConfigured && (
+                <div>
+                  <p className="text-sm font-medium text-fg">Framework account</p>
+                  <p className="text-xs text-fg-muted">
+                    Signs in against the API directly, without Firebase.
+                  </p>
+                </div>
+              )}
+
+              <form onSubmit={handleDirectSignIn} className="space-y-3">
+                <div>
+                  <label htmlFor="direct-username" className="label mb-1.5 block">
+                    Username or email
+                  </label>
+                  <input
+                    id="direct-username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="admin"
+                    className="input w-full"
+                    autoComplete="username"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="direct-password" className="label mb-1.5 block">
+                    Password
+                  </label>
+                  <input
+                    id="direct-password"
+                    type="password"
+                    value={directPassword}
+                    onChange={(e) => setDirectPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="input w-full"
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+                <button type="submit" disabled={loading} className="btn-primary w-full justify-center">
+                  {loading ? 'Signing in…' : 'Sign in'}
+                </button>
+              </form>
+            </div>
           )}
         </div>
 
-        <div className="text-center text-xs text-gray-500 mt-6">
-          <p>By signing in, you agree to our</p>
-          <p>
-            <a href="#" className="text-blue-600 hover:underline">Terms of Service</a>
-            {' '}&amp;{' '}
-            <a href="#" className="text-blue-600 hover:underline">Privacy Policy</a>
-          </p>
-        </div>
+        <p className="text-center text-xs text-fg-subtle">
+          By signing in you agree to the Terms of Service and Privacy Policy.
+        </p>
       </div>
     </div>
   );
