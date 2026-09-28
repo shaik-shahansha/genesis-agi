@@ -335,7 +335,7 @@ export default function CreateMindPage() {
             <CardContent className="space-y-6">
               {/* Name Input */}
               <div>
-                <label className="block text-white font-bold text-lg mb-3">
+                <label className="block text-base font-semibold text-fg mb-3">
                   Mind Name *
                 </label>
                 <input
@@ -345,14 +345,14 @@ export default function CreateMindPage() {
                   placeholder="e.g., Atlas, Nova, Sage, Echo..."
                   className="input"
                 />
-                <p className="text-sm text-gray-300 mt-2">
+                <p className="text-sm text-fg-muted mt-2">
                   Choose a unique name for your digital being
                 </p>
               </div>
 
               {/* Creator Email Input */}
               <div>
-                <label className="block text-white font-bold text-lg mb-3">
+                <label className="block text-base font-semibold text-fg mb-3">
                   Your Email *
                 </label>
                 <input
@@ -362,14 +362,14 @@ export default function CreateMindPage() {
                   placeholder="your.email@example.com"
                   className="input"
                 />
-                <p className="text-sm text-gray-300 mt-2">
+                <p className="text-sm text-fg-muted mt-2">
                   Your email helps the Mind remember conversations with you separately from other users
                 </p>
               </div>
 
               {/* Purpose Input */}
               <div>
-                <label className="block text-white font-bold text-lg mb-3">
+                <label className="block text-base font-semibold text-fg mb-3">
                   Purpose
                 </label>
                 <textarea
@@ -379,14 +379,14 @@ export default function CreateMindPage() {
                   className="input min-h-[80px]"
                   rows={3}
                 />
-                <p className="text-sm text-gray-300 mt-2">
+                <p className="text-sm text-fg-muted mt-2">
                   Define why this mind exists and what it should accomplish
                 </p>
               </div>
 
               {/* Role Input */}
               <div>
-                <label className="block text-white font-bold text-lg mb-3">
+                <label className="block text-base font-semibold text-fg mb-3">
                   Role
                 </label>
                 <textarea
@@ -396,14 +396,14 @@ export default function CreateMindPage() {
                   className="input min-h-[80px]"
                   rows={3}
                 />
-                <p className="text-sm text-gray-300 mt-2">
+                <p className="text-sm text-fg-muted mt-2">
                   Describe the specific role or function this mind will perform
                 </p>
               </div>
 
               {/* Guidance Notes Input */}
               <div>
-                <label className="block text-white font-bold text-lg mb-3">
+                <label className="block text-base font-semibold text-fg mb-3">
                   Guidance Notes
                 </label>
                 <textarea
@@ -413,14 +413,14 @@ export default function CreateMindPage() {
                   className="input min-h-[100px]"
                   rows={4}
                 />
-                <p className="text-sm text-gray-300 mt-2">
+                <p className="text-sm text-fg-muted mt-2">
                   Add any specific guidance, context, or notes the mind should always remember
                 </p>
               </div>
 
               {/* Template Selection */}
               <div>
-                <label className="block text-white font-bold text-lg mb-3">
+                <label className="block text-base font-semibold text-fg mb-3">
                   Personality Template
                 </label>
                 <div className="grid md:grid-cols-2 gap-4">
@@ -431,18 +431,18 @@ export default function CreateMindPage() {
                       onClick={() => setFormData({ ...formData, template: template.value })}
                       className={`cursor-pointer transition ${
                         formData.template === template.value
-                          ? 'border-purple-500 bg-purple-500/10'
+                          ? 'border-accent bg-accent/10'
                           : ''
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="text-4xl mb-3">{template.emoji}</div>
-                          <h3 className="text-lg font-bold text-white mb-2">{template.label}</h3>
-                          <p className="text-sm text-gray-300">{template.description}</p>
+                          <h3 className="text-base font-semibold text-fg mb-2">{template.label}</h3>
+                          <p className="text-sm text-fg-muted">{template.description}</p>
                         </div>
                         {formData.template === template.value && (
-                          <div className="text-2xl text-purple-400">✓</div>
+                          <div className="text-2xl text-accent">✓</div>
                         )}
                       </div>
                     </Card>
@@ -470,7 +470,7 @@ export default function CreateMindPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <label className="block text-white font-bold text-lg mb-3">
+                <label className="block text-base font-semibold text-fg mb-3">
                   Reasoning Model (Primary Brain)
                 </label>
                 <div className="space-y-3">
@@ -481,14 +481,14 @@ export default function CreateMindPage() {
                       onClick={() => setFormData({ ...formData, reasoning_model: model.value, fast_model: model.value })}
                       className={`cursor-pointer transition ${
                         formData.reasoning_model === model.value
-                          ? 'border-purple-500 bg-purple-500/10'
+                          ? 'border-accent bg-accent/10'
                           : ''
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h4 className="text-white font-semibold mb-1">{model.label}</h4>
-                          <p className="text-sm text-gray-300 mb-2">{model.description}</p>
+                          <h4 className="font-medium text-fg mb-1">{model.label}</h4>
+                          <p className="text-sm text-fg-muted mb-2">{model.description}</p>
                           <div className="flex gap-3">
                             <Badge variant="info">Cost: {model.cost}</Badge>
                             <Badge variant="success">Speed: {model.speed}</Badge>
@@ -536,7 +536,7 @@ export default function CreateMindPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-2xl">🌟</span>
-                    <h3 className="text-white font-bold text-lg">OpenRouter API Key</h3>
+                    <h3 className="text-base font-semibold text-fg">OpenRouter API Key</h3>
                     <Badge variant="success">FREE Models Available</Badge>
                   </div>
                   <input
@@ -549,13 +549,13 @@ export default function CreateMindPage() {
                     placeholder="Enter your OpenRouter API key (e.g., sk-or-v1-...)"
                     className="input"
                   />
-                  <p className="text-sm text-gray-300">
+                  <p className="text-sm text-fg-muted">
                     Get a FREE API key at{' '}
                     <a 
                       href="https://openrouter.ai/keys" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-purple-400 hover:underline"
+                      className="text-accent hover:underline"
                     >
                       openrouter.ai/keys
                     </a>
@@ -569,7 +569,7 @@ export default function CreateMindPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-2xl">🚀</span>
-                    <h3 className="text-white font-bold text-lg">Groq API Key</h3>
+                    <h3 className="text-base font-semibold text-fg">Groq API Key</h3>
                     <Badge variant="success">Free</Badge>
                   </div>
                   <input
@@ -582,13 +582,13 @@ export default function CreateMindPage() {
                     placeholder="Enter your Groq API key (e.g., gsk_...)"
                     className="input"
                   />
-                  <p className="text-sm text-gray-300">
+                  <p className="text-sm text-fg-muted">
                     Get a free API key at{' '}
                     <a 
                       href="https://console.groq.com/keys" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-purple-400 hover:underline"
+                      className="text-accent hover:underline"
                     >
                       console.groq.com/keys
                     </a>
@@ -601,7 +601,7 @@ export default function CreateMindPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-2xl">🤖</span>
-                    <h3 className="text-white font-bold text-lg">OpenAI API Key</h3>
+                    <h3 className="text-base font-semibold text-fg">OpenAI API Key</h3>
                     <Badge variant="warning">Paid</Badge>
                   </div>
                   <input
@@ -614,13 +614,13 @@ export default function CreateMindPage() {
                     placeholder="Enter your OpenAI API key (e.g., sk-...)"
                     className="input"
                   />
-                  <p className="text-sm text-gray-300">
+                  <p className="text-sm text-fg-muted">
                     Get your API key at{' '}
                     <a 
                       href="https://platform.openai.com/api-keys" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-purple-400 hover:underline"
+                      className="text-accent hover:underline"
                     >
                       platform.openai.com/api-keys
                     </a>
@@ -633,7 +633,7 @@ export default function CreateMindPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-2xl">🧠</span>
-                    <h3 className="text-white font-bold text-lg">Anthropic API Key</h3>
+                    <h3 className="text-base font-semibold text-fg">Anthropic API Key</h3>
                     <Badge variant="warning">Paid</Badge>
                   </div>
                   <input
@@ -646,13 +646,13 @@ export default function CreateMindPage() {
                     placeholder="Enter your Anthropic API key (e.g., sk-ant-...)"
                     className="input"
                   />
-                  <p className="text-sm text-gray-300">
+                  <p className="text-sm text-fg-muted">
                     Get your API key at{' '}
                     <a 
                       href="https://console.anthropic.com/settings/keys" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-purple-400 hover:underline"
+                      className="text-accent hover:underline"
                     >
                       console.anthropic.com
                     </a>
@@ -666,16 +666,16 @@ export default function CreateMindPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold text-fg">Ollama — local model</h3>
                   </div>
-                  <p className="text-sm text-gray-300 mb-2">
+                  <p className="text-sm text-fg-muted mb-2">
                     Ollama runs locally on your machine. Make sure Ollama is installed and running.
                   </p>
-                  <p className="text-sm text-gray-300">
+                  <p className="text-sm text-fg-muted">
                     No API key needed! Visit{' '}
                     <a 
                       href="https://ollama.ai" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-purple-400 hover:underline"
+                      className="text-accent hover:underline"
                     >
                       ollama.ai
                     </a>
@@ -686,7 +686,7 @@ export default function CreateMindPage() {
 
               <div className="rounded-card border border-warning/40 bg-warning/5 p-4">
                 <h3 className="font-semibold text-fg">Note</h3>
-                <p className="text-sm text-gray-300">
+                <p className="text-sm text-fg-muted">
                   You can skip this step and add API keys later in Settings, but your Mind won't be able to respond until you configure them.
                 </p>
               </div>
@@ -712,7 +712,7 @@ export default function CreateMindPage() {
             <CardContent className="space-y-6">
               {/* Autonomy Level */}
               <div>
-                <label className="block text-white font-bold text-lg mb-3">
+                <label className="block text-base font-semibold text-fg mb-3">
                   Autonomy Level
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -728,15 +728,15 @@ export default function CreateMindPage() {
                       onClick={() => setFormData({ ...formData, autonomy_level: level.value })}
                       className={`cursor-pointer text-center relative ${
                         formData.autonomy_level === level.value
-                          ? 'border-2 border-purple-500 bg-purple-500/20'
+                          ? 'border-2 border-accent bg-accent/10'
                           : ''
                       }`}
                     >
                       {formData.autonomy_level === level.value && (
-                        <div className="absolute top-2 right-2 text-purple-400 text-xl">✓</div>
+                        <div className="absolute top-2 right-2 text-accent text-xl">✓</div>
                       )}
-                      <div className="font-bold text-white mb-1">{level.label}</div>
-                      <div className="text-xs text-gray-300">{level.desc}</div>
+                      <div className="font-medium text-fg mb-1">{level.label}</div>
+                      <div className="text-xs text-fg-muted">{level.desc}</div>
                     </Card>
                   ))}
                 </div>
@@ -917,3 +917,4 @@ export default function CreateMindPage() {
     </AuthRequired>
   );
 }
+

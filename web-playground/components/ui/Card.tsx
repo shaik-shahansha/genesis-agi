@@ -36,7 +36,7 @@ interface CardTitleProps {
 
 export function CardTitle({ children, className = '' }: CardTitleProps) {
   return (
-    <h3 className={`text-2xl font-bold text-white ${className}`}>
+    <h3 className={`text-xl font-semibold text-fg ${className}`}>
       {children}
     </h3>
   );

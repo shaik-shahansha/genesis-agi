@@ -66,7 +66,7 @@ export default function MindAvatar({ url, name, emotion, isSpeaking, className, 
       case 'curious':
         return 'border-purple-400 shadow-purple-400/50';
       default:
-        return 'border-gray-700 shadow-gray-700/50';
+        return 'border-line shadow-gray-700/50';
     }
   };
 
@@ -138,7 +138,7 @@ export default function MindAvatar({ url, name, emotion, isSpeaking, className, 
         {/* Emotion Badge */}
         {emotion && !isSpeaking && (
           <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-            <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white px-4 py-1.5 rounded-full text-xs font-medium border border-gray-700 shadow-lg backdrop-blur-sm">
+            <div className="bg-gradient-to-r from-surface-3 to-surface-2 text-fg px-4 py-1.5 rounded-full text-xs font-medium border border-line shadow-lg backdrop-blur-sm">
               <span className="mr-1">
                 {emotion === 'happy' ? '😊' :
                  emotion === 'sad' ? '😢' :
@@ -155,9 +155,9 @@ export default function MindAvatar({ url, name, emotion, isSpeaking, className, 
         {/* Speaking indicator text */}
         {isSpeaking && (
           <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-1.5 rounded-full text-xs font-medium shadow-lg shadow-blue-500/50 animate-pulse">
+            <div className="animate-pulse rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-accent-fg shadow-raised">
               <span className="mr-1">🗣️</span>
-              Speaking...
+              Speaking…
             </div>
           </div>
         )}
@@ -165,9 +165,9 @@ export default function MindAvatar({ url, name, emotion, isSpeaking, className, 
 
       {/* Name Label */}
       <div className="text-center mt-8">
-        <h2 className="text-2xl font-semibold text-white drop-shadow-lg">{name}</h2>
+        <h2 className="text-2xl font-semibold text-fg">{name}</h2>
         {emotion && (
-          <p className="text-sm text-gray-400 mt-1 capitalize">Feeling {emotion}</p>
+          <p className="text-sm text-fg-muted mt-1 capitalize">Feeling {emotion}</p>
         )}
       </div>
 
