@@ -191,12 +191,28 @@ def test_every_down_revision_resolves():
             )
 
 
-def test_governance_revision_is_the_head():
-    """The governance plane must be reachable, not orphaned behind a broken chain."""
+def test_governance_revision_is_reachable_from_the_head():
+    """The governance plane must be reachable, not orphaned behind a broken chain.
+
+    Asserting the *chain reaches it* rather than that it *is* the head: pinning
+    the head by name means every later revision fails this test and has to edit
+    it, which trains people to update the assertion instead of reading it. What
+    actually matters is that `alembic upgrade head` applies the governance
+    tables.
+    """
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
     config = Config(str(VERSIONS_DIR.parents[1] / "alembic.ini"))
     config.set_main_option("script_location", str(VERSIONS_DIR.parent))
-    heads = ScriptDirectory.from_config(config).get_heads()
-    assert heads == ["008_governance_plane"]
+    script = ScriptDirectory.from_config(config)
+
+    heads = script.get_heads()
+    assert len(heads) == 1, f"expected exactly one head, found {heads}"
+
+    # Walk down from the head and confirm the governance revision is an ancestor.
+    ancestry = [rev.revision for rev in script.walk_revisions(base="base", head="heads")]
+    assert "008_governance_plane" in ancestry, (
+        "008_governance_plane is no longer reachable from head; the governance "
+        "tables will not be created on a fresh database"
+    )

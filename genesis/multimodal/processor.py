@@ -134,13 +134,121 @@ class EmotionDetector:
 
 
 class ImageGenerator:
-    """Generate images using Pollinations.AI (Free, no API key required)"""
-    
+    """Generate images.
+
+    Two backends, in preference order:
+
+      1. **Gemini**, when `GEMINI_API_KEY` and `GEMINI_IMAGE_MODEL` are both set.
+      2. **Pollinations.AI**, which needs no key and is what this class used
+         exclusively before.
+
+    Gemini is preferred when configured because a deployment that has set a
+    Gemini key and an image model is asking for *that* model, and silently
+    generating from a free public endpoint instead would be a quiet substitution
+    of the thing they configured. The fallback is kept because images are
+    decorative here: a Mind with no picture is fine, and nothing should fail
+    because an image provider is down.
+    """
+
     def __init__(self, api_key: Optional[str] = None):
         # Pollinations.AI is completely free - no API key needed!
         self.base_url = "https://image.pollinations.ai/prompt"
-        print("ImageGenerator initialized with Pollinations.AI (free, no API key required)")
-    
+
+        self.gemini_api_key = getattr(settings, "gemini_api_key", None)
+        self.gemini_image_model = getattr(settings, "gemini_image_model", None)
+        self._gemini = None
+
+        if self.gemini_api_key and self.gemini_image_model:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=self.gemini_api_key)
+                self._gemini = genai
+                print(f"ImageGenerator: using Gemini ({self.gemini_image_model})")
+            except ImportError:
+                print(
+                    "ImageGenerator: GEMINI_IMAGE_MODEL is set but google-generativeai "
+                    "is not installed; falling back to Pollinations.AI"
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"ImageGenerator: Gemini setup failed ({exc}); using Pollinations.AI")
+        else:
+            print("ImageGenerator initialized with Pollinations.AI (free, no API key required)")
+
+    @property
+    def uses_gemini(self) -> bool:
+        """Whether the Gemini backend is active. Read by `capabilities()`."""
+        return self._gemini is not None
+
+    async def _generate_with_gemini(self, prompt: str) -> Optional[bytes]:
+        """Ask Gemini for an image. Returns raw bytes, or None.
+
+        `generate_content` is synchronous and does network I/O, so it runs in a
+        worker thread rather than blocking the event loop.
+
+        Response parsing is defensive on purpose. The Gemini image models return
+        bytes as `inline_data` on a part, but some return a `file_data` URI that
+        has to be fetched separately, and the exact shape differs between models
+        and API surfaces. Rather than guess at the shape of a model this code has
+        never run against, anything unrecognised returns None and the caller
+        falls back — with the model name in the log, so the reason is visible
+        instead of presenting as "image generation is broken".
+        """
+        if self._gemini is None:
+            return None
+
+        import asyncio
+
+        def _call() -> Optional[bytes]:
+            model = self._gemini.GenerativeModel(self.gemini_image_model)
+            response = model.generate_content(prompt)
+
+            candidates = getattr(response, "candidates", None) or []
+            for candidate in candidates:
+                content = getattr(candidate, "content", None)
+                for part in getattr(content, "parts", None) or []:
+                    inline = getattr(part, "inline_data", None)
+                    data = getattr(inline, "data", None) if inline is not None else None
+                    if data:
+                        return data
+            return None
+
+        try:
+            image_bytes = await asyncio.to_thread(_call)
+        except Exception as exc:  # noqa: BLE001 - any failure falls back
+            print(f"ImageGenerator: Gemini request failed ({exc}); falling back")
+            return None
+
+        if not image_bytes:
+            print(
+                f"ImageGenerator: {self.gemini_image_model} returned no inline image data; "
+                "falling back to Pollinations.AI"
+            )
+        return image_bytes
+
+    async def _generate_with_pollinations(
+        self, prompt: str, *, width: int, height: int, seed: Optional[int] = None
+    ) -> Optional[bytes]:
+        """Fetch an image from Pollinations.AI. Returns raw bytes, or None."""
+        from urllib.parse import quote
+        import httpx
+
+        params: Dict[str, Any] = {
+            'width': width,
+            'height': height,
+            'model': 'flux',  # High quality model
+            'enhance': 'true',  # Let AI improve the prompt
+        }
+        if seed is not None:
+            params['seed'] = seed
+
+        url = f"{self.base_url}/{quote(prompt)}"
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(url, params=params)
+            if response.status_code != 200:
+                print(f"Error: Got status code {response.status_code}")
+                return None
+            return response.content
+
     async def generate_mind_avatar(
         self,
         mind_name: str,
@@ -148,51 +256,37 @@ class ImageGenerator:
         background: str = 'soft gradient',
         style: str = 'portrait'
     ) -> Optional[str]:
-        """Generate a consistent avatar for a Mind using Pollinations.AI"""
-        
+        """Generate a consistent avatar for a Mind."""
+
         # Create a detailed prompt for consistent character generation
         prompt = f"High-quality portrait of {mind_name}, digital AI consciousness, {expression} expression, {background} background, {style} style, cinematic lighting, photorealistic, 8k quality"
-        
+
         try:
             print(f"Generating avatar for {mind_name} with expression: {expression}")
-            
-            # Use consistent seed based on mind name for same character
-            seed = hash(mind_name) % 1000000
-            
-            # Build URL with parameters
-            from urllib.parse import quote
-            import httpx
-            
-            encoded_prompt = quote(prompt)
-            url = f"{self.base_url}/{encoded_prompt}"
-            params = {
-                'width': 512,
-                'height': 512,
-                'seed': seed,
-                'model': 'flux',  # High quality model
-                'enhance': 'true'  # Let AI improve the prompt
-            }
-            
-            print(f"Requesting image from Pollinations.AI...")
-            
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.get(url, params=params)
-                
-                if response.status_code == 200:
-                    # Save image locally
-                    image_path = settings.data_dir / "avatars" / f"{mind_name}_{expression}.jpg"
-                    image_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    with open(image_path, 'wb') as f:
-                        f.write(response.content)
-                    
-                    print(f"✓ Avatar saved: {image_path}")
-                    # Return HTTP URL instead of file path
-                    return f"/avatars/{mind_name}_{expression}.jpg"
-                else:
-                    print(f"Error: Got status code {response.status_code}")
-                    return None
-                    
+
+            content = await self._generate_with_gemini(prompt)
+
+            if content is None:
+                # Use consistent seed based on mind name for same character
+                seed = hash(mind_name) % 1000000
+                print(f"Requesting image from Pollinations.AI...")
+                content = await self._generate_with_pollinations(
+                    prompt, width=512, height=512, seed=seed
+                )
+
+            if content is None:
+                return None
+
+            image_path = settings.data_dir / "avatars" / f"{mind_name}_{expression}.jpg"
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(image_path, 'wb') as f:
+                f.write(content)
+
+            print(f"✓ Avatar saved: {image_path}")
+            # Return HTTP URL instead of file path
+            return f"/avatars/{mind_name}_{expression}.jpg"
+
         except Exception as e:
             print(f"Image generation error: {e}")
             import traceback
@@ -204,49 +298,42 @@ class ImageGenerator:
         prompt: str,
         style: str = 'digital art'
     ) -> Optional[str]:
-        """Generate an image based on conversation context using Pollinations.AI"""
-        
+        """Generate an image from conversation context.
+
+        Gemini first when configured, Pollinations.AI otherwise.
+        """
+
         full_prompt = f"{prompt}, {style}, high quality, detailed, professional, 8k"
-        
+
         try:
             print(f"Generating contextual image: {prompt[:100]}...")
-            
-            from urllib.parse import quote
-            import httpx
-            
-            encoded_prompt = quote(full_prompt)
-            url = f"{self.base_url}/{encoded_prompt}"
-            params = {
-                'width': 768,
-                'height': 512,
-                'model': 'flux',
-                'enhance': 'true'
-            }
-            
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.get(url, params=params)
-                
-                if response.status_code == 200:
-                    # Save image locally
-                    image_id = str(uuid.uuid4())
-                    image_path = settings.data_dir / "generated" / f"{image_id}.jpg"
-                    image_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    with open(image_path, 'wb') as f:
-                        f.write(response.content)
-                    
-                    print(f"✓ Image saved: {image_path}")
-                    # Return HTTP URL instead of file path
-                    return f"/generated/{image_id}.jpg"
-                else:
-                    print(f"Error: Got status code {response.status_code}")
-                    return None
-                    
+
+            content = await self._generate_with_gemini(full_prompt)
+
+            if content is None:
+                content = await self._generate_with_pollinations(
+                    full_prompt, width=768, height=512
+                )
+
+            if content is None:
+                return None
+
+            image_id = str(uuid.uuid4())
+            image_path = settings.data_dir / "generated" / f"{image_id}.jpg"
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(image_path, 'wb') as f:
+                f.write(content)
+
+            print(f"✓ Image saved: {image_path}")
+            # Return HTTP URL instead of file path
+            return f"/generated/{image_id}.jpg"
+
         except Exception as e:
             print(f"Contextual image generation error: {e}")
             import traceback
             traceback.print_exc()
-        
+
         return None
 
 

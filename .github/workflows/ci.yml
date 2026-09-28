@@ -135,11 +135,23 @@ jobs:
           absent_chain = chain - columns
           head = con.execute("select version_num from alembic_version").fetchone()
 
-          print(f"tables: {len(tables)}, head: {head[0] if head else None}")
-          if missing or absent_chain or not head or head[0] != "008_governance_plane":
+          # `users.hashed_password` must exist. Without it the login path fails
+          # closed and every credential read returns "no such column", which
+          # presents as "sign-in stopped working" with nothing explaining why.
+          user_columns = {r[1] for r in con.execute("pragma table_info(users)")}
+          head_revision = head[0] if head else None
+
+          print(f"tables: {len(tables)}, head: {head_revision}")
+          if missing or absent_chain or not head:
               print(f"missing tables: {missing}, missing chain columns: {absent_chain}")
               sys.exit(1)
-          print("governance schema verified")
+          if "hashed_password" not in user_columns:
+              print(f"users.hashed_password missing; users columns: {sorted(user_columns)}")
+              sys.exit(1)
+          if head_revision != "009_user_credentials":
+              print(f"unexpected head revision: {head_revision}")
+              sys.exit(1)
+          print("governance and user-credential schema verified")
           PY
 
       - name: Full round trip (head -> base -> head)

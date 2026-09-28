@@ -20,13 +20,27 @@ from genesis.api import auth as auth_module
 
 @pytest.fixture()
 def clean_users(monkeypatch):
-    """Give each test its own empty user store.
+    """Give each test its own empty world.
 
-    `USERS_DB` is module-level process memory, so tests would otherwise leak
-    accounts into one another.
+    Both stores have to be cleared. `USERS_DB` is process memory, but the
+    bootstrap admin is now also a row in `users`, so a row left by another test
+    would satisfy "seed the admin" and this file's assertions about *not*
+    seeding would never actually run.
     """
     monkeypatch.setattr(auth_module, "USERS_DB", {})
+    _purge_durable_admin()
     yield auth_module.USERS_DB
+    _purge_durable_admin()
+
+
+def _purge_durable_admin():
+    """Remove the bootstrap admin from the database, if it is there."""
+    try:
+        from genesis.database.manager import MetaverseDB
+        MetaverseDB().delete_user_record(auth_module.DEFAULT_ADMIN_USERNAME)
+    except Exception:  # noqa: BLE001 - the database may not be initialised yet
+        pass
+    auth_module.USERS_DB.pop(auth_module.DEFAULT_ADMIN_USERNAME, None)
 
 
 def _seed(monkeypatch, environment, password=None):

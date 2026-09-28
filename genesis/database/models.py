@@ -523,16 +523,32 @@ class UserRecord(Base):
     email = Column(String(255), nullable=True, unique=True, index=True)
     role = Column(String(20), nullable=False, default="user")
     disabled = Column(Boolean, nullable=False, default=False)
+    #: bcrypt hash of the account password.
+    #:
+    #: Null for accounts that have no password: Firebase users (they authenticate
+    #: at Google) and rows created by older builds, which recorded a user's role
+    #: and email but never the credential, so every such account became unable to
+    #: sign in after a restart. Null means "no password login", which is why it is
+    #: nullable rather than a placeholder hash — a placeholder would be a
+    #: credential that no one set.
+    hashed_password = Column(String(255), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     last_updated = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self) -> dict:
+        """Public view. Deliberately excludes `hashed_password`.
+
+        This is what `/api/v1/admin/users` serialises, so adding the hash to the
+        model must not put it on the wire.
+        """
         return {
             "username": self.username,
             "email": self.email,
             "role": self.role,
             "disabled": self.disabled,
+            "has_password": self.hashed_password is not None,
         }
+
 
 
 class GenesisCore(Base):

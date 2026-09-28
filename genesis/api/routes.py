@@ -40,6 +40,12 @@ settings = get_settings()
 # Initialize logger
 logger = logging.getLogger(__name__)
 
+#: Shortest password accepted when an administrator sets one for a user.
+#: Matches the bootstrap rule in `genesis/api/auth.py`: a deliberately-set weak
+#: credential is more dangerous than an absent one, because it is assumed to have
+#: been chosen carefully.
+MINIMUM_USER_PASSWORD_LENGTH = 12
+
 # Routers
 minds_router = APIRouter()
 system_router = APIRouter()
@@ -406,11 +412,33 @@ async def admin_create_user(body: Dict[str, str]):
 async def admin_update_user(username: str, body: Dict[str, Any]):
     role = body.get('role')
     disabled = body.get('disabled')
+    password = body.get('password')
+
     from genesis.database.manager import MetaverseDB
     db = MetaverseDB()
     updated = db.update_user_record(username, role=role, disabled=disabled)
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if password:
+        # Also the recovery path for accounts written before credentials were
+        # stored: those rows exist with no password, so nobody could sign in as
+        # them. Setting one here is how they are brought back.
+        from genesis.api import auth as auth_module
+        if len(str(password)) < MINIMUM_USER_PASSWORD_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail=f"password must be at least {MINIMUM_USER_PASSWORD_LENGTH} characters",
+            )
+        if not auth_module.update_user_password(username, str(password)):
+            raise HTTPException(status_code=500, detail="Could not set the password")
+
+    # Token resolution reads a process-local cache in front of the database, so a
+    # role or disabled change made here would not take effect until the next
+    # restart. Invalidate, and the next request re-reads the row.
+    from genesis.api.auth import invalidate_user_cache
+    invalidate_user_cache(username)
+
     return {"success": True, "username": username}
 
 
@@ -3287,7 +3315,12 @@ async def system_status(current_user: User = Depends(get_current_active_user)):
 
 @system_router.get("/providers")
 async def get_providers(current_user: User = Depends(get_current_active_user)):
-    """Get available model providers."""
+    """Get available model providers, and what is configured for each purpose.
+
+    `media_routing` answers "which model actually generates an image here, and is
+    the endpoint I set the one being used?" — questions the provider list alone
+    cannot answer, because a fallback provider is always present.
+    """
     from genesis.models.orchestrator import ModelOrchestrator
 
     orchestrator = ModelOrchestrator()
@@ -3295,6 +3328,7 @@ async def get_providers(current_user: User = Depends(get_current_active_user)):
     return {
         "providers": orchestrator.get_available_providers(),
         "health": await orchestrator.health_check(),
+        "media_routing": settings.media_routing(),
     }
 
 

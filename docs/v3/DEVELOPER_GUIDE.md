@@ -339,6 +339,7 @@ Be careful with these — several are asserted in public material and are not tr
 | Network isolation | Verified, not assumed: `verified` requires the host to have egress **and** the namespace to block it. If the probe cannot prove both, the sandbox reports `verified: false` with the reason and the receipt records the fact |
 | Memory as a temporal knowledge graph / bi-temporal store | Not implemented. ChromaDB + a relevance multiplier; cannot express "true from March, superseded in July". ADR-0003/0004 describe the target. |
 | Portable signed identity (DID / verifiable credentials) | Not implemented. `gmid` is a local identifier. |
+| Realtime voice (`GEMINI_LIVE_MODEL`) | Not implemented. The setting is read and reported, but there is no Live API client — bidirectional audio is a feature, not a configuration. The implemented speech paths are single-shot: `genesis/senses/speech_input.py` and `speech_output.py`. |
 | Durable multi-process kernel, checkpoints, resume | Not implemented. |
 | Embodiment | Not implemented. `actuate_robot` exists only as a **governance** entry at R4. |
 | Evals harness, OpenTelemetry tracing | Not implemented (B17, B18). |
@@ -419,6 +420,10 @@ alembic downgrade -1      # drops the four governance tables
 | `API_SECRET_KEY` / `SECRET_KEY` | placeholder | The app **refuses to boot** with the placeholder outside test/dev |
 | `GENESIS_ADMIN_PASSWORD` | unset | Bootstraps the first admin account. **Required by `docker-compose.yml`.** Minimum 12 characters; a shorter value is refused and no account is created. There is no default — the published development password is seeded only in test/development. See §4 |
 | `GENESIS_ADMIN_EMAIL` | `admin@genesis.local` | Address recorded for the bootstrap admin on first start |
+| `OPENAI_ENDPOINT` | unset | Base URL for any OpenAI-compatible service. Unset means api.openai.com. A key from a gateway or router cannot work without this |
+| `OPENAI_MODEL` | unset | Model name for that endpoint. Passed through unchanged — only the endpoint knows its own namespace |
+| `GEMINI_IMAGE_MODEL` | unset | Image generation. With `GEMINI_API_KEY` set, replaces the free Pollinations fallback for avatars and contextual images |
+| `GEMINI_LIVE_MODEL` | unset | **Recorded but not wired.** Realtime voice has no client in this codebase; setting it changes no behaviour. `GET /system/providers` reports `implemented: false` for it |
 | `DATA_DIR`, `MINDS_DIR`, `LOGS_DIR` | `~/.genesis/*` | Independent settings — do not assume they follow `GENESIS_HOME` |
 | `GENESIS_VECTOR_STORE_MODE` | from settings (`persistent`) | `ephemeral` keeps ChromaDB in memory. Read from the environment, not from `Settings`, because `Settings` has no `env_prefix` — a field named `vector_store_mode` would look for `VECTOR_STORE_MODE`. The test suite requires `ephemeral` |
 
@@ -708,6 +713,8 @@ tests/
                      #   secrets, the bootstrap admin boundary
   test_migrations.py # 31 tests: migration-chain guards
   test_mind_ownership.py # 8 tests: who may access a Mind, and placeholder repair
+  security/test_default_admin.py   # 10 tests: the bootstrap-admin boundary
+  security/test_persistent_users.py # 13 tests: accounts survive a restart
 docs/
   architecture/adr/  # ADR-0001 .. ADR-0008
   v3/
@@ -735,8 +742,9 @@ docs/
 | MCP servers inherit `os.environ` | ✅ **fixed** | Closed by the base allowlist in `mcp_integration.py` (B9). |
 | Prompt keyword scan false positives | Low | Advisory only now, so it no longer blocks turns, but the lists are unreviewed. |
 | `Mind` god-object | Medium | Blocks snapshot/fork/multi-process. Phase C. |
-| Users live in process memory | **High** | `USERS_DB` is a module-level dict. Accounts created through the admin panel are lost on restart, and the seeded admin was historically the only one that survived — which is why the default-credential issue mattered as much as it did. Moving users to the database is the next piece of work here. |
+| ~~Users live in process memory~~ | ✅ **fixed** | Accounts are now rows in `users` with a `hashed_password` column (`009_user_credentials`), and `USERS_DB` is only a cache in front of them. Before, every account created through the admin panel existed in the database with no credential and could not sign in after a restart, and a JWT issued before a restart stopped resolving. See §4 for the recovery path for accounts written by the old build |
 | No brute-force protection on the token endpoint | Medium | Rate limiting applies to `/` and `/health` only. `POST /api/v1/auth/token` is unthrottled, so a configured admin password can be guessed at speed. |
+| Additive schema changes are reconciled at startup | Low | `init_db` adds missing nullable columns via `ALTER TABLE ADD COLUMN`, because the app self-initialises its schema by default and `create_all` never alters an existing table. Necessary — without it, adding `users.hashed_password` broke login on every existing install — but it means a real migration must still be applied by hand (`RUN_MIGRATIONS=true`). The code warns when a change is not safely additive |
 | `mypy genesis` not clean | Low | A4 — the last Phase B item. |
 | Mind detail tabs still use legacy markup | Low | The highest-traffic ones (Overview, Identity, Conversation, Thinking, Plugins, LLM Calls, Autonomy, Settings, Workspace) are migrated. The rest inherit the correct theme via `globals.css`'s compatibility layer, so they read correctly, but their structure predates the design system. |
 | Ownership is a single string column | Medium | `MindRecord.creator` is compared by equality in one place. There is no notion of a co-owner, a transfer, or an org. Sufficient for now; revisit with multi-tenancy (Phase K). |

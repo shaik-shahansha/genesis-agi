@@ -530,7 +530,13 @@ class MetaverseDB:
     # =========================================================================
 
     def create_user_record(self, username: str, password_hash: Optional[str] = None, email: Optional[str] = None, role: str = "user") -> 'UserRecord':
-        """Create a persistent UserRecord. Returns the created record or existing one."""
+        """Create a persistent UserRecord. Returns the created record or existing one.
+
+        An existing row is returned unchanged, including when `password_hash` is
+        supplied. Deliberately: a caller that wants to change a credential must
+        go through `set_user_password`, so that re-registering a username cannot
+        quietly take over an account.
+        """
         from genesis.database.models import UserRecord
         with get_session() as session:
             existing = None
@@ -540,11 +546,49 @@ class MetaverseDB:
                 existing = session.query(UserRecord).filter_by(email=email).first()
             if existing:
                 return existing
-            user = UserRecord(username=username, email=email, role=role)
+            user = UserRecord(
+                username=username,
+                email=email,
+                role=role,
+                hashed_password=password_hash,
+            )
             session.add(user)
             session.commit()
             session.refresh(user)
             return user
+
+    def get_user_credentials(self, username: str) -> Optional[dict]:
+        """Look up a user's login material by username.
+
+        Returns `{"username", "email", "role", "disabled", "hashed_password"}` or
+        None. This is the only reader that returns the hash, and it is for
+        authentication — never serialise its result into a response. Use
+        `get_all_users()` for anything user-facing; it goes through
+        `UserRecord.to_dict()`, which omits the hash.
+        """
+        from genesis.database.models import UserRecord
+        with get_session() as session:
+            user = session.query(UserRecord).filter_by(username=username).first()
+            if not user:
+                return None
+            return {
+                "username": user.username,
+                "email": user.email,
+                "role": user.role,
+                "disabled": user.disabled,
+                "hashed_password": user.hashed_password,
+            }
+
+    def set_user_password(self, username: str, password_hash: Optional[str]) -> bool:
+        """Set or clear a user's password hash. Returns whether the user exists."""
+        from genesis.database.models import UserRecord
+        with get_session() as session:
+            user = session.query(UserRecord).filter_by(username=username).first()
+            if not user:
+                return False
+            user.hashed_password = password_hash
+            session.commit()
+            return True
 
     def get_all_users(self) -> list[dict]:
         """Return list of all users as dicts."""

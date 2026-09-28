@@ -124,10 +124,27 @@ def _bootstrap_admin_password() -> Optional[str]:
 def _initialize_default_users():
     """Seed the bootstrap admin, if this environment is allowed to have one.
 
-    Idempotent: an account that already exists is left alone, so calling this
-    again cannot reset a password the operator has since changed.
+    Order matters and is the whole design:
+
+      1. Already cached — done.
+      2. **The database has the account** — use it and stop. The database is
+         authoritative, so an operator who rotated the admin password does not
+         have it silently reset to the configured value on the next restart.
+      3. Otherwise seed, from `GENESIS_ADMIN_PASSWORD` or — in test/development
+         only — the published development password. The row is written to the
+         database, so the account is durable and rotatable like any other.
+
+    Before, this only touched the in-memory dict: the bootstrap admin had no row,
+    so it could not survive a restart on its own (it was re-derived from the
+    environment) and `update_user_password("admin", ...)` failed with "no such
+    user" because there was nothing to update.
     """
     if DEFAULT_ADMIN_USERNAME in USERS_DB:
+        return
+
+    existing = _persisted_user(DEFAULT_ADMIN_USERNAME)
+    if existing:
+        USERS_DB[DEFAULT_ADMIN_USERNAME] = existing
         return
 
     password = _bootstrap_admin_password()
@@ -153,14 +170,33 @@ def _initialize_default_users():
             Settings.environment_name(),
         )
 
+    email = os.environ.get("GENESIS_ADMIN_EMAIL", "admin@genesis.local").strip() or "admin@genesis.local"
+    password_hash = get_password_hash(password)
+
+    # Durable first. An admin that exists only in memory is the bug this whole
+    # change is about, and for this account it was the *only* way in.
+    try:
+        from genesis.database.manager import MetaverseDB
+        MetaverseDB().create_user_record(
+            username=DEFAULT_ADMIN_USERNAME,
+            password_hash=password_hash,
+            email=email,
+            role=UserRole.ADMIN.value,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Could not persist the bootstrap admin, so it will not survive a restart: %s",
+            exc,
+        )
+
     USERS_DB[DEFAULT_ADMIN_USERNAME] = {
         "username": DEFAULT_ADMIN_USERNAME,
-        "email": os.environ.get("GENESIS_ADMIN_EMAIL", "admin@genesis.local").strip()
-        or "admin@genesis.local",
-        "hashed_password": get_password_hash(password),
+        "email": email,
+        "hashed_password": password_hash,
         "role": UserRole.ADMIN,
         "disabled": False,
     }
+
 
 
 # In-memory API keys (should be replaced with database in production)
@@ -183,15 +219,89 @@ def get_password_hash(password: str) -> str:
     return hashed.decode('utf-8')
 
 
+def invalidate_user_cache(username: str) -> None:
+    """Drop a user from the process cache so the next read comes from the database.
+
+    Needed wherever a role, email or disabled flag is changed outside this
+    module — otherwise the change takes effect at the next restart and not
+    before, because token resolution reads the cache.
+    """
+    USERS_DB.pop(username, None)
+
+
+def _persisted_user(username: str) -> Optional[Dict[str, Any]]:
+    """Read a user's login material from the database, or None.
+
+    Returns the shape `USERS_DB` uses, so callers cannot tell the two apart. A
+    database failure returns None rather than raising: authentication is allowed
+    to fail closed, but it must not turn a transient database problem into a 500
+    on the login endpoint.
+    """
+    try:
+        from genesis.database.manager import MetaverseDB
+        return MetaverseDB().get_user_credentials(username)
+    except Exception as exc:  # noqa: BLE001 - any failure means "cannot authenticate"
+        logger.warning("Could not read credentials for %s: %s", username, exc)
+        return None
+
+
+def load_user(username: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Resolve a user, from the process cache first and the database second.
+
+    The database is the source of truth. `USERS_DB` is only a cache in front of
+    it, which is what stops a restart from signing everybody out: before this,
+    the dict *was* the store, so a token issued seconds earlier stopped resolving
+    the moment the process was replaced.
+
+    A row with no credential is still returned — it carries the role and email,
+    which is what token and API-key auth need. Whether it can password-authenticate
+    is a separate question, answered by whether `hashed_password` is set.
+    """
+    if not username:
+        return None
+
+    cached = USERS_DB.get(username)
+    if cached:
+        return cached
+
+    record = _persisted_user(username)
+    if record is None:
+        return None
+
+    USERS_DB[username] = record
+    return record
+
+
 def authenticate_user(username: str, password: str) -> Optional[User]:
-    """Authenticate a user by username and password."""
+    """Authenticate a user by username and password.
+
+    A disabled account is refused here rather than after token issue, so a
+    disabled user cannot obtain a credential at all.
+
+    An account with no stored hash cannot password-authenticate. That is a real
+    case and not an error: Firebase users have no password, and rows written by
+    older builds recorded none. Previously this called bcrypt with an empty hash,
+    which raises `ValueError: Invalid salt` — an unhandled 500 on the login
+    endpoint for a plain wrong-username guess.
+    """
     _initialize_default_users()
-    user_dict = USERS_DB.get(username)
+
+    user_dict = load_user(username)
     if not user_dict:
         return None
-    if not verify_password(password, user_dict["hashed_password"]):
+
+    if user_dict.get("disabled"):
         return None
+
+    stored_hash = user_dict.get("hashed_password")
+    if not stored_hash:
+        return None
+
+    if not verify_password(password, stored_hash):
+        return None
+
     return User(**user_dict)
+
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -311,8 +421,11 @@ async def resolve_user_from_token(token: str) -> Optional[User]:
         return None
 
     _initialize_default_users()
-    user_dict = USERS_DB.get(token_data.username)
+    user_dict = load_user(token_data.username)
     if user_dict is None:
+        return None
+
+    if user_dict.get("disabled"):
         return None
 
     # If email is in token, update the user dict with it
@@ -357,8 +470,8 @@ async def resolve_user_from_api_key(api_key: str) -> Optional[User]:
     key_data["last_used"] = datetime.utcnow().isoformat()
 
     username = key_data["username"]
-    user_dict = USERS_DB.get(username)
-    if not user_dict:
+    user_dict = load_user(username)
+    if not user_dict or user_dict.get("disabled"):
         return None
 
     # If the user's email is a global admin in DB, elevate role
@@ -496,60 +609,82 @@ def create_user(
     email: Optional[str] = None,
     role: UserRole = UserRole.USER,
 ) -> User:
-    """Create a new user (in-memory and persistent record).
+    """Create a user, durably.
 
-    This keeps compatibility with the existing in-memory USERS_DB while creating
-    a persistent `UserRecord` for admin management.
+    The password hash is written to the `users` row. It used to be kept only in
+    the in-memory dict while the row was created without it, so the account
+    existed in the database and could not sign in after a restart.
+
+    Raises:
+        ValueError: if the username is taken.
     """
-    if username in USERS_DB:
+    if load_user(username):
         raise ValueError(f"User {username} already exists")
 
+    password_hash = get_password_hash(password)
     user_dict = {
         "username": username,
         "email": email,
-        "hashed_password": get_password_hash(password),
+        "hashed_password": password_hash,
         "role": role,
         "disabled": False,
     }
 
-    # Add to in-memory store
+    # Durable first. If this fails the account must not appear to exist, because
+    # an account that only lives in memory is exactly the bug being fixed here.
+    from genesis.database.manager import MetaverseDB
+    MetaverseDB().create_user_record(
+        username=username,
+        password_hash=password_hash,
+        email=email,
+        role=role.value if isinstance(role, UserRole) else role,
+    )
+
     USERS_DB[username] = user_dict
-
-    # Also persist to DB for admin panel
-    try:
-        from genesis.database.manager import MetaverseDB
-        db = MetaverseDB()
-        db.create_user_record(username=username, email=email, role=role)
-    except Exception:
-        # Non-fatal; in-memory users still work
-        pass
-
     return User(**user_dict)
 
 
 def delete_user(username: str) -> bool:
-    """Delete a user."""
-    if username in USERS_DB:
-        del USERS_DB[username]
-        return True
-    return False
+    """Delete a user from the database and the cache."""
+    from genesis.database.manager import MetaverseDB
+
+    removed_db = MetaverseDB().delete_user_record(username)
+    removed_cache = USERS_DB.pop(username, None) is not None
+    return removed_db or removed_cache
 
 
 def update_user_password(username: str, new_password: str) -> bool:
-    """Update user password."""
-    if username not in USERS_DB:
+    """Set a user's password, durably.
+
+    This is also the recovery path for accounts written by an older build, which
+    have a row but no credential: setting one here makes them usable again.
+    """
+    user_dict = load_user(username)
+    if not user_dict:
         return False
 
-    USERS_DB[username]["hashed_password"] = get_password_hash(new_password)
+    password_hash = get_password_hash(new_password)
+
+    from genesis.database.manager import MetaverseDB
+    if not MetaverseDB().set_user_password(username, password_hash):
+        return False
+
+    user_dict["hashed_password"] = password_hash
     return True
 
 
+
 def update_user_email(username: str, email: str) -> bool:
-    """Update user email."""
-    if username not in USERS_DB:
+    """Update a user's email address, durably."""
+    user_dict = load_user(username)
+    if not user_dict:
         return False
 
-    USERS_DB[username]["email"] = email
+    from genesis.database.manager import MetaverseDB
+    if not MetaverseDB().update_user_record(username, email=email):
+        return False
+
+    user_dict["email"] = email
     return True
 
 

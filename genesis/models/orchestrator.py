@@ -55,7 +55,10 @@ class ModelOrchestrator:
                     traceback.print_exc()
 
             if 'openai' in self.api_keys:
-                self.providers["openai"] = OpenAIProvider(api_key=self.api_keys['openai'])
+                self.providers["openai"] = OpenAIProvider(
+                    api_key=self.api_keys['openai'],
+                    base_url=self.settings.openai_endpoint,
+                )
 
             if 'anthropic' in self.api_keys:
                 self.providers["anthropic"] = AnthropicProvider(api_key=self.api_keys['anthropic'])
@@ -82,7 +85,10 @@ class ModelOrchestrator:
 
             openai_key = self.settings.openai_api_key
             if openai_key:
-                self.providers["openai"] = OpenAIProvider(api_key=openai_key)
+                self.providers["openai"] = OpenAIProvider(
+                    api_key=openai_key,
+                    base_url=self.settings.openai_endpoint,
+                )
 
             anthropic_key = self.settings.anthropic_api_key
             if anthropic_key:

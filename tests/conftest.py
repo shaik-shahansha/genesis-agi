@@ -25,6 +25,10 @@ import tempfile
 import shutil
 from typing import Generator, Dict, Any
 
+#: Scratch home for the whole session. Set in `pytest_configure` so that every
+#: `Settings` constructed afterwards points here.
+_TEST_HOME = Path(tempfile.mkdtemp(prefix="genesis-test-home-"))
+
 
 def pytest_configure(config):
     """Set the test environment before any genesis module reads settings.
@@ -38,6 +42,32 @@ def pytest_configure(config):
     # The durable governance store is the production default; tests that want it
     # opt in explicitly (see tests/governance/test_sql_store.py).
     os.environ.setdefault("GENESIS_GOVERNANCE_STORE", "memory")
+
+    # Point the whole suite at a throwaway home.
+    #
+    # `data_dir`, `minds_dir` and `logs_dir` are INDEPENDENT settings, so setting
+    # only GENESIS_HOME would leave the database, Mind JSON and logs in the real
+    # `~/.genesis`. (`docker-compose.yml` carries the same caveat, for the same
+    # reason.)
+    #
+    # This became necessary when user accounts turned into rows in `genesis.db`:
+    # the suite started writing into the developer's own database and reading
+    # back whatever a previous run had left. That made the bootstrap-admin tests
+    # order-dependent — a row created by one test satisfied "seed the admin" for
+    # the next, so a test asserting "nothing was seeded" saw a leftover account.
+    home = str(_TEST_HOME)
+    os.environ.setdefault("GENESIS_HOME", home)
+    os.environ.setdefault("DATA_DIR", f"{home}/data")
+    os.environ.setdefault("MINDS_DIR", f"{home}/minds")
+    os.environ.setdefault("LOGS_DIR", f"{home}/logs")
+
+    for path in (home, f"{home}/data", f"{home}/minds", f"{home}/logs"):
+        Path(path).mkdir(parents=True, exist_ok=True)
+
+
+def pytest_unconfigure(config):
+    """Remove the scratch home."""
+    shutil.rmtree(_TEST_HOME, ignore_errors=True)
 
 
 @pytest.fixture(scope="session", autouse=True)
