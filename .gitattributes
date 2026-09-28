@@ -1,0 +1,31 @@
+# Normalise line endings so container builds are reproducible across platforms.
+#
+# Shell scripts MUST be LF: a CRLF shebang makes bash fail inside the Linux
+# container with "\r: command not found", which is easy to hit when the repo is
+# cloned on Windows.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.conf          text eol=lf
+
+# Python and web sources: keep LF in the repo, allow native endings on checkout.
+*.py            text eol=lf
+*.ts            text eol=lf
+*.tsx           text eol=lf
+*.js            text eol=lf
+*.json          text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.md            text eol=lf
+*.toml          text eol=lf
+*.ini           text eol=lf
+
+# Binary assets must never be converted.
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.pdf           binary
+*.woff          binary
+*.woff2         binary
+*.ttf           binary
+*.ico           binary
