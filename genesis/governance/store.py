@@ -471,9 +471,15 @@ class SqlAlchemyGovernanceStore:
             models.GovernanceEventRecord.sequence.desc(),
         ).limit(limit)
 
+        # Convert INSIDE the session block. `get_session()` commits and closes on
+        # exit, and SQLAlchemy expires instances on commit, so accessing an
+        # attribute of a returned row afterwards raises DetachedInstanceError.
+        # This only reproduces once rows exist, which is why it survived the
+        # in-memory test suite and surfaced the first time the journal had a
+        # single event in it.
         with get_session() as session:
             records = session.execute(statement).scalars().all()
-        events = [_record_to_event(record) for record in records]
+            events = [_record_to_event(record) for record in records]
         events.reverse()
         return events
 
@@ -495,7 +501,8 @@ class SqlAlchemyGovernanceStore:
 
         with get_session() as session:
             records = session.execute(statement).scalars().all()
-        return _verify_stream([_record_to_event(record) for record in records], limit=limit)
+            events = [_record_to_event(record) for record in records]
+        return _verify_stream(events, limit=limit)
 
     # -- receipts -------------------------------------------------------- #
     def save_receipt(self, receipt: ActionReceipt) -> ActionReceipt:
@@ -550,7 +557,7 @@ class SqlAlchemyGovernanceStore:
 
         with get_session() as session:
             records = session.execute(statement).scalars().all()
-        return [_record_to_receipt(record) for record in records]
+            return [_record_to_receipt(record) for record in records]
 
     # -- approvals -------------------------------------------------------- #
     def save_approval(self, approval: ApprovalRequest) -> ApprovalRequest:
@@ -608,7 +615,7 @@ class SqlAlchemyGovernanceStore:
 
         with get_session() as session:
             records = session.execute(statement).scalars().all()
-        return [_record_to_approval(record) for record in records]
+            return [_record_to_approval(record) for record in records]
 
     # -- grants ----------------------------------------------------------- #
     def save_grant(self, grant: PermissionGrant) -> PermissionGrant:
@@ -670,7 +677,7 @@ class SqlAlchemyGovernanceStore:
 
         with get_session() as session:
             records = session.execute(statement).scalars().all()
-        return [_record_to_grant(record) for record in records]
+            return [_record_to_grant(record) for record in records]
 
 
 # --------------------------------------------------------------------------- #
