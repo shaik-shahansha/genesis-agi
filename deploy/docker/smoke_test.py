@@ -16,8 +16,10 @@ Run INSIDE the container:
 
 Exit code 0 = all checks passed, 1 = at least one check failed.
 
-No API keys are required: every check is either unauthenticated by design or uses
-the built-in admin account.
+API keys are not required: every check is either unauthenticated by design or
+uses the admin account. The admin password comes from `GENESIS_ADMIN_PASSWORD`,
+and falls back to the development default so that a local `GENESIS_ENV=development`
+container can still be checked without exporting anything.
 """
 
 from __future__ import annotations
@@ -33,10 +35,16 @@ from pathlib import Path
 
 DEFAULT_BASE = os.environ.get("SMOKE_BASE_URL", "http://127.0.0.1:8080")
 
-# The default admin seeded by genesis/api/auth.py. Intentionally public in the
-# source today; see docs/v3/SECURITY_BASELINE.md SEC-08 (T-16 in the threat model).
-DEFAULT_ADMIN_USER = "admin"
-DEFAULT_ADMIN_PASSWORD = "genesis-admin-2026"
+# Credentials for the authenticated checks.
+#
+# These read the environment rather than hardcoding the published development
+# password. That password is no longer seeded outside test/development (see
+# tests/security/test_default_admin.py), so a production container would fail
+# these checks with a misleading "admin login failed" if they were hardcoded here
+# — pointing at the auth path when the real answer is "you did not export the
+# password you configured".
+DEFAULT_ADMIN_USER = os.environ.get("GENESIS_ADMIN_USER", "admin")
+DEFAULT_ADMIN_PASSWORD = os.environ.get("GENESIS_ADMIN_PASSWORD", "genesis-admin-2026")
 
 results: list[tuple[bool, str, str]] = []
 

@@ -10,7 +10,9 @@ Provides:
 
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+import os
 import secrets
+import logging
 from enum import Enum
 
 from fastapi import Depends, HTTPException, status, Security
@@ -20,7 +22,10 @@ import bcrypt
 from pydantic import BaseModel
 
 from genesis.config import get_settings
+from genesis.config.settings import Settings, _INSECURE_ALLOWED_ENVS
 from genesis.api.firebase_auth import verify_firebase_token, is_firebase_enabled
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -62,20 +67,101 @@ class TokenData(BaseModel):
     role: Optional[str] = None
 
 
-# In-memory user store (should be replaced with database in production)
-# Lazy initialization to avoid hashing at import time
+#: In-memory user store (should be replaced with database in production)
+#: Lazy initialization to avoid hashing at import time
 USERS_DB: Dict[str, Dict[str, Any]] = {}
 
+#: Username of the account seeded to make a fresh install reachable at all.
+DEFAULT_ADMIN_USERNAME = "admin"
+
+#: The password seeded in test/development. **Published in this repository**, so
+#: it must never be usable outside those environments — see
+#: `_bootstrap_admin_password`.
+DEFAULT_DEV_ADMIN_PASSWORD = "genesis-admin-2026"
+
+#: Set this to bootstrap the first admin on a real deployment.
+ADMIN_PASSWORD_ENV = "GENESIS_ADMIN_PASSWORD"
+
+#: Shortest bootstrap password accepted as real. Below this it is refused rather
+#: than used, because a deliberately-configured weak secret is *more* dangerous
+#: than a default: it is assumed to have been chosen carefully.
+MINIMUM_ADMIN_PASSWORD_LENGTH = 12
+
+
+def _bootstrap_admin_password() -> Optional[str]:
+    """The password to seed the first admin with, or `None` to seed nothing.
+
+    The rule is: an explicit configuration wins, otherwise the published
+    development password is used **only** in test/development.
+
+    This exists because the account used to be created unconditionally, in every
+    environment, as a side effect of someone trying to log in. The password has
+    been in this repository the whole time, so every reachable Genesis install
+    had a publicly-known administrator login — the same class of mistake the
+    signing-key check prevents, and invisible for the same reason: it looks like
+    a convenience and behaves like a working credential.
+    """
+    configured = os.environ.get(ADMIN_PASSWORD_ENV, "").strip()
+    if configured:
+        if len(configured) < MINIMUM_ADMIN_PASSWORD_LENGTH:
+            logger.error(
+                "%s is set but shorter than %d characters, so no admin account has been "
+                "created. A weak configured password is worse than none, because it is "
+                "assumed to have been chosen deliberately. Generate one with: "
+                'python -c "import secrets; print(secrets.token_urlsafe(24))"',
+                ADMIN_PASSWORD_ENV,
+                MINIMUM_ADMIN_PASSWORD_LENGTH,
+            )
+            return None
+        return configured
+
+    if Settings.environment_name() in _INSECURE_ALLOWED_ENVS:
+        return DEFAULT_DEV_ADMIN_PASSWORD
+
+    return None
+
+
 def _initialize_default_users():
-    """Initialize default users if not already done."""
-    if "admin" not in USERS_DB:
-        USERS_DB["admin"] = {
-            "username": "admin",
-            "email": "admin@genesis.local",
-            "hashed_password": get_password_hash("genesis-admin-2026"),  # Default password
-            "role": UserRole.ADMIN,
-            "disabled": False,
-        }
+    """Seed the bootstrap admin, if this environment is allowed to have one.
+
+    Idempotent: an account that already exists is left alone, so calling this
+    again cannot reset a password the operator has since changed.
+    """
+    if DEFAULT_ADMIN_USERNAME in USERS_DB:
+        return
+
+    password = _bootstrap_admin_password()
+    if password is None:
+        logger.warning(
+            "No admin account exists and none was created, because GENESIS_ENV=%s and "
+            "%s is not set. Set %s to bootstrap the first administrator:\n"
+            '  python -c "import secrets; print(secrets.token_urlsafe(24))"\n'
+            "Then export it as %s and restart. Until you do, there is no account that "
+            "can sign in.",
+            Settings.environment_name(),
+            ADMIN_PASSWORD_ENV,
+            ADMIN_PASSWORD_ENV,
+            ADMIN_PASSWORD_ENV,
+        )
+        return
+
+    if password == DEFAULT_DEV_ADMIN_PASSWORD:
+        logger.warning(
+            "Seeded the development admin (%s) because GENESIS_ENV=%s. The password is "
+            "published in this repository, so do not expose this process to a network.",
+            DEFAULT_ADMIN_USERNAME,
+            Settings.environment_name(),
+        )
+
+    USERS_DB[DEFAULT_ADMIN_USERNAME] = {
+        "username": DEFAULT_ADMIN_USERNAME,
+        "email": os.environ.get("GENESIS_ADMIN_EMAIL", "admin@genesis.local").strip()
+        or "admin@genesis.local",
+        "hashed_password": get_password_hash(password),
+        "role": UserRole.ADMIN,
+        "disabled": False,
+    }
+
 
 # In-memory API keys (should be replaced with database in production)
 API_KEYS: Dict[str, Dict[str, Any]] = {}

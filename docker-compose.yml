@@ -1,7 +1,8 @@
 # =============================================================================
 # Genesis Minds — SINGLE-CONTAINER deployment (VPS-friendly)
 #
-#   cp .env.example .env      # then set API_SECRET_KEY + one model API key
+#   cp .env.example .env      # then set API_SECRET_KEY, GENESIS_ADMIN_PASSWORD
+#                             # and one model API key
 #   docker compose up -d --build
 #
 # Everything runs in ONE container behind ONE port:
@@ -71,6 +72,20 @@ services:
       # default is a public constant (see docs/v3/SECURITY_BASELINE.md SEC-08).
       # Generate with:  openssl rand -hex 32
       API_SECRET_KEY: "${API_SECRET_KEY:?API_SECRET_KEY must be set in .env - run: openssl rand -hex 32}"
+
+      # Required. Bootstraps the first administrator account.
+      #
+      # This used to be implicit: the app seeded `admin` with the password
+      # `genesis-admin-2026`, which is published in the source. Between that and
+      # the user store being process memory, it meant every reachable install had
+      # a publicly-known administrator, and it was the only account that survived
+      # a restart. There is no default now, so this must be set.
+      # Generate with:  openssl rand -base64 24
+      GENESIS_ADMIN_PASSWORD: "${GENESIS_ADMIN_PASSWORD:?GENESIS_ADMIN_PASSWORD must be set in .env - run: openssl rand -base64 24}"
+
+      # Optional. Address recorded for the bootstrap admin. Only used on the
+      # first start, when no account exists yet.
+      GENESIS_ADMIN_EMAIL: "${GENESIS_ADMIN_EMAIL:-admin@genesis.local}"
 
       # Only needed if the web app is served from a DIFFERENT origin.
       # Empty is correct for this single-container, same-origin setup.

@@ -163,9 +163,10 @@ No migration has been added for any V3 control-plane concept (none exist).
   is the literal string `"your-secret-key-change-this-in-production"`.
 - Token lifetime: `ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24` (24h). Uses naive
   `datetime.utcnow()` (deprecated).
-- `USERS_DB`, a module-level **in-memory dict**, with an auto-seeded `admin` user whose
-  password is hardcoded `genesis-admin-2026`. Comment in code: *"should be replaced with
-  database in production"*.
+- `USERS_DB`, a module-level **in-memory dict**, reset on every restart. It previously
+  auto-seeded `admin` with the hardcoded password `genesis-admin-2026`; that seed now happens
+  only in test/development, or when `GENESIS_ADMIN_PASSWORD` (≥12 chars) is set. The in-memory
+  store itself is unchanged — see the note below on why that matters.
 - `API_KEYS`, another **in-memory dict**; API keys are lost on restart.
 - Firebase ID token verification available (`genesis/api/firebase_auth.py`), optional.
 - Password hashing: `bcrypt` via `passlib` import, direct `bcrypt` calls, 72-byte truncation.

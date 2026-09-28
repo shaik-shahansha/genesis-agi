@@ -27,8 +27,10 @@ import urllib.parse
 import urllib.request
 
 DEFAULT_BASE = os.environ.get("SMOKE_BASE_URL", "http://127.0.0.1:8080")
-ADMIN_USER = "admin"
-ADMIN_PASSWORD = "genesis-admin-2026"
+# Read from the environment; the published development password is only a
+# fallback for a local GENESIS_ENV=development container.
+ADMIN_USER = os.environ.get("GENESIS_ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("GENESIS_ADMIN_PASSWORD", "genesis-admin-2026")
 
 results: list[tuple[bool, str, str]] = []
 

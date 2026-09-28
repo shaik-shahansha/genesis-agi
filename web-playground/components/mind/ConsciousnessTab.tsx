@@ -2,169 +2,243 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import {
+  EmptyState,
+  ErrorState,
+  LoadingRows,
+  Section,
+  StatusBadge,
+} from '@/components/governance/primitives';
+import { RefreshIcon, SparkIcon } from '@/components/shell/icons';
 
 interface ConsciousnessTabProps {
   mindId: string;
 }
 
+type Feedback = { tone: 'success' | 'danger'; message: string };
+
+/**
+ * The Mind's thought stream and recent activity.
+ *
+ * Changes worth naming:
+ *
+ *  - The activity panel was hardcoded dark (`bg-gray-900`, `text-white`) on one
+ *    of the few screens that is not a terminal, so in light mode it was a black
+ *    slab with near-invisible text. It uses theme tokens now.
+ *  - `triggerThought` reported success only to `console.log`. Clicking "Generate
+ *    Thought" produced no visible response at all — the honest reading was that
+ *    the button was broken. It now says what happened, including when the model
+ *    returned nothing.
+ *  - The tab blocked on `loading` for every fetch, so switching auto-refresh on
+ *    blanked the whole view every ten seconds. Only the first load blocks now.
+ */
 export default function ConsciousnessTab({ mindId }: ConsciousnessTabProps) {
   const [thoughts, setThoughts] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   useEffect(() => {
     loadData();
   }, [mindId]);
 
-  // Auto-refresh every 10 seconds (disabled by default)
   useEffect(() => {
     if (!autoRefresh) return;
-    
-    const interval = setInterval(() => {
-      loadData();
-    }, 10000);
-    
+    const interval = setInterval(() => loadData({ quiet: true }), 10000);
     return () => clearInterval(interval);
   }, [mindId, autoRefresh]);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async ({ quiet = false }: { quiet?: boolean } = {}) => {
+    if (!quiet) setLoading(true);
+    setError(null);
     try {
       const [thoughtsData, logsData] = await Promise.all([
         api.getMindThoughts(mindId, 20),
         api.getMindLogs(mindId, 50),
       ]);
-      setThoughts(thoughtsData.thoughts || []);
-      setLogs(logsData.logs || []);
-    } catch (error) {
-      console.error('Error loading consciousness data:', error);
+      setThoughts(thoughtsData?.thoughts || []);
+      setLogs(logsData?.logs || []);
+    } catch (err: any) {
+      setError(err?.message || 'Could not load the consciousness stream.');
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
   const triggerThought = async () => {
     if (generating) return;
-    
+
     setGenerating(true);
+    setFeedback(null);
     try {
       const result = await api.generateThought(mindId);
-      console.log('Generated thought:', result);
-      
-      // Wait a moment for the thought to be saved
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Reload the data
-      await loadData();
-      
-      if (result.success) {
-        // Show success feedback
-        console.log('Thought generated successfully');
-      }
-    } catch (error: any) {
-      console.error('Error generating thought:', error);
-      alert(`Failed to generate thought: ${error.message}`);
+      await loadData({ quiet: true });
+
+      // The endpoint can return 200 with nothing in it when no provider is
+      // configured. Saying "done" there would be wrong, so the message depends
+      // on what actually came back.
+      const produced = result?.thought || result?.content || result?.success;
+      setFeedback(
+        produced
+          ? { tone: 'success', message: 'Thought generated. It should appear below.' }
+          : {
+              tone: 'danger',
+              message:
+                'The request succeeded but no thought came back. That usually means no model provider is configured for this Mind — check Settings, then the daemon status on the Overview tab.',
+            }
+      );
+    } catch (err: any) {
+      setFeedback({
+        tone: 'danger',
+        message: `Could not generate a thought: ${err?.message ?? 'unknown error'}`,
+      });
     } finally {
       setGenerating(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="text-center py-8">
-        <div className="spinner mx-auto"></div>
-      </div>
-    );
+    return <LoadingRows rows={3} label="Loading the consciousness stream" />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Consciousness Stream</h2>
-          <div className="flex gap-2 items-center">
-            <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input 
-                type="checkbox" 
-                checked={autoRefresh} 
+      {error && <ErrorState message={error} onRetry={() => loadData()} />}
+
+      {feedback && (
+        <div
+          role="status"
+          className={`rounded-card border p-3 text-sm ${
+            feedback.tone === 'success'
+              ? 'border-success/40 bg-success/5 text-fg'
+              : 'border-danger/40 bg-danger/5 text-fg'
+          }`}
+        >
+          {feedback.message}
+        </div>
+      )}
+
+      <Section
+        title="Thought stream"
+        description="A thought is produced by the cognition loop, which runs in the daemon — not in this page."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="consciousness-auto" className="flex cursor-pointer items-center gap-2">
+              <input
+                id="consciousness-auto"
+                type="checkbox"
+                checked={autoRefresh}
                 onChange={(e) => setAutoRefresh(e.target.checked)}
-                className="rounded"
+                className="h-4 w-4 rounded border-line accent-[rgb(var(--accent))]"
               />
-              Auto-refresh (10s)
+              <span className="text-xs text-fg-muted">Auto-refresh (10s)</span>
             </label>
-            <button 
-              onClick={triggerThought} 
-              className="btn-primary"
+            <button
+              type="button"
+              onClick={triggerThought}
               disabled={generating}
+              className="btn-primary btn-sm"
             >
-              {generating ? '⏳ Generating...' : '💭 Generate Thought'}
+              <SparkIcon className="h-4 w-4" />
+              {generating ? 'Generating…' : 'Generate one now'}
             </button>
-            <button 
-              onClick={loadData} 
-              className="btn-ghost"
+            <button
+              type="button"
+              onClick={() => loadData()}
               disabled={generating}
+              className="btn-ghost btn-sm"
             >
-              🔄 Refresh
+              <RefreshIcon className="h-4 w-4" />
+              Refresh
             </button>
           </div>
+        }
+      >
+        <div className="flex items-center gap-2 text-xs text-fg-muted">
+          <span
+            className={`inline-block h-2 w-2 rounded-full ${
+              autoRefresh ? 'animate-pulse bg-success' : 'bg-fg-subtle'
+            }`}
+          />
+          {autoRefresh ? 'Refreshing every 10 seconds' : 'Manual refresh'}
         </div>
-      </div>
+      </Section>
 
-      {/* Live Activity Logs */}
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <span className={autoRefresh ? "inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" : "inline-block w-2 h-2 bg-gray-500 rounded-full"}></span>
-          Live Activity Logs ({logs.length})
-        </h3>
-        <div className="space-y-1 font-mono text-sm max-h-96 overflow-y-auto">
-          {logs.length === 0 ? (
-            <p className="text-gray-400 text-center py-4">No activity logs yet</p>
-          ) : (
-            logs.slice().reverse().map((log, index) => (
-              <div key={index} className={`p-2 rounded ${
-                log.level === 'error' ? 'bg-red-900/20 text-red-300' :
-                log.level === 'warning' ? 'bg-yellow-900/20 text-yellow-300' :
-                log.level === 'info' ? 'bg-blue-900/20 text-blue-300' :
-                'bg-gray-800 text-gray-300'
-              }`}>
-                <span className="text-gray-500 text-xs">
-                  {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}
-                </span>
-                {' '}
-                <span className="text-gray-400">
-                  [{log.level?.toUpperCase() || 'LOG'}]
-                </span>
-                {' '}
-                <span className="text-white">{log.message || JSON.stringify(log)}</span>
+      <Section title={`Recent thoughts (${thoughts.length})`}>
+        {thoughts.length === 0 ? (
+          <EmptyState
+            title="No thoughts yet"
+            description="Start the daemon on the Overview tab and one will appear after the first cognition cycle. You can also generate a single thought above without a daemon."
+          />
+        ) : (
+          <div className="space-y-3">
+            {thoughts.map((thought, index) => (
+              <div key={index} className="card-flat">
+                <p className="text-xs tabular-nums text-fg-subtle">
+                  {thought?.timestamp
+                    ? new Date(thought.timestamp).toLocaleString()
+                    : 'Time not recorded'}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-fg">
+                  {typeof thought === 'string'
+                    ? thought
+                    : thought.content || JSON.stringify(thought)}
+                </p>
               </div>
-            ))
-          )}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </Section>
 
-      {/* Recent Thoughts */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Thoughts ({thoughts.length})</h3>
-        <div className="space-y-3">
-          {thoughts.length === 0 ? (
-            <p className="text-gray-600 text-center py-4">No thoughts yet</p>
-          ) : (
-            thoughts.map((thought, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <span className="text-xs text-gray-500">
-                    {thought.timestamp ? new Date(thought.timestamp).toLocaleString() : 'Unknown time'}
-                  </span>
+      <Section
+        title={`Activity (${logs.length})`}
+        description="The last 50 log entries written by this Mind, newest first."
+      >
+        {logs.length === 0 ? (
+          <EmptyState
+            title="No activity yet"
+            description="The daemon writes here as the Mind works. A stopped daemon produces nothing."
+          />
+        ) : (
+          <div className="card max-h-96 overflow-y-auto p-4 font-mono text-sm">
+            {logs
+              .slice()
+              .reverse()
+              .map((log, index) => (
+                <div
+                  key={index}
+                  className="mb-1 rounded px-2 py-1 hover:bg-surface-2"
+                >
+                  <span className="text-xs tabular-nums text-fg-subtle">
+                    {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}
+                  </span>{' '}
+                  <StatusBadge tone={logTone(log.level)}>
+                    {log.level?.toUpperCase() || 'LOG'}
+                  </StatusBadge>{' '}
+                  <span className="text-fg">{log.message || JSON.stringify(log)}</span>
                 </div>
-                <p className="text-gray-900">{typeof thought === 'string' ? thought : thought.content || JSON.stringify(thought)}</p>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+              ))}
+          </div>
+        )}
+      </Section>
     </div>
   );
 }
+
+function logTone(level?: string) {
+  switch ((level || '').toLowerCase()) {
+    case 'error':
+      return 'danger';
+    case 'warning':
+    case 'warn':
+      return 'warning';
+    case 'info':
+      return 'info';
+    default:
+      return 'neutral';
+  }
+}
+

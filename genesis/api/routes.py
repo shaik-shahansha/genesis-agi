@@ -416,18 +416,29 @@ async def admin_update_user(username: str, body: Dict[str, Any]):
 
 @admin_router.delete("/users/{username}", dependencies=[Depends(require_admin)])
 async def admin_delete_user(username: str):
+    """Delete a user, from both the in-memory store and the durable record.
+
+    There used to be a second handler decorated with the same route, defined
+    immediately below this one. FastAPI matches the first registration, so the
+    duplicate was dead code — but it was dead code that *looked* like the active
+    path, and it only removed the in-memory entry. Anyone reading the file, or
+    "fixing" the wrong one, would have concluded that `delete_user_record` was
+    unreachable and removed it, leaving deleted accounts in the database and in
+    the admin list. One handler, both stores.
+    """
     from genesis.api.auth import delete_user
     from genesis.database.manager import MetaverseDB
-    db = MetaverseDB()
-    db.delete_user_record(username)
-    ok = delete_user(username)
-    return {"success": ok, "username": username}
 
-@admin_router.delete("/users/{username}", dependencies=[Depends(require_admin)])
-async def admin_delete_user(username: str):
-    from genesis.api.auth import delete_user
-    ok = delete_user(username)
-    return {"success": ok, "username": username}
+    db = MetaverseDB()
+    removed_record = db.delete_user_record(username)
+    removed_memory = delete_user(username)
+
+    return {
+        "success": removed_record or removed_memory,
+        "username": username,
+        "in_memory": removed_memory,
+        "record": removed_record,
+    }
 
 
 @admin_router.get("/minds", dependencies=[Depends(require_admin)])

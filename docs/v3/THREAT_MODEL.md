@@ -255,11 +255,11 @@
 | **Actor** | Any network client; automated scanners |
 | **Entry point** | `api/auth.py` default admin password `genesis-admin-2026`; default JWT secret `your-secret-key-change-this-in-production`; `.env.example` omits the secret |
 | **Impact** | Full administrative takeover; forgeable tokens |
-| **Existing control** | NONE |
-| **Missing control** | Mandatory secret configuration, startup refusal on defaults, password rotation, brute-force protection |
-| **Mitigation** | Fail fast on default secrets; generate random secrets on first boot; document in `.env.example`; rate-limit the token endpoint |
-| **Test case** | Start with default `SECRET_KEY`; assert startup fails with a clear error |
-| **Residual** | Low |
+| **Existing control** | **Partly closed.** The signing key is refused outside test/development (`assert_secure_secrets`, B12). The default admin password is no longer seeded outside test/development: it requires `GENESIS_ADMIN_PASSWORD` (≥12 chars), and `docker-compose.yml` requires it, so a deploy fails fast instead of starting with a known credential. Guarded by `tests/security/test_default_admin.py`. |
+| **Missing control** | Password rotation, brute-force protection on `POST /api/v1/auth/token`, and a durable user store — `USERS_DB` is process memory, so any account created by an admin disappears on restart. |
+| **Mitigation** | Fail fast on default secrets; document in `.env.example`; rate-limit the token endpoint; move users to the database |
+| **Test case** | `tests/security/test_default_admin.py::test_production_does_not_seed_the_published_password`, and `assert_secure_secrets` refusing the placeholder key |
+| **Residual** | **Medium.** The published password is gone, but an install that sets `GENESIS_ADMIN_PASSWORD` to something guessable, or that never changes it, is still one credential away from full administration — and brute force is unthrottled. |
 
 ---
 

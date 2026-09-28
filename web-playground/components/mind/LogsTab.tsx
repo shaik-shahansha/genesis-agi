@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import {
+  EmptyState,
+  ErrorState,
+  LoadingRows,
+  Section,
+  StatusBadge,
+} from '@/components/governance/primitives';
+import { AlertIcon, RefreshIcon, TrashIcon } from '@/components/shell/icons';
 
 interface LogEntry {
   timestamp: string;
@@ -17,51 +25,102 @@ interface LogsTabProps {
   mindId: string;
 }
 
+/** Log levels the API emits, with the tone each should read as. */
+const LEVELS: { value: string; label: string; tone: string }[] = [
+  { value: 'all', label: 'All levels', tone: 'neutral' },
+  { value: 'info', label: 'Info', tone: 'neutral' },
+  { value: 'thought', label: 'Thoughts', tone: 'violet' },
+  { value: 'dream', label: 'Dreams', tone: 'info' },
+  { value: 'memory', label: 'Memory', tone: 'success' },
+  { value: 'llm_call', label: 'Model calls', tone: 'warning' },
+  { value: 'emotion', label: 'Emotions', tone: 'violet' },
+  { value: 'action', label: 'Actions', tone: 'info' },
+  { value: 'search', label: 'Searches', tone: 'info' },
+  { value: 'relationship', label: 'Relationships', tone: 'success' },
+  { value: 'error', label: 'Errors', tone: 'danger' },
+];
+
+const LEVEL_TONE: Record<string, string> = {
+  error: 'text-danger',
+  thought: 'text-violet',
+  dream: 'text-info',
+  memory: 'text-success',
+  llm_call: 'text-warning',
+  emotion: 'text-violet',
+  action: 'text-info',
+  search: 'text-info',
+  relationship: 'text-success',
+};
+
+/**
+ * The Mind's activity log.
+ *
+ * The previous version carried a "CLI Commands" panel: a text input labelled
+ * `genesis command...` and an **Execute** button with no handler, plus four
+ * quick-command buttons that did nothing either. Typing a command and pressing
+ * Execute silently did nothing at all, which is the worst version of this
+ * feature — it looks like a working console.
+ *
+ * It has not been wired up, and that is deliberate. A web endpoint that runs
+ * arbitrary shell commands is remote code execution, and the whole governance
+ * plane exists to make the opposite guarantee: every consequential action is
+ * classified, approval-gated above R2, and written to a hash-chained journal.
+ * A free-text command box is none of those things. The commands are listed
+ * instead, as text, to be run on the host by whoever operates the install.
+ */
 export default function LogsTab({ mindId }: LogsTabProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filter, setFilter] = useState('all');
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadLogs();
   }, [mindId]);
 
   useEffect(() => {
-    if (autoRefresh) {
-      const interval = setInterval(loadLogs, 5000);
-      return () => clearInterval(interval);
-    }
+    if (!autoRefresh) return;
+    const interval = setInterval(() => loadLogs({ quiet: true }), 5000);
+    return () => clearInterval(interval);
   }, [autoRefresh, mindId]);
 
-  const loadLogs = async () => {
-    setLoading(true);
+  /**
+   * `quiet` keeps the auto-refresh from flipping the page into a loading state
+   * every five seconds, which made the buttons flicker and the list blank.
+   */
+  const loadLogs = async ({ quiet = false }: { quiet?: boolean } = {}) => {
+    if (!quiet) setLoading(true);
+    setError(null);
     try {
       const data = await api.getMindLogs(mindId);
-      setLogs(data.logs || []);
-    } catch (error) {
-      console.error('Error loading logs:', error);
+      setLogs(data?.logs || []);
+    } catch (err: any) {
       setLogs([]);
+      setError(err?.message || 'Could not load the log.');
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
   const clearLogs = async () => {
-    if (!confirm('Clear all logs?')) return;
-
+    if (!confirm('Clear all logs for this Mind? This cannot be undone.')) return;
     try {
       await api.clearMindLogs(mindId);
       setLogs([]);
-    } catch (error: any) {
-      alert(`Failed to clear logs: ${error.message}`);
+    } catch (err: any) {
+      setError(`Failed to clear logs: ${err?.message ?? 'unknown error'}`);
     }
   };
 
   const downloadLogs = () => {
-    const content = logs.map(log => 
-      `[${log.timestamp}] [${log.level.toUpperCase()}] ${log.message}${log.emotion ? ` (${log.emotion})` : ''}`
-    ).join('\n');
+    const content = logs
+      .map(
+        (log) =>
+          `[${log.timestamp}] [${log.level.toUpperCase()}] ${log.message}` +
+          (log.emotion ? ` (${log.emotion})` : '')
+      )
+      .join('\n');
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -71,171 +130,187 @@ export default function LogsTab({ mindId }: LogsTabProps) {
     URL.revokeObjectURL(url);
   };
 
-  const filteredLogs = logs.filter(log => {
-    if (filter === 'all') return true;
-    return log.level.toLowerCase() === filter.toLowerCase();
-  });
+  const filteredLogs =
+    filter === 'all'
+      ? logs
+      : logs.filter((log) => log.level?.toLowerCase() === filter.toLowerCase());
+
+  const errorCount = logs.filter((l) => l.level === 'error').length;
+  const thoughtCount = logs.filter((l) => l.level === 'thought').length;
+
+  if (loading) {
+    return <LoadingRows rows={3} label="Loading the activity log" />;
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Controls */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-          <div className="flex gap-2 flex-wrap">
+    <div className="space-y-6">
+      {error && <ErrorState message={error} onRetry={() => loadLogs()} />}
+
+      <Section
+        title="Activity log"
+        description="What this Mind has been doing, newest first."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => loadLogs()} className="btn-ghost btn-sm">
+              <RefreshIcon className="h-4 w-4" />
+              Refresh
+            </button>
+            <button type="button" onClick={downloadLogs} className="btn-ghost btn-sm">
+              Download
+            </button>
             <button
-              onClick={loadLogs}
-              disabled={loading}
-              className="btn-ghost"
+              type="button"
+              onClick={clearLogs}
+              className="btn-ghost btn-sm text-danger"
+              disabled={logs.length === 0}
             >
-              🔄 Refresh
+              <TrashIcon className="h-4 w-4" />
+              Clear
             </button>
-            <button onClick={downloadLogs} className="btn-ghost">
-              📥 Download
-            </button>
-            <button onClick={clearLogs} className="btn-ghost text-red-600">
-              🗑️ Clear
-            </button>
-            <label className="flex items-center gap-2 px-3 py-2">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                className="rounded"
-              />
-              <span className="text-sm text-gray-700">Auto-refresh</span>
-            </label>
           </div>
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <label htmlFor="auto-refresh" className="flex cursor-pointer items-center gap-2">
+            <input
+              id="auto-refresh"
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              className="h-4 w-4 rounded border-line accent-[rgb(var(--accent))]"
+            />
+            <span className="text-sm text-fg-muted">Refresh every 5 seconds</span>
+          </label>
 
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="input md:w-48"
+            className="input sm:w-48"
+            aria-label="Filter by log level"
           >
-            <option value="all">All Logs</option>
-            <option value="info">ℹ️ Info</option>
-            <option value="thought">💭 Thoughts</option>
-            <option value="dream">💤 Dreams</option>
-            <option value="memory">🧠 Memory</option>
-            <option value="llm_call">🤖 LLM Calls</option>
-            <option value="emotion">😊 Emotions</option>
-            <option value="action">⚡ Actions</option>
-            <option value="search">🔍 Searches</option>
-            <option value="relationship">👥 Relationships</option>
-            <option value="error">❌ Errors</option>
+            {LEVELS.map((level) => (
+              <option key={level.value} value={level.value}>
+                {level.label}
+              </option>
+            ))}
           </select>
         </div>
-      </div>
 
-      {/* Log Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Total</div>
-          <div className="text-2xl font-bold text-gray-900">{logs.length}</div>
+        <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <Metric label="Entries" value={logs.length} />
+          <Metric label="Shown" value={filteredLogs.length} />
+          <Metric label="Errors" value={errorCount} tone={errorCount > 0 ? 'danger' : undefined} />
+          <Metric label="Thoughts" value={thoughtCount} />
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Filtered</div>
-          <div className="text-2xl font-bold text-gray-900">{filteredLogs.length}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Errors</div>
-          <div className="text-2xl font-bold text-red-600">
-            {logs.filter(l => l.level === 'error').length}
-          </div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Thoughts</div>
-          <div className="text-2xl font-bold text-purple-600">
-            {logs.filter(l => l.level === 'thought').length}
-          </div>
-        </div>
-      </div>
+      </Section>
 
-      {/* Log Viewer */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-gray-900 text-gray-100 p-4 font-mono text-sm overflow-auto" style={{ maxHeight: '600px' }}>
-          {filteredLogs.length === 0 ? (
-            <div className="text-gray-500 text-center py-8">
-              {logs.length === 0 ? 'No logs available' : 'No logs match the filter'}
-            </div>
-          ) : (
-            filteredLogs.map((log, index) => {
-              const isError = log.level === 'error';
-              const isThought = log.level === 'thought';
-              const isDream = log.level === 'dream';
-              const isMemory = log.level === 'memory';
-              const isLLM = log.level === 'llm_call';
-              
-              const color = isError ? 'text-red-400' : 
-                           isThought ? 'text-purple-400' : 
-                           isDream ? 'text-blue-400' :
-                           isMemory ? 'text-green-400' :
-                           isLLM ? 'text-yellow-400' :
-                           'text-gray-300';
-              
-              const emoji = isError ? '❌' :
-                           isThought ? '💭' :
-                           isDream ? '💤' :
-                           isMemory ? '🧠' :
-                           isLLM ? '🤖' :
-                           '📝';
-              
-              return (
-                <div key={index} className={`${color} mb-2 hover:bg-gray-800 px-2 py-1 rounded`}>
-                  <div className="flex gap-2">
-                    <span className="opacity-60 text-xs">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                    <span>{emoji}</span>
-                    <span className="font-semibold">[{log.level.toUpperCase()}]</span>
-                    {log.emotion && <span className="text-pink-400">({log.emotion})</span>}
-                  </div>
-                  <div className="ml-20">{log.message}</div>
-                  {Object.keys(log.metadata).length > 0 && (
-                    <div className="ml-20 mt-1 text-xs opacity-70">
-                      {JSON.stringify(log.metadata, null, 2)}
+      <Section title="Entries">
+        {filteredLogs.length === 0 ? (
+          <EmptyState
+            title={logs.length === 0 ? 'Nothing logged yet' : 'Nothing matches'}
+            description={
+              logs.length === 0
+                ? 'The daemon writes here as the Mind thinks. If you expect entries and see none, check the Overview tab — a stopped daemon produces no log.'
+                : 'No entries at this level. Switch the filter to see the rest.'
+            }
+          />
+        ) : (
+          <div className="card overflow-hidden p-0">
+            <div className="max-h-[600px] overflow-auto p-4 font-mono text-sm">
+              {filteredLogs.map((log, index) => {
+                const hasMetadata =
+                  log.metadata && Object.keys(log.metadata).length > 0;
+                return (
+                  <div
+                    key={`${log.timestamp}-${index}`}
+                    className="mb-2 rounded px-2 py-1 hover:bg-surface-2"
+                  >
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <span className="text-xs tabular-nums text-fg-subtle">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </span>
+                      <span className={LEVEL_TONE[log.level] ?? 'text-fg-muted'}>
+                        [{log.level?.toUpperCase() ?? 'INFO'}]
+                      </span>
+                      {log.emotion && <span className="text-violet">({log.emotion})</span>}
                     </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* CLI Commands */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">CLI Commands</h2>
-        <div className="space-y-2">
-          <p className="text-sm text-gray-600 mb-3">
-            Execute Genesis CLI commands directly from the interface
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="genesis command..."
-              className="input flex-1 font-mono text-sm"
-            />
-            <button className="btn-primary">
-              ▶️ Execute
-            </button>
-          </div>
-          <div className="mt-4 space-y-2">
-            <p className="text-xs text-gray-600 font-medium">Quick Commands:</p>
-            <div className="flex flex-wrap gap-2">
-              <button className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded">
-                genesis list
-              </button>
-              <button className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded">
-                genesis inspect {mindId}
-              </button>
-              <button className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded">
-                genesis status
-              </button>
-              <button className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded">
-                genesis think {mindId}
-              </button>
+                    <div className={`pl-0 sm:pl-6 ${LEVEL_TONE[log.level] ?? 'text-fg'}`}>
+                      {log.message}
+                    </div>
+                    {hasMetadata && (
+                      <pre className="mt-1 pl-0 text-xs text-fg-subtle sm:pl-6">
+                        {JSON.stringify(log.metadata, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
+        )}
+      </Section>
+
+      <Section title="Operator commands">
+        <div className="card">
+          <p className="text-sm text-fg-muted">
+            These run on the host, not in this page. There is deliberately no button for them: a web
+            endpoint that executes arbitrary commands is remote code execution, and it would sit
+            entirely outside the governance plane — no risk classification, no approval, no receipt.
+            If you need one of these as an auditable action, register it as a capability instead
+            (see §6.1 of the developer guide) so it is classified and journalled like everything else.
+          </p>
+          <div className="mt-4 space-y-2">
+            {[
+              ['genesis list', 'Every Mind on this install'],
+              [`genesis inspect ${mindId}`, 'This Mind\u2019s stored state'],
+              ['genesis status', 'Daemon and provider health'],
+              [`genesis daemon start ${mindId}`, 'Start the daemon for this Mind'],
+            ].map(([command, purpose]) => (
+              <div
+                key={command}
+                className="flex flex-wrap items-baseline justify-between gap-3 rounded-lg border border-line bg-surface-2 px-3 py-2"
+              >
+                <code className="font-mono text-xs text-fg">{command}</code>
+                <span className="text-xs text-fg-subtle">{purpose}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 flex items-start gap-2 text-xs text-fg-subtle">
+            <span className="mt-0.5 text-warning">
+              <AlertIcon className="h-4 w-4" />
+            </span>
+            <span>
+              The daemon lifecycle commands go through <code>GENESIS_SUPERVISOR</code>. With the
+              default supervisor the API refuses to start a daemon rather than forking one, and
+              tells you the command to run.
+            </span>
+          </p>
         </div>
+      </Section>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: string;
+}) {
+  return (
+    <div className="card-flat">
+      <div className="text-xs text-fg-muted">{label}</div>
+      <div
+        className={`mt-1 text-2xl font-semibold tabular-nums ${
+          tone === 'danger' ? 'text-danger' : 'text-fg'
+        }`}
+      >
+        {value}
       </div>
     </div>
   );
 }
+

@@ -185,10 +185,19 @@ Consequences:
 
 - `genesis/api/auth.py` holds `USERS_DB: Dict[str, Dict[str, Any]] = {}` — an **in-memory
   user store**, reset on every restart, with the code comment *"should be replaced with
-  database in production"*.
-- `_initialize_default_users()` seeds `admin` with password **`genesis-admin-2026`**, public
+  database in production"*. **Still open.** It is why the bootstrap account below mattered so
+  much: with the store in memory, the seeded `admin` was the only account that survived a
+  restart, so it was not merely a leftover default but the *only* way into a restarted
+  deployment.
+- ~~`_initialize_default_users()` seeds `admin` with password **`genesis-admin-2026`**, public
   in the source. There is no forced rotation and the value is not marked as a placeholder in
-  any startup warning.
+  any startup warning.~~ **Fixed.** The account is now created only in test/development, or
+  when `GENESIS_ADMIN_PASSWORD` is set and at least 12 characters. Outside those it is not
+  created at all, and the process logs the command needed to bootstrap one. `docker-compose.yml`
+  requires the variable, so a deploy fails fast rather than starting with a known credential.
+  Guarded by `tests/security/test_default_admin.py` (10 tests), including that an unset
+  `GENESIS_ENV` is treated as production and that the seed no longer happens as a side effect
+  of a login attempt.
 - `API_KEYS: Dict[str, Dict[str, Any]] = {}` is also in-memory; API keys do not survive
   restarts, and their format is `gen-api-<random>` (verified in `tests/api/test_auth.py`).
 - Token lifetime is 24 hours (`ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24`), with no refresh or
