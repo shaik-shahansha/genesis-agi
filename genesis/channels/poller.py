@@ -541,6 +541,7 @@ class ChannelPoller:
         mind_id: str,
         lookback: timedelta = timedelta(days=3),
         on_stuck: Optional[StuckClaimHandler] = None,
+        conversations: Optional[Any] = None,
     ):
         self.registry = registry
         self.gateway = gateway
@@ -548,6 +549,9 @@ class ChannelPoller:
         self.mind_id = mind_id
         self.lookback = lookback
         self.on_stuck = on_stuck
+        #: Writes what happened into the Mind's memory. Optional, and called *after*
+        #: the send so a storage failure cannot lose a reply that was delivered.
+        self.conversations = conversations
 
     async def poll_once(self, *, since: Optional[datetime] = None) -> PollReport:
         """One pass over every enabled channel."""
@@ -639,6 +643,14 @@ class ChannelPoller:
             "delivered" if outcome.delivered else "not_sent",
             f"{outcome.reason}" + (f" / {outcome.decision}" if outcome.decision else ""),
         )
+
+        # Remember it, after the send. A Mind that answers someone and forgets them
+        # cannot hold a conversation — the next message from the same person arrives
+        # with no context. Written here rather than in the gateway so a storage failure
+        # cannot lose a reply that was already delivered, and it never raises: see
+        # `ConversationMemory.__call__`.
+        if self.conversations is not None:
+            self.conversations(event, outcome)
 
         if outcome.engaged:
             report.engaged += 1
@@ -824,6 +836,16 @@ def build_poller(
         except Exception as exc:  # noqa: BLE001
             logger.warning("channel poller: could not journal a stuck claim: %s", exc)
 
+    # Memory is written only if the Mind actually has a memory manager. Resolved
+    # through `getattr` because a Mind constructed without one is a valid state, and
+    # requiring it would make the poller unusable in a test.
+    conversations = None
+    memory = getattr(mind, "memory", None)
+    if memory is not None:
+        from .conversation_memory import ConversationMemory
+
+        conversations = ConversationMemory(memory=memory, mind_id=mind_id)
+
     return ChannelPoller(
         registry=registry,
         gateway=gateway,
@@ -831,4 +853,5 @@ def build_poller(
         mind_id=mind_id,
         lookback=lookback,
         on_stuck=on_stuck,
+        conversations=conversations,
     )

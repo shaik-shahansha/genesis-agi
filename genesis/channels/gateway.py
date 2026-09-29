@@ -203,6 +203,19 @@ class ChannelGateway:
                 inbound=event, engaged=False, reason="sender could not be resolved"
             )
 
+        # Record who this turned out to be, on the event itself.
+        #
+        # `InboundEvent.is_known_contact` was a field nothing ever wrote, so it was
+        # permanently False — which meant a memory of a colleague and a memory of a
+        # stranger were indistinguishable at recall time, and the journal said
+        # `known_contact: false` for everyone. This is the one place that knows: the
+        # contact has just been resolved.
+        #
+        # A stranger is not an error here. `InMemoryContacts` and `DatabaseContacts`
+        # both return an unknown sender as reply-only rather than None, so the
+        # `relationship_id` prefix is what distinguishes them.
+        event.is_known_contact = not str(contact.relationship_id).startswith("unknown:")
+
         registration = self.registry.get(event.channel)
         if registration is None or not registration.enabled:
             return EngagementOutcome(

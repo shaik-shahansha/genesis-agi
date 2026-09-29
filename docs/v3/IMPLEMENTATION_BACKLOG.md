@@ -327,7 +327,7 @@ Visual or feature work must not start before this passes.
 | P2.4 | Per-Mind channel credentials | `[ ]` every Mind on an install currently shares one mailbox, and `Mind.channels` says so rather than implying isolation |
 | P3.1 | Webhook gateway with per-provider signature verification | `[ ]` |
 | P3.2 | IMAP poller as a background task, on the existing scheduler | `[x]` `ChannelPoller`, driven from `MindDaemon` via `_channel_loop`. Off unless `MIND_CHANNEL_AUTOREPLY_ENABLED` |
-| P3.3 | Inbound events → journal → memory, so the Mind remembers who wrote and when | `[~]` journal `[x]` (`channel.*` event family); **memory `[ ]`** — an inbound message is not yet something the Mind remembers |
+| P3.3 | Inbound events → journal → memory, so the Mind remembers who wrote and when | `[x]` journal (`channel.*` family) **and** memory (`channels/conversation_memory.py`). A Mind that answers and forgets cannot hold a conversation. Also fixed `InboundEvent.is_known_contact`, which was a field nothing wrote |
 | P3.4 | Reply flow: inbound → cognition → intent → gate → send, with the receipt as the reply's record | `[x]` `MindResponder` → `GovernanceAuthorizer` → `ChannelGateway`. The responder is told nothing about policy, and actions are disabled during a draft |
 | P3.5 | Durable outbound ledger (replaces the in-memory default, which resets on restart) | `[x]` `outbound_messages`, migration `012_outbound_messages`. **One ledger shared by every channel** — before this the weekly cap was per channel, so nine contacts a week passed a documented limit of three |
 | P3.6 | Durable Telegram `getUpdates` offset, or dedup by message id | `[~]` dedup by message id `[x]` (`inbound_events`); the offset itself is still per-process |

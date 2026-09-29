@@ -11,7 +11,7 @@
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
 | **Last verified** | 2026-09-29 — full suite; the live sandbox/container checks below still date from 2026-09-28 |
-| **Test suite** | **945 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
+| **Test suite** | **975 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
 | **Container** | Image builds; runs `Up (healthy)`; all 9 governance endpoints verified live in the final image |
 | **Sandbox isolation** | Verified against a real container: 10/10 claims held, 11 escape tests in the suite |
 | **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.2` |
@@ -314,7 +314,7 @@ They were all found by exercising the deployed path and looking at what came bac
 | Item | State |
 |---|---|
 | Test suite runs without paid API keys | ✅ |
-| 945 passing tests, 16 skipped | ✅ |
+| 975 passing tests, 16 skipped | ✅ |
 | `genesis/channels/` — the digital-presence substrate | ✅ **built** — protocol, registry, enforced disclosure, contactability floors, approval-integrity digest, `ChannelGateway`. 27 substrate + 52 provider/gateway + 34 contact-store + 70 answering-loop tests. Provider setup: `CHANNEL_PROVIDERS.md` |
 | Container sandbox escape tests | ✅ 11 tests, skipped when no runtime/image is present rather than silently passing |
 | Alembic migration for governance tables | ✅ `008_governance_plane`, verified upgrade → downgrade → upgrade → `downgrade base` → upgrade |
@@ -343,7 +343,7 @@ Be careful with these — several are asserted in public material and are not tr
 | A Mind can email and call | **Adapters exist, none has been called.** `HostingerMailChannel`, `RinggVoiceChannel`, `EmailChannel` and `TelegramChannel` implement the protocol and pass tests against a fake transport, but no real message has been sent and no real call placed — neither account exists yet. Hostinger's send path is documented; its read paths are inferred. Run `adapter.verify()` before the first real use |
 | A Mind can receive inbound mail | **Off by default.** `ChannelPoller` is built and driven from `MindDaemon._channel_loop`, with a durable at-most-once ledger. It does nothing until `MIND_CHANNEL_AUTOREPLY_ENABLED=true`, and without a standing grant every reply raises an approval request |
 | An email reply can be auto-approved | **It cannot, and cannot be made to.** `comms.email.reply` is R3 because it carries personal data across the trust boundary, and standing grants cap at R2. A Telegram reply is R2 and can be granted. This asymmetry is a governance decision — see §6 of `CHANNEL_PROVIDERS.md` |
-| Inbound messages become memories | Not implemented. They reach the journal (`channel.*` events) but not the Mind's memory, so a Mind does not yet *remember* who wrote to it |
+| Inbound messages become memories | ✅ **fixed** | `channels/conversation_memory.py`, called by the poller *after* the send so a storage failure cannot lose a reply. The body is stored — memory is content by definition — bounded, and tagged by channel and direction so recall is a query rather than a scan |
 | Voice transcription | Not implemented. Ringg's assistant speaks; the transcript arrives later by webhook or from call history, and neither is ingested. `RinggVoiceChannel.capabilities().can_receive` is `False` |
 | Contact persistence | Not implemented. The only `ContactResolver` is `InMemoryContacts`, which returns every unknown sender as reply-only with no `consent_source`. A Mind does not yet remember who it has spoken to |
 | Durable outbound rate limits | Not implemented. `InMemoryOutboundLedger.durable` is `False`, so the weekly cap and minimum gap are a per-process floor that a restart clears. `InMemoryOutboundLedger` reports this itself rather than claiming otherwise |
@@ -757,6 +757,7 @@ genesis/
     ringg_voice.py     #   Ringg AI: the Mind picks context, Ringg speaks
     gateway.py         #   inbound -> responder -> floors -> gate -> send
     contacts.py        #   the durable contact store: who a Mind knows, consent per channel
+    conversation_memory.py  # inbound traffic -> the Mind's memory, so it can recall it
     ledger.py          #   durable weekly cap + durable cross-channel opt-out
     outreach.py        #   proactive outreach from commitments; proposes, never sends
     poller.py          #   poll -> claim -> gate -> send; at most one reply per message
@@ -771,12 +772,12 @@ alembic/versions/20260928_0800_add_governance_plane.py
 tests/
   governance/        # 305 tests: policy, approvals, audit, SQL store, gate, API,
                      #   correlation, domain events, commitments
-  security/          # 551 tests: sandbox, container escapes, network probe, MCP env,
+  security/          # 581 tests: sandbox, container escapes, network probe, MCP env,
                      #   secrets, the bootstrap admin boundary, and the channels
                      #   substrate itself (test_channels.py 27, test_channel_providers.py 52,
                      #   test_contact_store.py 34, test_channel_poller.py 41,
                      #   test_channel_responder.py 44, test_channel_ledgers.py 30,
-                     #   test_channel_outreach.py 39)
+                     #   test_channel_outreach.py 39, test_channel_memory.py 30)
   test_migrations.py # 31 tests: migration-chain guards
   test_mind_ownership.py # 8 tests: who may access a Mind, and placeholder repair
   security/test_default_admin.py   # 10 tests: the bootstrap-admin boundary

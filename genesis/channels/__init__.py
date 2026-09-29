@@ -50,6 +50,7 @@ from .gateway import (
     InMemoryContacts,
 )
 from .contacts import DatabaseContacts, normalise_handle
+from .conversation_memory import ConversationMemory
 from .ledger import DatabaseOptOutRegistry, DatabaseOutboundLedger
 from .outreach import (
     CommitmentTriggers,
@@ -144,6 +145,8 @@ __all__ = [
     # durable ledgers
     "DatabaseOutboundLedger",
     "DatabaseOptOutRegistry",
+    # memory
+    "ConversationMemory",
     # proactive outreach
     "CommitmentTriggers",
     "ContactStoreBeneficiaries",
