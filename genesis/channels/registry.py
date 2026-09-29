@@ -27,6 +27,7 @@ from .base import (
     CommunicationChannel,
     InboundEvent,
 )
+from .limits import ChannelLimits, parse_call_window
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +228,48 @@ def credentials_from_settings(settings: Any) -> ChannelCredentials:
     if telegram["bot_token"]:
         channels["telegram"] = telegram
 
+    # Hostinger Mail API. Preferred over plain IMAP/SMTP when configured, because
+    # the token is scoped to specific mailboxes and the provider threads replies
+    # and can enforce an outgoing allow list.
+    hostinger = {
+        "api_token": getattr(settings, "mind_hostinger_mail_api_token", None),
+        "mailbox_id": getattr(settings, "mind_hostinger_mailbox_id", None),
+        "address": getattr(settings, "mind_hostinger_mail_address", None),
+        "display_name": getattr(settings, "mind_hostinger_mail_display_name", None),
+        "base_url": getattr(settings, "mind_hostinger_mail_base_url", None),
+        "api_version": getattr(settings, "mind_hostinger_mail_api_version", None),
+    }
+    if hostinger["api_token"] and hostinger["mailbox_id"]:
+        channels["email"] = hostinger
+
+    ringg = {
+        "api_key": getattr(settings, "mind_ringg_api_key", None),
+        "agent_id": getattr(settings, "mind_ringg_agent_id", None),
+        "from_number_id": getattr(settings, "mind_ringg_from_number_id", None),
+        "phone_number": getattr(settings, "mind_ringg_phone_number", None),
+        "disclosure_confirmed": getattr(settings, "mind_ringg_disclosure_confirmed", False),
+    }
+    # The provider enforces its own calling window; this aligns our floor with it
+    # so a call inside the operator's window does not fail at the provider as an
+    # unexplained delivery error. Unparseable means the default floor is kept and
+    # the operator is told, rather than the control silently disappearing.
+    window_text = getattr(settings, "mind_ringg_call_window", None)
+    window = parse_call_window(window_text)
+    if window is None and window_text:
+        logger.warning(
+            "MIND_RINGG_CALL_WINDOW=%r is not a window like '09:00-18:00'; "
+            "the default quiet hours (%d:00-%d:00) stay in force",
+            window_text,
+            ChannelLimits().default_quiet_hours[0],
+            ChannelLimits().default_quiet_hours[1],
+        )
+    if window is not None:
+        ringg["quiet_hours"] = window
+    # All three ids are required. Any subset would produce a channel that appears
+    # configured and fails on the first call.
+    if ringg["api_key"] and ringg["agent_id"] and ringg["from_number_id"]:
+        channels["voice"] = ringg
+
     return ChannelCredentials(
         channels=channels,
         administrator=getattr(settings, "mind_administrator_name", "") or "",
@@ -240,38 +283,87 @@ def build_registry(mind_id: str, credentials: ChannelCredentials) -> ChannelRegi
     not registered as disabled either — it was never configured, which is a
     different fact from "configured and refused", and conflating them would fill
     the status list with noise and hide the refusals that matter.
+
+    Order matters for email: **Hostinger Mail is preferred when configured**,
+    because its token is scoped to specific mailboxes, the provider threads replies
+    for us, and an outgoing allow list can reject a misaddressed send at the
+    provider even if our own code is wrong. Plain IMAP/SMTP is the fallback for
+    anyone with a mailbox elsewhere.
     """
     registry = ChannelRegistry(mind_id)
     administrator = credentials.administrator
 
-    if credentials.for_channel("email"):
+    email_cfg = credentials.for_channel("email")
+    if email_cfg and email_cfg.get("api_token"):
+        from .hostinger_mail import HostingerMailChannel
+
+        registry.register(
+            HostingerMailChannel(
+                api_token=email_cfg["api_token"],
+                mailbox_id=email_cfg["mailbox_id"],
+                address=email_cfg.get("address") or email_cfg["mailbox_id"],
+                display_name=email_cfg.get("display_name") or email_cfg.get("address") or "",
+                base_url=email_cfg.get("base_url") or "",
+                api_version=email_cfg.get("api_version") or "",
+                administrator=administrator,
+                mind_id=mind_id,
+            )
+        )
+    elif email_cfg:
         from .email import EmailChannel
 
-        cfg = credentials.for_channel("email")
         registry.register(
             EmailChannel(
-                address=cfg["address"],
-                display_name=cfg.get("display_name") or cfg["address"],
-                imap_host=cfg.get("imap_host") or "",
-                imap_port=int(cfg.get("imap_port") or 993),
-                smtp_host=cfg.get("smtp_host") or "",
-                smtp_port=int(cfg.get("smtp_port") or 587),
-                username=cfg.get("username") or cfg["address"],
-                password=cfg.get("password") or "",
-                use_tls=bool(cfg.get("use_tls", True)),
+                address=email_cfg["address"],
+                display_name=email_cfg.get("display_name") or email_cfg["address"],
+                imap_host=email_cfg.get("imap_host") or "",
+                imap_port=int(email_cfg.get("imap_port") or 993),
+                smtp_host=email_cfg.get("smtp_host") or "",
+                smtp_port=int(email_cfg.get("smtp_port") or 587),
+                username=email_cfg.get("username") or email_cfg["address"],
+                password=email_cfg.get("password") or "",
+                use_tls=bool(email_cfg.get("use_tls", True)),
                 administrator=administrator,
+                mind_id=mind_id,
             )
         )
 
-    if credentials.for_channel("telegram"):
+    telegram_cfg = credentials.for_channel("telegram")
+    if telegram_cfg:
         from .telegram import TelegramChannel
 
-        cfg = credentials.for_channel("telegram")
         registry.register(
             TelegramChannel(
-                bot_token=cfg["bot_token"],
-                bot_username=cfg.get("address") or "",
+                bot_token=telegram_cfg["bot_token"],
+                bot_username=telegram_cfg.get("address") or "",
                 administrator=administrator,
+                mind_id=mind_id,
+            )
+        )
+
+    ringg_cfg = credentials.for_channel("voice")
+    if ringg_cfg:
+        from .ringg_voice import RinggVoiceChannel
+
+        quiet_hours = ringg_cfg.get("quiet_hours")
+        registry.register(
+            RinggVoiceChannel(
+                api_key=ringg_cfg["api_key"],
+                agent_id=ringg_cfg["agent_id"],
+                from_number_id=ringg_cfg["from_number_id"],
+                phone_number=ringg_cfg.get("phone_number") or "",
+                display_name="Genesis Mind",
+                disclosure_confirmed=bool(ringg_cfg.get("disclosure_confirmed")),
+                # Passing limits explicitly only when the operator configured a
+                # window keeps the documented default reachable and makes it
+                # obvious which of the two is in force.
+                **(
+                    {"limits": ChannelLimits(default_quiet_hours=tuple(quiet_hours))}
+                    if quiet_hours
+                    else {}
+                ),
+                administrator=administrator,
+                mind_id=mind_id,
             )
         )
 

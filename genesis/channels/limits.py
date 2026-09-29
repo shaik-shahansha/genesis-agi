@@ -41,6 +41,62 @@ class ChannelLimits:
     min_gap_between_outbound: timedelta = timedelta(hours=6)
 
 
+def parse_call_window(value: Optional[str]) -> Optional[tuple[int, int]]:
+    """Parse an `"HH:MM-HH:MM"` window into quiet hours, or None.
+
+    Telephony providers let an operator set their own calling window, and a
+    provider-side window is enforced by the provider, not by us. This exists so the
+    adapter's *own* floor can be aligned with what the operator configured: if our
+    window is wider than the provider's, the Mind believes a call is allowed and
+    the provider refuses it at the last moment, which surfaces as an unexplained
+    delivery failure rather than a policy refusal.
+
+    Returns None for anything unparseable rather than raising. The caller keeps its
+    default in that case, and the caller is expected to say so — silently treating
+    a typo as "no hours configured" would remove a control and look like a
+    configuration change.
+    """
+    if not value:
+        return None
+    text = value.strip()
+    for separator in ("-", "–", "to"):
+        if separator in text:
+            start_text, _, end_text = text.partition(separator)
+            start = _parse_clock(start_text)
+            end = _parse_clock(end_text)
+            if start is not None and end is not None:
+                return (start, end)
+            return None
+    # A bare hour means "from this hour to midnight-ish"; treat as 24h unparseable
+    # rather than inventing an end.
+    return None
+
+
+def _parse_clock(value: str) -> Optional[int]:
+    """`"9"`, `"09:00"`, `"9:30 pm"` -> hour. Minutes are dropped rather than
+    rounded, because rounding *up* would extend the window past what was asked
+    for, and rounding down would shorten a window a human deliberately set."""
+    text = value.strip().lower().replace(".", "")
+    if not text:
+        return None
+    if text.endswith("pm") or text.endswith("am"):
+        meridiem = text[-2:]
+        text = text[:-2].strip()
+    else:
+        meridiem = ""
+    text = text.split(":")[0].strip()
+    if not text.isdigit():
+        return None
+    hour = int(text)
+    if meridiem == "pm" and hour != 12:
+        hour += 12
+    elif meridiem == "am" and hour == 12:
+        hour = 0
+    if not 0 <= hour <= 24:
+        return None
+    return hour
+
+
 class OutboundLedger(Protocol):
     """Records and counts messages a Mind *initiated*.
 

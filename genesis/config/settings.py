@@ -130,6 +130,64 @@ class Settings(BaseSettings):
     mind_telegram_bot_token: Optional[str] = None
     mind_telegram_bot_username: Optional[str] = None
 
+    # --- Hostinger Mail API (recommended email provider) -------------------
+    #
+    # Hostinger runs a Mail API separate from their hosting API: different base
+    # URL, different tokens, different SDK. Their hosting API *manages mailboxes*;
+    # this one **reads and sends mail**, which is the part a Mind needs.
+    #
+    # Create the token under Agentic Mail -> API access in the email domain's
+    # sidebar. It is scoped to one order and optionally to specific mailboxes, so
+    # the token can only reach what it was granted — which is the same shape as
+    # our own capability model and worth preferring over a broader credential.
+    #
+    # Two provider features are worth knowing about because they overlap with
+    # controls we already enforce ourselves:
+    #   * an outgoing allow list, which rejects a send addressed to the wrong
+    #     person (provider-side, so it holds even if our code is wrong)
+    #   * webhooks for new mail, so reacting to inbound does not need polling
+    mind_hostinger_mail_api_token: Optional[str] = None
+    #: Mailbox resource id, `AC...`. Returned by the account endpoint; every other
+    #: operation is scoped to one mailbox.
+    mind_hostinger_mailbox_id: Optional[str] = None
+    #: The address the mailbox owns. Shown in the disclosure and used as the From.
+    mind_hostinger_mail_address: Optional[str] = None
+    mind_hostinger_mail_display_name: Optional[str] = None
+    #: Overridable so a documented-but-unverified path can be corrected without a
+    #: code change. `HostingerMailChannel.verify()` reports which paths work.
+    mind_hostinger_mail_base_url: str = "https://api.mail.hostinger.com"
+    mind_hostinger_mail_api_version: str = "v1"
+
+    # --- Ringg AI voice ----------------------------------------------------
+    #
+    # Ringg runs the voice assistant; the Mind starts calls and reads the results.
+    # That is a different shape from every other channel: the Mind does not speak,
+    # Ringg does, using a prompt configured in Ringg's dashboard. So the adapter
+    # cannot put our prepared body on the wire — see `ringg_voice.py`.
+    mind_ringg_api_key: Optional[str] = None
+    #: Assistant that handles the call. Created in the Ringg dashboard.
+    mind_ringg_agent_id: Optional[str] = None
+    #: Caller number id from `GET /workspace/numbers`.
+    mind_ringg_from_number_id: Optional[str] = None
+    #: The E.164 number the Mind calls from, for the disclosure and for receipts.
+    mind_ringg_phone_number: Optional[str] = None
+    #: Records call windows in Ringg. Ringg enforces `call_config.call_time`, so
+    #: this is a hint for the adapter's own quiet-hours default, not the control.
+    mind_ringg_call_window: str = "09:00-18:00"
+    #: **An assertion, not a check.**
+    #:
+    #: Ringg's assistant speaks a prompt configured in Ringg's dashboard, and no
+    #: API exposes that prompt's text. So we cannot verify that the assistant
+    #: discloses it is an AI — and an undisclosed voice channel is the one outcome
+    #: this product must not ship. The channel therefore registers **disabled**
+    #: unless the operator asserts it, and the assertion is recorded.
+    #:
+    #: This is the same rule as `supports_disclosure` in the registry: a channel
+    #: that cannot demonstrate disclosure is not enabled. The honest difference is
+    #: that here it is a human's word rather than a capability flag, and that is
+    #: stated rather than hidden.
+    mind_ringg_disclosure_confirmed: bool = False
+
     #: Gemini model used for realtime / live voice sessions.
     #:
     #: Recorded and surfaced so a deployment can declare its intent, but there is

@@ -136,6 +136,11 @@
 | MCP **server** | not claimed | **NF** | — | none | n/a | **NF** | Phase I (priority) |
 | A2A / agent delegation | not claimed | **NF** | — | none | n/a | **NF** | Phase M |
 | Email / calendar / chat integrations | "Slack, Discord, Email, Calendar" | `integrations/*.py` with guarded optional imports | plugins | none | unscoped credentials | **PT** | Phase I: scoped OAuth |
+| **Channel substrate** (the Mind's own comms) | new, `DIGITAL_PRESENCE.md` | `channels/{base,disclosure,limits,adapter,registry,fake}.py` | `ChannelRegistry`, `ChannelGateway` | `tests/security/test_channels.py` (27) | **enforced disclosure, contactability floors, approval-integrity digest; `comms.broadcast`/`account.create`/`impersonate_human`/`undisclosed_outreach` prohibited at R5** | **FI** | P2: contact identity; P3: durability |
+| Mind sends/reads **email** | new | `channels/email.py` (stdlib IMAP/SMTP), `channels/hostinger_mail.py` (Mail API: scoped token, provider-side threading, allow list) | `ChannelRegistry` | `test_channel_providers.py` (52) | disclosure in the writer; R0 read / R1 draft / R2 reply / R3 initiate | **PT** | **never called a real server.** Hostinger send path documented; read paths inferred. Run `verify()` |
+| Mind **places voice calls** | new | `channels/ringg_voice.py` (Ringg AI) | `ChannelRegistry` | `test_channel_providers.py` | **does not register unless disclosure is asserted** — no Ringg API returns the assistant's prompt, so this is a human assertion, recorded rather than hidden; R3, never a standing grant | **PT** | **never placed a real call.** `can_receive: False`; no transcript ingestion |
+| Mind **receives inbound** comms | new | `channels/gateway.py` (`handle`/`drain`) | not scheduled | `test_channel_providers.py` | refusal on any floor leaves the Mind unable to send; a refused message produces **no** approval card | **PT** | **nothing drives it**; no webhook ingestion |
+| Hosted **MCP servers** | "MCP (Model Context Protocol)" | `connect()` implements **stdio only** — HTTP/WS return `False` after a warning; `MCPServerConfig.command` required | plugin | none | inherits the SEC-05 allowlist | **NF** | **HTTP/SSE transport is a prerequisite**; affects `mcp.mail.hostinger.com/mcp` |
 | Notifications (Twilio/Firebase) | "SMS, Push" | `integrations/notification_integration.py`, `core/notification_manager.py` | websocket/API | none | **delivered to spoofable identity (SEC-01)** | **FI** | Phase B fix |
 | Browser automation | "browser automation plugin" | `plugins/browser_use_plugin.py` | plugin | none | **H: model-directed browsing + SOCKS proxy guidance** | **UN** | Phase I |
 | Web search | "free web search (DuckDuckGo)" | `ddgs`; `plugins/perplexity_search.py` | plugin | none | injection surface | **FI** | Phase I |
@@ -160,13 +165,20 @@
 | Maturity | Count |
 |---|---|
 | **PR** Production-ready | 1 |
-| **FI** Functional but incomplete | 31 |
-| **PT** Prototype | 14 |
+| **FI** Functional but incomplete | 32 |
+| **PT** Prototype | 17 |
 | **PH** Placeholder | 3 |
 | **DO** Documentation-only | 2 |
 | **UN** Unsafe | 7 |
 | **BR** Broken | 2 |
-| **NF** Not found | 18 |
+| **NF** Not found | 19 |
+
+> **Note on the channel rows.** Four of the five added to §H are marked **PT**
+> rather than **FI** for a specific reason: their code is tested, but *nothing has
+> ever talked to the other end*. A channel adapter that has never reached a
+> provider is a prototype no matter how many tests pass against a fake transport —
+> that is the same standard applied to the container sandbox, which was only
+> upgraded once it had been run against a real runtime.
 
 ### The 7 **Unsafe** items, ranked by urgency
 1. Code execution with no sandbox — `core/code_executor.py`

@@ -377,6 +377,42 @@ an AI, and names the responsible administrator.
   digital being and a deception, and it is the line on which the whole project
   would be judged.
 
+### When a provider speaks for us — the Ringg case
+
+For every channel where the adapter writes the message, disclosure is a property
+of the writer and is therefore enforceable: `ChannelRegistry.register()` refuses
+any channel whose `capabilities().supports_disclosure` is `False`, or whose
+identity has no disclosure text.
+
+Ringg breaks that, and it is the only channel that does. Ringg's assistant speaks
+from a prompt configured in *their* dashboard, and **no Ringg API returns that
+prompt's text**. So we cannot prove the assistant discloses. `RinggVoiceChannel`
+reports `supports_disclosure=bool(self.disclosure_confirmed)`, which means an
+unasserted voice channel **does not register**:
+
+```
+ringg enabled: False
+reason: channel cannot carry an AI disclosure; undisclosed outbound messages
+        are not permitted, so this channel stays off
+```
+
+The rule is unchanged — a channel that cannot demonstrate disclosure is not
+enabled — but here the evidence is a human's explicit assertion rather than a
+capability flag. That difference is stated in the channel's status, in
+`.env.example`, and in `CHANNEL_PROVIDERS.md` §2 rather than hidden, because an
+assertion that is silently treated as a check stops being either.
+
+Two things make the assertion cheap to honour:
+
+1. The disclosure text is **always** passed as `custom_args_values.ai_disclosure`,
+   so a prompt written to speak `@{{ai_disclosure}}` discloses by construction.
+2. `RinggVoiceChannel` deliberately does **not** send `prepared.body`. Ringg
+   speaks its own sentences, so sending our text as a script would imply the Mind
+   delivers its own words. What reaches Ringg is structured context for the
+   prompt.
+
+A receipt from this channel therefore does not claim the body was delivered.
+
 ---
 
 ## 10. Money
@@ -414,10 +450,10 @@ Regardless of approval, configuration, or owner instruction:
 | Phase | Scope | State |
 |---|---|---|
 | **P0 — Substrate** | `genesis/channels/`: protocol, identity, registry, normalised inbound/outbound types, enforced disclosure, quiet-hours + weekly-cap + minimum-gap floors, cross-channel opt-out, approval-integrity digest, governance capabilities. Both §2.3 hazards removed. | **done** — 27 tests in `tests/security/test_channels.py` |
-| **P1 — Channels that need no third party** | Email (IMAP/SMTP, stdlib only), Telegram Bot API. Both are reachable today with credentials an admin already has. | **adapters written, not yet exercised against a live provider** |
+| **P1 — Channels that need no third party** | Email (IMAP/SMTP, stdlib only), Telegram Bot API, plus the **Hostinger Mail API** (preferred email) and **Ringg AI** (voice). All four take credentials an admin already has, so none of them needs anyone else to say yes first. | **adapters written, not yet exercised against a live provider** — see `CHANNEL_PROVIDERS.md` |
 | **P2 — Contact identity** | `ContactChannel` + `Contactability` + scoped trust + `consent_source` on `Relationship`. Migration. Wire a `ChannelRegistry` onto `Mind`. | next |
 | **P3 — Inbound at scale** | Webhook gateway with per-provider signature verification; IMAP poller; durable `getUpdates` offset; inbound events → journal → memory; reply flow through the gate. | next |
-| **P4 — Telephony** | Twilio / Ringg.ai / Sarvam adapters. Needs a funded account, a number, and a real call-flow design. R3, per-message approval, never a standing grant. | planned, needs accounts |
+| **P4 — Telephony** | Twilio / Sarvam adapters behind the same `RinggVoiceChannel` shape. Needs a funded account, a number, and a real call-flow design. R3, per-message approval, never a standing grant. | planned, needs accounts |
 | **P5 — WhatsApp Business** | Meta Cloud API. Needs business verification and pre-approved message templates; outside a 24-hour service window only templates may be sent. | planned, needs verification |
 | **P6 — Social publishing** | Per-platform adapters behind `comms.social.publish`. OAuth per platform, disclosure in bio. | planned |
 | **P7 — Capability requests** | The `CapabilityRequest` flow of §7, with an admin review surface. | planned |
@@ -430,18 +466,46 @@ sandbox shipped four bugs that only executing could find.
 
 ### What P1 being "written but not exercised" means
 
-The email and Telegram adapters implement the protocol and pass the shared
-behavioural tests, because those run against `FakeChannel`. They have **not**
-sent a real message or read a real mailbox. Specifically unverified:
+The email, Telegram, Hostinger and Ringg adapters implement the protocol and pass
+the shared behavioural tests, because those run against `FakeChannel`. Their own
+parsing, error handling and disclosure rules pass against a fake HTTP transport.
+They have **not** sent a real message, read a real mailbox, or placed a real
+call. Specifically unverified:
 
 - IMAP `SINCE` date formatting against a real server, and Gmail/Outlook's
   provider-specific folder rules
 - whether `search` returns UIDs in the order assumed
 - Telegram's live `getUpdates` pagination and error strings
 - TLS negotiation against a real SMTP relay
+- **Hostinger's read paths.** `POST /api/v1/mailboxes/{id}/send` is quoted
+  verbatim in their SDK documentation. The read paths are *inferred* from the
+  documented convention that the mailbox resource id comes first — the class
+  names (`AccountApi`, `FoldersApi`, `MessagesApi`) are documented, their exact
+  paths are not. A message's individual field names are not documented at all
+- **Ringg's list-item shapes.** `_contains_id` scans the serialised payload
+  instead of asserting a schema we have not seen
 
-Each is the kind of thing that only shows up on contact, which is the argument
-for testing them against a real account before the next phase builds on top.
+Each is the kind of thing that only shows up on contact. Both adapters therefore
+ship a `verify()` that calls their read paths against the live API and reports a
+per-path verdict, and every path is overridable so a wrong guess is a config
+change rather than a release. **Run `verify()` before the first real send or
+call** — that is the difference between written and works.
+
+`HostingerMailChannel.verify()` deliberately does not exercise `send`, because
+verifying it would send a real message to a real person.
+
+### The MCP route is blocked, and by what
+
+Both providers offer hosted MCP servers (`mcp.mail.hostinger.com/mcp`, and
+Hostinger's `mcp.hostinger.com` platform connector). Neither is reachable today:
+`MCPClient.connect()` in `genesis/integrations/mcp_integration.py` implements only
+`STDIO` and logs `"HTTP/WS transport not yet implemented"` for the other two
+transports it declares. `MCPServerConfig` also requires a `command`, which no
+remote server has.
+
+So **HTTP/SSE transport is a prerequisite for the MCP route, not an alternative
+to the REST adapters** — which is why the REST adapters were built first. See
+`CHANNEL_PROVIDERS.md` §4.
 
 ---
 

@@ -10,11 +10,11 @@
 |---|---|
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
-| **Last verified** | 2026-09-28 — full suite, container build, live endpoint checks, live sandbox escape tests |
-| **Test suite** | 629 passed, 5 skipped, 11 deselected (quarantined with a printed reason each), 10 known failures |
+| **Last verified** | 2026-09-29 — full suite; the live sandbox/container checks below still date from 2026-09-28 |
+| **Test suite** | **725 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
 | **Container** | Image builds; runs `Up (healthy)`; all 9 governance endpoints verified live in the final image |
 | **Sandbox isolation** | Verified against a real container: 10/10 claims held, 11 escape tests in the suite |
-| **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.1` |
+| **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.2` |
 
 ---
 
@@ -314,7 +314,8 @@ They were all found by exercising the deployed path and looking at what came bac
 | Item | State |
 |---|---|
 | Test suite runs without paid API keys | ✅ |
-| 629 passing tests, 5 skipped, 11 quarantined with a printed reason | ✅ |
+| 725 passing tests, 16 skipped | ✅ |
+| `genesis/channels/` — the digital-presence substrate | ✅ **built** — protocol, registry, enforced disclosure, contactability floors, approval-integrity digest, `ChannelGateway`. 27 substrate tests + 52 provider/gateway tests. Provider setup: `CHANNEL_PROVIDERS.md` |
 | Container sandbox escape tests | ✅ 11 tests, skipped when no runtime/image is present rather than silently passing |
 | Alembic migration for governance tables | ✅ `008_governance_plane`, verified upgrade → downgrade → upgrade → `downgrade base` → upgrade |
 | Migration chain usable from a fresh database | ✅ **fixed** — three earlier revisions created the same index twice (`index=True` *and* an explicit `create_index`), so `alembic upgrade head` aborted partway and every later revision, including the governance one, was unreachable on a new install. Guarded by `tests/test_migrations.py`. |
@@ -339,6 +340,12 @@ Be careful with these — several are asserted in public material and are not tr
 | Network isolation | Verified, not assumed: `verified` requires the host to have egress **and** the namespace to block it. If the probe cannot prove both, the sandbox reports `verified: false` with the reason and the receipt records the fact |
 | Memory as a temporal knowledge graph / bi-temporal store | Not implemented. ChromaDB + a relevance multiplier; cannot express "true from March, superseded in July". ADR-0003/0004 describe the target. |
 | Portable signed identity (DID / verifiable credentials) | Not implemented. `gmid` is a local identifier. |
+| A Mind can email and call | **Adapters exist, none has been called.** `HostingerMailChannel`, `RinggVoiceChannel`, `EmailChannel` and `TelegramChannel` implement the protocol and pass tests against a fake transport, but no real message has been sent and no real call placed — neither account exists yet. Hostinger's send path is documented; its read paths are inferred. Run `adapter.verify()` before the first real use |
+| A Mind can receive inbound mail | **Not wired to the daemon.** `ChannelGateway.handle()`/`drain()` implement and test the loop, but nothing schedules it, and there is no webhook ingestion. Inbound is nothing more than a returned object today |
+| Voice transcription | Not implemented. Ringg's assistant speaks; the transcript arrives later by webhook or from call history, and neither is ingested. `RinggVoiceChannel.capabilities().can_receive` is `False` |
+| Contact persistence | Not implemented. The only `ContactResolver` is `InMemoryContacts`, which returns every unknown sender as reply-only with no `consent_source`. A Mind does not yet remember who it has spoken to |
+| Durable outbound rate limits | Not implemented. `InMemoryOutboundLedger.durable` is `False`, so the weekly cap and minimum gap are a per-process floor that a restart clears. `InMemoryOutboundLedger` reports this itself rather than claiming otherwise |
+| Hosted MCP servers | **Unreachable.** `MCPClient.connect()` implements only `STDIO` and logs "HTTP/WS transport not yet implemented" for the two other transports it declares. `MCPServerConfig.command` is required, which no remote server has. HTTP/SSE transport is a prerequisite, not a config change |
 | Realtime voice (`GEMINI_LIVE_MODEL`) | Not implemented. The setting is read and reported, but there is no Live API client — bidirectional audio is a feature, not a configuration. The implemented speech paths are single-shot: `genesis/senses/speech_input.py` and `speech_output.py`. |
 | Durable multi-process kernel, checkpoints, resume | Not implemented. |
 | Embodiment | Not implemented. `actuate_robot` exists only as a **governance** entry at R4. |
@@ -426,6 +433,18 @@ alembic downgrade -1      # drops the four governance tables
 | `GEMINI_LIVE_MODEL` | unset | **Recorded but not wired.** Realtime voice has no client in this codebase; setting it changes no behaviour. `GET /system/providers` reports `implemented: false` for it |
 | `DATA_DIR`, `MINDS_DIR`, `LOGS_DIR` | `~/.genesis/*` | Independent settings — do not assume they follow `GENESIS_HOME` |
 | `GENESIS_VECTOR_STORE_MODE` | from settings (`persistent`) | `ephemeral` keeps ChromaDB in memory. Read from the environment, not from `Settings`, because `Settings` has no `env_prefix` — a field named `vector_store_mode` would look for `VECTOR_STORE_MODE`. The test suite requires `ephemeral` |
+| `MIND_ADMINISTRATOR_NAME` | `"the system operator"` | Named in every disclosure signature. A Mind whose messages are signed by nobody in particular has not disclosed anything |
+| `MIND_HOSTINGER_MAIL_API_TOKEN` + `MIND_HOSTINGER_MAILBOX_ID` + `MIND_HOSTINGER_MAIL_ADDRESS` | unset | The Mind's email via the Hostinger Mail API. **Both token and mailbox id are required** — email is not registered with only one, because half a credential fails on first use. Token comes from hPanel → Agentic Mail → API access and is shown once. See `CHANNEL_PROVIDERS.md` |
+| `MIND_HOSTINGER_MAIL_BASE_URL` / `_API_VERSION` | `https://api.mail.hostinger.com` / `v1` | Overridable. Hostinger's *hosting* API is a different service at a different URL with different tokens and cannot send mail |
+| `MIND_EMAIL_*` | unset | Fallback IMAP/SMTP mailbox, used only when no Hostinger Mail token is set. For Gmail use an App Password |
+| `MIND_TELEGRAM_BOT_TOKEN` | unset | Bot identity from @BotFather. The easiest real channel: no business verification, and a bot cannot message a user who has not started the chat |
+| `MIND_RINGG_API_KEY`, `MIND_RINGG_AGENT_ID`, `MIND_RINGG_FROM_NUMBER_ID` | unset | Voice via Ringg AI. Ringg's assistant speaks from a prompt in *its* dashboard; the Mind decides who and what context |
+| `MIND_RINGG_DISCLOSURE_CONFIRMED` | `false` | **An assertion, not a check.** The channel does not register while this is false. No Ringg API returns the assistant's prompt text, so we cannot verify it discloses; the operator has to say so, and that statement is recorded. See §9 of `DIGITAL_PRESENCE.md` |
+| `MIND_RINGG_CALL_WINDOW` | `09:00-18:00` | Sets **our** quiet-hours floor to match the window configured in Ringg, which enforces its own. If ours is wider the Mind believes a call is allowed and the provider refuses it as an unexplained delivery error instead of a policy refusal. Unparseable keeps the default and warns |
+
+> **Naming:** these are `MIND_*`-prefixed because `Settings` has **no `env_prefix`** — a
+> field name *is* the environment variable name. An unprefixed `email_password` would
+> collide with a host variable of the same name.
 
 ---
 
@@ -590,15 +609,29 @@ something already acting on their behalf.
 
 ### Recommended next three, in order
 
-1. **Finish Phase N (N5–N10)** — responsibilities, projects, habits, then the
-   workspace surface where a human can see what the being owes. Commitments alone
-   are already differentiating; the rest makes life state coherent.
-2. **Migrate the Mind detail tabs** to the new design primitives. They inherit the
-   correct theme through the compatibility layer, so they are readable, but they
-   keep their original structure — and those are the pages people live in.
+1. **P2 — contact identity, and a registry on `Mind`.** This is the blocker for
+   everything in `DIGITAL_PRESENCE.md`. The gateway is written and tested, but the
+   only `ContactResolver` is `InMemoryContacts`, so a Mind cannot remember who it
+   has spoken to and every stranger is reply-only forever; and `Mind` has no
+   `channels` attribute, so `action_executor._execute_send_email` — which already
+   reads `getattr(self.mind, "channels", None)` — finds `None` and refuses
+   honestly. Two pieces of scaffolding, and the adapters become reachable.
+2. **Drive the gateway from the daemon** — an inbound poll on the existing
+   scheduler, with a stated approval policy for replies. Without this, a Mind can
+   address someone but can never answer, which is the half of the feature the user
+   actually asked for. Decide the policy first: auto-approve replies to known
+   contacts inside a thread is the defensible default, and everything else keeps
+   its R2/R3 decision.
 3. **Phase C kernel extraction** — split the ~99 KB `Mind`, and define the `Body`
    protocol while doing it. This is the gate for forking, multi-process daemons
    and embodiment.
+
+**Deliberately not on this list: more providers.** Twilio, WhatsApp and social
+publishing each need an external human to say yes first, and both of the two
+adapters that exist have never been called. Adding a third unexercised adapter
+would add surface without adding anything a user can do. Run `verify()` against
+one real account — Hostinger is the cheapest of the two to stand up — and close
+the gaps that finds before widening.
 
 ---
 
@@ -701,6 +734,19 @@ genesis/
       commitments.py   # what a Mind owes, to whom, by when (Phase N)
   integrations/
     mcp_integration.py # MCP with a scrubbed environment (SEC-05)
+  channels/            # the digital-presence substrate
+    base.py            #   protocol + types: identity, capabilities, intents,
+                       #   approvals (with a body digest), receipts, contacts
+    disclosure.py      #   the AI marker: composed in the writer, idempotent
+    limits.py          #   quiet hours, weekly cap, minimum gap, opt-out, ledger
+    adapter.py         #   BaseChannel: prepare (pure) / send (gated)
+    registry.py        #   per-channel enable/disable WITH a reason; credentials
+    email.py           #   stdlib IMAP/SMTP fallback
+    telegram.py        #   Bot API
+    hostinger_mail.py  #   Hostinger Mail API: scoped token, threads, allow list
+    ringg_voice.py     #   Ringg AI: the Mind picks context, Ringg speaks
+    gateway.py         #   inbound -> responder -> floors -> gate -> send
+    fake.py            #   FakeChannel: the test double the suite runs on
   api/
     governance_routes.py   # 12 endpoints: approvals, receipts, timeline, e-stop
   database/
@@ -709,8 +755,9 @@ alembic/versions/20260928_0800_add_governance_plane.py
 tests/
   governance/        # 305 tests: policy, approvals, audit, SQL store, gate, API,
                      #   correlation, domain events, commitments
-  security/          # 261 tests: sandbox, container escapes, network probe, MCP env,
-                     #   secrets, the bootstrap admin boundary
+  security/          # 363 tests: sandbox, container escapes, network probe, MCP env,
+                     #   secrets, the bootstrap admin boundary, and the channels
+                     #   substrate itself (test_channels.py 27, test_channel_providers.py 52)
   test_migrations.py # 31 tests: migration-chain guards
   test_mind_ownership.py # 8 tests: who may access a Mind, and placeholder repair
   security/test_default_admin.py   # 10 tests: the bootstrap-admin boundary
@@ -719,6 +766,8 @@ docs/
   architecture/adr/  # ADR-0001 .. ADR-0008
   v3/
     DEVELOPER_GUIDE.md            # this document
+    CHANNEL_PROVIDERS.md          # how to configure email/voice, and what is unverified
+    DIGITAL_PRESENCE.md           # the design: the Mind's body in the digital world
     DIGITAL_LIFE_STATE.md         # Phase N design: commitments, projects, habits
     RELATIONSHIP_INTELLIGENCE.md  # Phase O design: trust scopes, boundaries
     EMBODIMENT_ABSTRACTION.md     # Body protocol + ROSBody safety preconditions
@@ -733,7 +782,10 @@ docs/
 
 | Issue | Impact | Notes |
 |---|---|---|
-| 10 test failures (was 12) | Pre-existing | Reproduce on the pristine tree. Mostly environment (`test_emotional_intelligence`, `test_memory`). Two of the original twelve were **not** code faults at all but the shared ChromaDB; they are gone now that the test store is ephemeral (A2). |
+| 9 test failures + 1 collection error | Pre-existing | Reproduce on the pristine tree (`git stash` is how they were classified). Environment/interpreter-specific (`test_emotional_intelligence` ×2, `test_admin`, `test_conversation_api`), the shared ChromaDB store (`test_memory`), and three that look like genuine product defects (`test_environment_access_controls`, `test_mind_gens_coercion`, `test_create_mind_with_auth`) |
+| No channel adapter has been run against a real provider | **Medium** | Written from documentation. Hostinger's send path is quoted verbatim in their SDK docs; its read paths are inferred from a documented convention, and a message's field names are not documented at all. Run `verify()` before the first real send or call, and prefer acting on its verdict over this table |
+| Nothing drives `ChannelGateway` | **Medium** | The loop is implemented and tested; no scheduler or webhook calls it. A Mind does not answer an email today, and should not be assumed to |
+| `Mind` has no `ChannelRegistry` | **Medium** | So adapters are unreachable from the API at runtime. `action_executor._execute_send_email` already looks for `getattr(mind, "channels", None)` and finds `None`, which is why it reports honestly rather than claiming to have sent anything |
 | Order-dependent tests | Low | The ChromaDB half is fixed (A2). `test_memory_user_scoping` fails alone and passes in the suite; the cause is the test, not the store. |
 | CI quarantine list | Low | 11 tests are deselected with a printed reason each (`.github/workflows/ci.yml`). A CI that is red on arrival gets ignored; an honest short list does not. |
 | `sqlite` URL filename is ignored | Low | Both `database/base.py` and `alembic/env.py` resolve a sqlite URL to `genesis_home/genesis.db`, ignoring the path in `DATABASE_URL`. Consistent, but surprising. |

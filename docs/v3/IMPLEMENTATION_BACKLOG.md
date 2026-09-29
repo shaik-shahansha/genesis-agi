@@ -316,17 +316,23 @@ Visual or feature work must not start before this passes.
 | P0.7 | `ChannelRegistry` with per-channel enable/disable **and a reason**, so a refused channel is visible rather than absent | `[x]` |
 | P1.1 | Email adapter (IMAP/SMTP, stdlib only) | `[~]` written; never exercised against a live server |
 | P1.2 | Telegram Bot API adapter | `[~]` written; never exercised against a live bot |
+| P1.3 | **Hostinger Mail API adapter** (preferred email: scoped token, provider-side threading, allow list, webhooks). Read paths inferred from their documented convention; `verify()` reports per-path verdicts | `[~]` written and tested against a fake transport; never called live |
+| P1.4 | **Ringg AI voice adapter**: Mind decides who and what context, Ringg's assistant speaks. Disclosure asserted by the operator and the channel refuses to register without it | `[~]` written and tested; never called live |
+| P1.5 | **HTTP/SSE transport for `MCPClient`**, without which no hosted MCP server (including `mcp.mail.hostinger.com/mcp`) is reachable. `MCPServerConfig.command` must become optional for remote servers | `[ ]` prerequisite for the MCP route |
+| P1.6 | `ChannelGateway`: inbound → responder → floors → approval → send → receipt, each outcome recorded | `[x]` logic done; not yet driven by the daemon |
+| P1.7 | Contact resolution behind a `ContactResolver` protocol, with unknown senders reply-only and no `consent_source` | `[x]` in-memory default; durable store is P2.1 |
 | P2.1 | `ContactChannel` + `Contactability` + scoped trust + `consent_source` on `Relationship`; migration | `[ ]` |
-| P2.2 | Attach a `ChannelRegistry` to `Mind`; per-Mind credentials rather than install-level | `[ ]` |
+| P2.2 | Attach a `ChannelRegistry` to `Mind`; per-Mind credentials rather than install-level. `action_executor._execute_send_email` already reads `getattr(mind, "channels", None)` and finds nothing | `[ ]` |
 | P3.1 | Webhook gateway with per-provider signature verification | `[ ]` |
 | P3.2 | IMAP poller as a background task, on the existing scheduler | `[ ]` |
 | P3.3 | Inbound events → journal → memory, so the Mind remembers who wrote and when | `[ ]` |
 | P3.4 | Reply flow: inbound → cognition → intent → gate → send, with the receipt as the reply's record | `[ ]` |
 | P3.5 | Durable outbound ledger (replaces the in-memory default, which resets on restart) | `[ ]` |
 | P3.6 | Durable Telegram `getUpdates` offset, or dedup by message id | `[ ]` |
-| P4.1 | Telephony adapter (Twilio / Ringg.ai / Sarvam), R3, per-message approval, never a standing grant | `[ ]` |
-| P4.2 | Spoken AI disclosure at call open, not configurable off | `[ ]` |
-| P4.3 | Call recording requires disclosure and is off by default | `[ ]` |
+| P4.1 | Telephony adapters (Ringg.ai done; Twilio / Sarvam behind the same channel shape), R3, per-message approval, never a standing grant | `[~]` Ringg written; others `[ ]` |
+| P4.2 | Spoken AI disclosure at call open, not configurable off. Done for Ringg by passing `ai_disclosure` as a prompt variable and refusing to register until the operator asserts the prompt speaks it | `[x]` for Ringg, with the assertion recorded rather than hidden |
+| P4.3 | Call transcript → memory, so a call becomes something the Mind remembers rather than only an action it took | `[ ]` |
+| P4.4 | Call recording requires disclosure and is off by default | `[ ]` |
 | P5.1 | WhatsApp Business via Meta Cloud API; template-based outside the 24-hour window | `[ ]` |
 | P6.1 | Social publishing adapters, disclosure in bio, per-platform OAuth | `[ ]` |
 | P7.1 | `CapabilityRequest`: the Mind asks for a capability it lacks; admin provisions or declines. The Mind cannot self-grant | `[ ]` |

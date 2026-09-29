@@ -43,6 +43,7 @@ from .disclosure import (
     is_disclosed,
 )
 from .fake import FakeChannel
+from .gateway import ChannelGateway, EngagementOutcome, InMemoryContacts
 from .limits import (
     ChannelLimits,
     InMemoryOutboundLedger,
@@ -50,6 +51,7 @@ from .limits import (
     OutboundLedger,
     assert_can_send,
     outbound_refusal_reason,
+    parse_call_window,
 )
 from .registry import (
     ChannelCredentials,
@@ -96,6 +98,7 @@ __all__ = [
     "OutboundLedger",
     "assert_can_send",
     "outbound_refusal_reason",
+    "parse_call_window",
     # registry
     "ChannelCredentials",
     "ChannelRegistration",
@@ -103,6 +106,10 @@ __all__ = [
     "build_fake_registry",
     "build_registry",
     "credentials_from_settings",
+    # gateway
+    "ChannelGateway",
+    "EngagementOutcome",
+    "InMemoryContacts",
     # test double
     "FakeChannel",
 ]
