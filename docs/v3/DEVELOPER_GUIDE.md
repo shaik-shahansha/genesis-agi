@@ -11,7 +11,7 @@
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
 | **Last verified** | 2026-09-29 — full suite; the live sandbox/container checks below still date from 2026-09-28 |
-| **Test suite** | **975 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
+| **Test suite** | **997 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
 | **Container** | Image builds; runs `Up (healthy)`; all 9 governance endpoints verified live in the final image |
 | **Sandbox isolation** | Verified against a real container: 10/10 claims held, 11 escape tests in the suite |
 | **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.2` |
@@ -314,7 +314,7 @@ They were all found by exercising the deployed path and looking at what came bac
 | Item | State |
 |---|---|
 | Test suite runs without paid API keys | ✅ |
-| 975 passing tests, 16 skipped | ✅ |
+| 997 passing tests, 16 skipped | ✅ |
 | `genesis/channels/` — the digital-presence substrate | ✅ **built** — protocol, registry, enforced disclosure, contactability floors, approval-integrity digest, `ChannelGateway`. 27 substrate + 52 provider/gateway + 34 contact-store + 70 answering-loop tests. Provider setup: `CHANNEL_PROVIDERS.md` |
 | Container sandbox escape tests | ✅ 11 tests, skipped when no runtime/image is present rather than silently passing |
 | Alembic migration for governance tables | ✅ `008_governance_plane`, verified upgrade → downgrade → upgrade → `downgrade base` → upgrade |
@@ -777,7 +777,8 @@ tests/
                      #   substrate itself (test_channels.py 27, test_channel_providers.py 52,
                      #   test_contact_store.py 34, test_channel_poller.py 41,
                      #   test_channel_responder.py 44, test_channel_ledgers.py 30,
-                     #   test_channel_outreach.py 39, test_channel_memory.py 30)
+                     #   test_channel_outreach.py 39, test_channel_memory.py 30,
+                     #   test_channel_transport_live.py 22 — real HTTP against a local server)
   test_migrations.py # 31 tests: migration-chain guards
   test_mind_ownership.py # 8 tests: who may access a Mind, and placeholder repair
   security/test_default_admin.py   # 10 tests: the bootstrap-admin boundary
@@ -803,7 +804,7 @@ docs/
 | Issue | Impact | Notes |
 |---|---|---|
 | 9 test failures + 1 collection error | Pre-existing | Reproduce on the pristine tree (`git stash` is how they were classified). Environment/interpreter-specific (`test_emotional_intelligence` ×2, `test_admin`, `test_conversation_api`), the shared ChromaDB store (`test_memory`), and three that look like genuine product defects (`test_environment_access_controls`, `test_mind_gens_coercion`, `test_create_mind_with_auth`) |
-| No channel adapter has been run against a real provider | **Medium** | Written from documentation. Hostinger's send path is quoted verbatim in their SDK docs; its read paths are inferred from a documented convention, and a message's field names are not documented at all. Run `verify()` before the first real send or call, and prefer acting on its verdict over this table |
+| No channel adapter has been run against a real provider | **Medium** | Written from documentation. Hostinger's send path is quoted verbatim in their SDK docs; its read paths are inferred from a documented convention, and a message's field names are not documented at all. **The transport is now verified against a real HTTP server** (`test_channel_transport_live.py`), which found two bugs a fake transport could not — a discarded list payload that reported a full inbox as empty, and replies that were never threaded. The *contract* is still unverified. Run `verify()` before the first real send |
 | Nothing drives `ChannelGateway` | ✅ **fixed** | `ChannelPoller` is started by `MindDaemon._channel_loop` when `MIND_CHANNEL_AUTOREPLY_ENABLED` is set. Off by default, and it logs why when it declines to start |
 | A Mind can only reply, never initiate | **Medium** | Every initiating path is built and enforced (`may_initiate()` needs permission *and* a recorded `consent_source`; R3; the floors apply) but nothing produces an initiating intent, so `may_initiate()` is only ever checked. Proactive outreach is the next phase |
 | Channel credentials are install-level, not per-Mind | **Medium** | `Mind.channels` reads the install's settings, so every Mind on an install shares one mailbox and one phone number. Per-Mind credentials need a store for them; a per-Mind override that read the same settings would look like isolation without being it, which is why it was not added |

@@ -239,7 +239,30 @@ class HostingerMailChannel(BaseChannel):
             )
 
         data = body.get("data")
-        result: dict[str, Any] = data if isinstance(data, dict) else {}
+
+        # **A list payload must survive.** `{data: [...]}` is the documented shape for
+        # a collection endpoint, and the earlier version of this method kept `data`
+        # only when it was a dict:
+        #
+        #     result = data if isinstance(data, dict) else {}
+        #
+        # so a message list arrived, was recognised as "not a dict", and was replaced
+        # with `{}`. The read path then saw no `messages` key, returned an empty list,
+        # and reported a full inbox as an empty one. Nothing raised and nothing logged:
+        # a Mind with unread mail would simply never answer any of it.
+        #
+        # Found by the real-HTTP tests in `tests/security/test_channel_transport_live.py`,
+        # and structurally invisible to a fake transport — the fake returned the shape
+        # this code expected rather than the shape the documentation describes, so it
+        # agreed with the bug.
+        result: dict[str, Any] = {}
+        if isinstance(data, dict):
+            result.update(data)
+        elif data is not None:
+            # Kept under a private key rather than guessed at: `items` would be a
+            # second invented field name, and the caller can read a list directly.
+            result["_data"] = data
+
         # Pagination travels *alongside* `data`, not inside it.
         pagination = body.get("pagination")
         if isinstance(pagination, dict):
@@ -260,8 +283,16 @@ class HostingerMailChannel(BaseChannel):
         # A reply is the same call with a reference attached. The API copies the
         # original's id and references across and flags the source as answered, so
         # threading is the provider's job rather than ours.
+        #
+        # Read from `prepared`, not from `approved`. The earlier version did
+        # `getattr(approved, "reply_to_message_id", None)`, and
+        # `ApprovedCommunication` has no such field — so this was `None` for every
+        # reply, `inReplyTo` was never sent, and every answer arrived as a brand-new
+        # message. A `getattr` with a default turns a missing field into a silent
+        # absence, which is why the test for it had to assert on the bytes on the wire
+        # rather than on an object.
         if prepared.is_reply:
-            in_reply_to = getattr(approved, "reply_to_message_id", None)
+            in_reply_to = prepared.reply_to_message_id
             if in_reply_to:
                 payload["inReplyTo"] = in_reply_to
 
@@ -291,7 +322,13 @@ class HostingerMailChannel(BaseChannel):
                 params={"page": page, "per_page": PAGE_SIZE},
             )
 
-            messages = result.get("messages") or result.get("items") or []
+            # Three shapes, because a collection endpoint's shape is not documented and
+            # all three are plausible: the payload *is* the list (`{data: [...]}`), the
+            # payload contains a named list, or the payload is a single object. Reading
+            # all three is cheaper than being wrong about which one it is.
+            messages = result.get("messages") or result.get("items")
+            if messages is None and isinstance(result.get("_data"), list):
+                messages = result["_data"]
             if not isinstance(messages, list) or not messages:
                 break
 

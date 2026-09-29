@@ -196,6 +196,53 @@ This section exists because both adapters were written from documentation, and
 - **Webhooks from either provider.** Not implemented; inbound for voice therefore
   reports `can_receive: False`.
 
+### What the real-HTTP tests did verify, and what they found
+
+`tests/security/test_channel_transport_live.py` runs the Hostinger adapter against a
+**real `http.server` on a real port** with real `httpx` and real bytes on the wire. It
+exists because a fake transport that patches `httpx` and returns dicts I wrote cannot
+possibly catch: a wrong method, URL or header; a body that fails to encode; a status
+code arriving as an exception rather than a parsed payload; or a response that only
+fails to parse against a real socket.
+
+It found two bugs immediately, both of which the fake transport was structurally
+incapable of seeing because the fake returned the shape the code expected rather than
+the shape the documentation describes:
+
+**1. A list payload was discarded.** `_request` kept `data` only when it was a dict:
+
+```python
+result = data if isinstance(data, dict) else {}
+```
+
+`{data: [...]}` is the documented shape for a collection endpoint. So a message list
+arrived, was recognised as "not a dict", and was replaced with `{}`. The read path then
+saw no `messages` key, returned an empty list, and reported **a full inbox as an empty
+one**. Nothing raised and nothing logged: a Mind with unread mail would simply never
+answer any of it, and the symptom would have been "the Mind is quiet".
+
+**2. Replies were never threaded.** `_deliver` read the original message id from a
+field that does not exist:
+
+```python
+in_reply_to = getattr(approved, "reply_to_message_id", None)
+```
+
+`ApprovedCommunication` has no such field, so this was `None` for every reply,
+`inReplyTo` was never sent, and **every answer arrived as a brand-new message** —
+breaking the thread for the person on the other end. A `getattr` with a default turns a
+missing field into a silent absence, which is exactly why the test had to assert on the
+bytes on the wire rather than on an object. The id now travels on `PreparedMessage`.
+
+Both are pinned by mutation: reintroducing the discarded list fails 3 tests, and
+reading the id from the wrong object fails 1.
+
+**What it still does not prove.** The local server implements the paths and envelope
+*this adapter asks for*, so it agrees with the adapter by construction. If Hostinger's
+real API puts messages somewhere else, every test here passes and the adapter still
+fails. That boundary is asserted in the file itself rather than left for a reader to
+assume otherwise — only credentials can close it.
+
 ### How to close the gap
 
 Every path is overridable, so a wrong guess is a config change rather than a

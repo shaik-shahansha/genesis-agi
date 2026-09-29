@@ -189,6 +189,7 @@ class BaseChannel:
             warnings=warnings,
             trigger=intent.trigger or ("reply" if intent.is_reply else "manual"),
             trigger_ref=intent.trigger_ref,
+            reply_to_message_id=intent.reply_to_message_id,
         )
 
     async def send(self, approved: ApprovedCommunication) -> DeliveryReceipt:

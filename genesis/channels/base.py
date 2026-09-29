@@ -289,6 +289,12 @@ class PreparedMessage:
     #: trigger is provenance, not message content, and a human approving a body has
     #: not approved a trigger string.
     trigger_ref: Optional[str] = None
+    #: The provider message id this is a reply to. Carried on the prepared message
+    #: because the adapter needs it at send time and `ApprovedCommunication` has no
+    #: such field — reading it from there with `getattr(..., None)` silently returned
+    #: `None` for every reply, so replies were sent as new messages and threading
+    #: never worked. Also not part of the digest: it is a routing fact, not content.
+    reply_to_message_id: Optional[str] = None
 
     @property
     def body_bytes(self) -> int:
