@@ -139,7 +139,8 @@
 | **Channel substrate** (the Mind's own comms) | new, `DIGITAL_PRESENCE.md` | `channels/{base,disclosure,limits,adapter,registry,fake}.py` | `ChannelRegistry`, `ChannelGateway` | `tests/security/test_channels.py` (27) | **enforced disclosure, contactability floors, approval-integrity digest; `comms.broadcast`/`account.create`/`impersonate_human`/`undisclosed_outreach` prohibited at R5** | **FI** | P2: contact identity; P3: durability |
 | Mind sends/reads **email** | new | `channels/email.py` (stdlib IMAP/SMTP), `channels/hostinger_mail.py` (Mail API: scoped token, provider-side threading, allow list) | `ChannelRegistry` | `test_channel_providers.py` (52) | disclosure in the writer; R0 read / R1 draft / R2 reply / R3 initiate | **PT** | **never called a real server.** Hostinger send path documented; read paths inferred. Run `verify()` |
 | Mind **places voice calls** | new | `channels/ringg_voice.py` (Ringg AI) | `ChannelRegistry` | `test_channel_providers.py` | **does not register unless disclosure is asserted** — no Ringg API returns the assistant's prompt, so this is a human assertion, recorded rather than hidden; R3, never a standing grant | **PT** | **never placed a real call.** `can_receive: False`; no transcript ingestion |
-| Mind **receives inbound** comms | new | `channels/gateway.py` (`handle`/`drain`) | not scheduled | `test_channel_providers.py` | refusal on any floor leaves the Mind unable to send; a refused message produces **no** approval card | **PT** | **nothing drives it**; no webhook ingestion |
+| Mind **receives inbound** comms | new | `channels/gateway.py` (`handle`/`drain`), `channels/poller.py` (`ChannelPoller`), driven from `MindDaemon._channel_loop` | `MIND_CHANNEL_AUTOREPLY_ENABLED` | `test_channel_poller.py` | refusal on any floor leaves the Mind unable to send; a refused message produces **no** approval card; **at most one reply per message across restarts** | **FI** | **off by default**; no webhook ingestion; inbound is not yet a memory |
+| Mind **drafts and sends a reply** | new | `channels/responder.py` (`MindResponder`), `channels/poller.py` (`GovernanceAuthorizer` → the policy engine) | `Mind.think` → gate → adapter | `test_channel_responder.py` (29) | **the model is told nothing about policy, and actions are disabled during a draft**; an email reply is R3 and can never hold a standing grant | **PT** | **never sent a real reply.** Telegram replies can be auto-approved; email ones cannot, by governance |
 | Contact persistence | new | `channels/contacts.py` (`DatabaseContacts`), `contacts` + `contact_channels` tables, migration `010_contacts` | `ContactResolver` on `ChannelGateway` | `tests/security/test_contact_store.py` (34) | **consent per channel, per Mind; unknown sender reply-only with no `consent_source`; `may_initiate()` needs both permission *and* provenance** | **FI** | Per-Mind credentials (P2.4) |
 | Hosted **MCP servers** | "MCP (Model Context Protocol)" | `connect()` implements **stdio only** — HTTP/WS return `False` after a warning; `MCPServerConfig.command` required | plugin | none | inherits the SEC-05 allowlist | **NF** | **HTTP/SSE transport is a prerequisite**; affects `mcp.mail.hostinger.com/mcp` |
 | Notifications (Twilio/Firebase) | "SMS, Push" | `integrations/notification_integration.py`, `core/notification_manager.py` | websocket/API | none | **delivered to spoofable identity (SEC-01)** | **FI** | Phase B fix |
@@ -166,7 +167,7 @@
 | Maturity | Count |
 |---|---|
 | **PR** Production-ready | 1 |
-| **FI** Functional but incomplete | 33 |
+| **FI** Functional but incomplete | 34 |
 | **PT** Prototype | 17 |
 | **PH** Placeholder | 3 |
 | **DO** Documentation-only | 2 |

@@ -188,6 +188,44 @@ class Settings(BaseSettings):
     #: stated rather than hidden.
     mind_ringg_disclosure_confirmed: bool = False
 
+    # --- Answering: the inbound loop --------------------------------------
+    #
+    # There is deliberately **no `reply_approval_mode` setting here.** Whether a
+    # reply is auto-approved is already answered by tenant policy's standing-grant
+    # mechanism (`auto_approve_risk_levels` + a capability or category scope in
+    # `PolicyContext.tenant_policy`), which is capped at R2 by
+    # `STANDING_GRANT_MAX_RISK` and therefore cannot be used to grant R3. A second
+    # toggle here would be a weaker copy of a control that already exists, and the
+    # copy is the one that would turn out to be wrong.
+    #
+    # So `mind_channel_tenant_policy` is how an administrator opts into replying
+    # without a human in the loop for every message. Example, granting auto-approval
+    # for R0–R2 communication actions only:
+    #
+    #   MIND_CHANNEL_TENANT_POLICY={"auto_approve_risk_levels":["R0","R1","R2"],
+    #                               "auto_approve_categories":["COMMUNICATION"]}
+    #
+    # Empty means every reply raises an approval request. That is the default
+    # because it fails closed, and because "the Mind answers email by itself" is a
+    # change an operator should make deliberately rather than discover.
+    mind_channel_tenant_policy: str = ""
+    #: Scopes the Mind is granted for outbound communication. Without the scope a
+    #: reply is refused for `missing_scope` regardless of risk level, so a standing
+    #: grant cannot apply at all — the scope is a prerequisite, not a formality.
+    mind_channel_granted_scopes: str = ""
+    #: How often the inbound poller runs. Below ~30s a mailbox is polled faster than
+    #: most providers like, and duplicates are cheap to dismiss while a rate limit is
+    #: not.
+    mind_channel_poll_interval_seconds: int = 60
+    #: How far back the first pass looks. Bounded because a Mind starting up should
+    #: not answer a month of backlog, and because the ledger makes the window
+    #: irrelevant to correctness — only to which messages are considered new.
+    mind_channel_lookback_days: int = 3
+    #: Whether the daemon runs the inbound poller at all. Off by default: a Mind that
+    #: starts answering email the moment it has credentials, with no approval policy
+    #: configured, is not a behaviour anyone asked for.
+    mind_channel_autoreply_enabled: bool = False
+
     #: Gemini model used for realtime / live voice sessions.
     #:
     #: Recorded and surfaced so a deployment can declare its intent, but there is

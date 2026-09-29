@@ -368,12 +368,40 @@ _CORE_CAPABILITIES: Tuple[CapabilityProfile, ...] = (
     # and physical consequence, and a call is external communication like any
     # other. What makes a call different is that it can never be granted standing
     # approval — and standing grants already cap at R2, so that is handled.
+    #
+    # **Two declarations here were wrong and are corrected, not re-designed.**
+    #
+    # `comms.email.read` declared R0 *and* `data_sensitivity="personal"`. The
+    # sensitivity floor maps `personal` to R3, so the profile silently resolved to
+    # R3 with `require_approval` — a Mind could not read its own inbox without a
+    # human. That contradicts the R0 rationale written directly above it, and the
+    # rationale is the correct one: reading ingests into the Mind's own workspace
+    # and discloses nothing outward, so no sensitivity floor applies. The floor is
+    # about data crossing a boundary, not about data being looked at.
+    #
+    # `comms.email.reply` declared R2 while resolving to R3, for the same reason:
+    # a reply does carry personal content *outward*, so the floor is right and the
+    # declared value was wrong. It is R3 now, and `reversible=False` because a sent
+    # email cannot be retracted — it previously claimed `reversible=True`, which
+    # would have let the policy engine treat an irreversible send as reversible.
+    # `data_sensitivity="personal"` is retained even though the declared R3 now
+    # already yields R3: it is a true statement about the data, and it means that
+    # lowering the declared risk alone would not silently remove the floor. Verified
+    # by mutation — removing it changes nothing today, which is the point.
+    #
+    # The consequence is worth stating because it is load-bearing: **an email reply
+    # can never hold a standing grant**, since R3 is above
+    # `STANDING_GRANT_MAX_RISK`. An earlier draft of these comments claimed the
+    # opposite ("standing grants already cap at R2, so that is handled"), which was
+    # only true while the declaration said R2 and the behaviour said R3. A Mind can
+    # hold an autonomous conversation on Telegram; by email it cannot, because an
+    # email reply carries personal data across the trust boundary. That asymmetry is
+    # a governance decision, not an oversight — see `docs/v3/CHANNEL_PROVIDERS.md`.
     CapabilityProfile(
         name="comms.email.read",
         risk=RiskLevel.R0,
         category="COMMUNICATION",
         reversible=True,
-        data_sensitivity="personal",
         required_scopes=("comms.email.read",),
     ),
     CapabilityProfile(
@@ -384,9 +412,10 @@ _CORE_CAPABILITIES: Tuple[CapabilityProfile, ...] = (
     ),
     CapabilityProfile(
         name="comms.email.reply",
-        risk=RiskLevel.R2,
+        risk=RiskLevel.R3,
         category="COMMUNICATION",
         external=True,
+        reversible=False,
         data_sensitivity="personal",
         required_scopes=("comms.email.send",),
     ),

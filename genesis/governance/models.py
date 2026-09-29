@@ -110,6 +110,22 @@ class EventType:
     ACTION_EMERGENCY_STOP = "action.emergency_stop"
     EMERGENCY_STOP_RELEASED = "emergency_stop.released"
 
+    # Channels: the Mind's own digital presence (docs/v3/DIGITAL_PRESENCE.md).
+    #
+    # A separate family rather than reusing `action.*`, because the question an
+    # operator asks is "what did this being say to people?" — and answering that
+    # should be a query over one prefix, not a filter over action events hoping the
+    # channel ones were labelled consistently.
+    #
+    # Note what these carry: channel, direction, decision, approval id, and the
+    # contact's *relationship* id. Not the body. `record` redacts the payload in the
+    # writer, so message content does not reach the journal by this path.
+    CHANNEL_INBOUND_RECEIVED = "channel.inbound_received"
+    CHANNEL_REPLY_SENT = "channel.reply_sent"
+    CHANNEL_REPLY_REFUSED = "channel.reply_refused"
+    CHANNEL_REPLY_NOT_SENT = "channel.reply_not_sent"
+    CHANNEL_CLAIM_ABANDONED = "channel.claim_abandoned"
+
     GRANT_ISSUED = "grant.issued"
     GRANT_REDEEMED = "grant.redeemed"
     GRANT_REVOKED = "grant.revoked"
@@ -130,6 +146,7 @@ class EventType:
         "memory.",
         "skill.",
         "action.",
+        "channel.",
         "grant.",
         "receipt.",
         "journal.",

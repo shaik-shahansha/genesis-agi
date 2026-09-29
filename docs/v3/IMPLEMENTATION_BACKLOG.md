@@ -326,11 +326,13 @@ Visual or feature work must not start before this passes.
 | P2.3 | Durable contact store: `contacts` + `contact_channels`, migration `010_contacts`, `DatabaseContacts` resolving | `[x]` 34 tests. A **new table** rather than columns on `Relationship`: that table's FKs point at `minds.gmid`, so a human contact needs an invented Mind, which would then appear in the metaverse and be addressable as a peer |
 | P2.4 | Per-Mind channel credentials | `[ ]` every Mind on an install currently shares one mailbox, and `Mind.channels` says so rather than implying isolation |
 | P3.1 | Webhook gateway with per-provider signature verification | `[ ]` |
-| P3.2 | IMAP poller as a background task, on the existing scheduler | `[ ]` |
-| P3.3 | Inbound events → journal → memory, so the Mind remembers who wrote and when | `[ ]` |
-| P3.4 | Reply flow: inbound → cognition → intent → gate → send, with the receipt as the reply's record | `[ ]` |
+| P3.2 | IMAP poller as a background task, on the existing scheduler | `[x]` `ChannelPoller`, driven from `MindDaemon` via `_channel_loop`. Off unless `MIND_CHANNEL_AUTOREPLY_ENABLED` |
+| P3.3 | Inbound events → journal → memory, so the Mind remembers who wrote and when | `[~]` journal `[x]` (`channel.*` event family); **memory `[ ]`** — an inbound message is not yet something the Mind remembers |
+| P3.4 | Reply flow: inbound → cognition → intent → gate → send, with the receipt as the reply's record | `[x]` `MindResponder` → `GovernanceAuthorizer` → `ChannelGateway`. The responder is told nothing about policy, and actions are disabled during a draft |
 | P3.5 | Durable outbound ledger (replaces the in-memory default, which resets on restart) | `[ ]` |
-| P3.6 | Durable Telegram `getUpdates` offset, or dedup by message id | `[ ]` |
+| P3.6 | Durable Telegram `getUpdates` offset, or dedup by message id | `[~]` dedup by message id `[x]` (`inbound_events`); the offset itself is still per-process |
+| P3.7 | Durable **inbound** ledger: at most one reply per message across restarts | `[x]` `inbound_events`, migration `011_inbound_events`. Claims before dispatch, so a crash loses a reply rather than duplicating one. Verified by mutation |
+| P3.8 | Stuck claims surfaced and journalled rather than retried | `[x]` `PollReport.stuck` + `channel.reply_not_sent` |
 | P4.1 | Telephony adapters (Ringg.ai done; Twilio / Sarvam behind the same channel shape), R3, per-message approval, never a standing grant | `[~]` Ringg written; others `[ ]` |
 | P4.2 | Spoken AI disclosure at call open, not configurable off. Done for Ringg by passing `ai_disclosure` as a prompt variable and refusing to register until the operator asserts the prompt speaks it | `[x]` for Ringg, with the assertion recorded rather than hidden |
 | P4.3 | Call transcript → memory, so a call becomes something the Mind remembers rather than only an action it took | `[ ]` |

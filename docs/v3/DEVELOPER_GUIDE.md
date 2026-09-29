@@ -11,7 +11,7 @@
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
 | **Last verified** | 2026-09-29 — full suite; the live sandbox/container checks below still date from 2026-09-28 |
-| **Test suite** | **779 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
+| **Test suite** | **852 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
 | **Container** | Image builds; runs `Up (healthy)`; all 9 governance endpoints verified live in the final image |
 | **Sandbox isolation** | Verified against a real container: 10/10 claims held, 11 escape tests in the suite |
 | **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.2` |
@@ -314,8 +314,8 @@ They were all found by exercising the deployed path and looking at what came bac
 | Item | State |
 |---|---|
 | Test suite runs without paid API keys | ✅ |
-| 779 passing tests, 16 skipped | ✅ |
-| `genesis/channels/` — the digital-presence substrate | ✅ **built** — protocol, registry, enforced disclosure, contactability floors, approval-integrity digest, `ChannelGateway`. 27 substrate tests + 52 provider/gateway tests + 34 contact-store tests. Provider setup: `CHANNEL_PROVIDERS.md` |
+| 852 passing tests, 16 skipped | ✅ |
+| `genesis/channels/` — the digital-presence substrate | ✅ **built** — protocol, registry, enforced disclosure, contactability floors, approval-integrity digest, `ChannelGateway`. 27 substrate + 52 provider/gateway + 34 contact-store + 70 answering-loop tests. Provider setup: `CHANNEL_PROVIDERS.md` |
 | Container sandbox escape tests | ✅ 11 tests, skipped when no runtime/image is present rather than silently passing |
 | Alembic migration for governance tables | ✅ `008_governance_plane`, verified upgrade → downgrade → upgrade → `downgrade base` → upgrade |
 | Migration chain usable from a fresh database | ✅ **fixed** — three earlier revisions created the same index twice (`index=True` *and* an explicit `create_index`), so `alembic upgrade head` aborted partway and every later revision, including the governance one, was unreachable on a new install. Guarded by `tests/test_migrations.py`. |
@@ -341,7 +341,9 @@ Be careful with these — several are asserted in public material and are not tr
 | Memory as a temporal knowledge graph / bi-temporal store | Not implemented. ChromaDB + a relevance multiplier; cannot express "true from March, superseded in July". ADR-0003/0004 describe the target. |
 | Portable signed identity (DID / verifiable credentials) | Not implemented. `gmid` is a local identifier. |
 | A Mind can email and call | **Adapters exist, none has been called.** `HostingerMailChannel`, `RinggVoiceChannel`, `EmailChannel` and `TelegramChannel` implement the protocol and pass tests against a fake transport, but no real message has been sent and no real call placed — neither account exists yet. Hostinger's send path is documented; its read paths are inferred. Run `adapter.verify()` before the first real use |
-| A Mind can receive inbound mail | **Not wired to the daemon.** `ChannelGateway.handle()`/`drain()` implement and test the loop, but nothing schedules it, and there is no webhook ingestion. Inbound is nothing more than a returned object today |
+| A Mind can receive inbound mail | **Off by default.** `ChannelPoller` is built and driven from `MindDaemon._channel_loop`, with a durable at-most-once ledger. It does nothing until `MIND_CHANNEL_AUTOREPLY_ENABLED=true`, and without a standing grant every reply raises an approval request |
+| An email reply can be auto-approved | **It cannot, and cannot be made to.** `comms.email.reply` is R3 because it carries personal data across the trust boundary, and standing grants cap at R2. A Telegram reply is R2 and can be granted. This asymmetry is a governance decision — see §6 of `CHANNEL_PROVIDERS.md` |
+| Inbound messages become memories | Not implemented. They reach the journal (`channel.*` events) but not the Mind's memory, so a Mind does not yet *remember* who wrote to it |
 | Voice transcription | Not implemented. Ringg's assistant speaks; the transcript arrives later by webhook or from call history, and neither is ingested. `RinggVoiceChannel.capabilities().can_receive` is `False` |
 | Contact persistence | Not implemented. The only `ContactResolver` is `InMemoryContacts`, which returns every unknown sender as reply-only with no `consent_source`. A Mind does not yet remember who it has spoken to |
 | Durable outbound rate limits | Not implemented. `InMemoryOutboundLedger.durable` is `False`, so the weekly cap and minimum gap are a per-process floor that a restart clears. `InMemoryOutboundLedger` reports this itself rather than claiming otherwise |
@@ -441,6 +443,11 @@ alembic downgrade -1      # drops the four governance tables
 | `MIND_RINGG_API_KEY`, `MIND_RINGG_AGENT_ID`, `MIND_RINGG_FROM_NUMBER_ID` | unset | Voice via Ringg AI. Ringg's assistant speaks from a prompt in *its* dashboard; the Mind decides who and what context |
 | `MIND_RINGG_DISCLOSURE_CONFIRMED` | `false` | **An assertion, not a check.** The channel does not register while this is false. No Ringg API returns the assistant's prompt text, so we cannot verify it discloses; the operator has to say so, and that statement is recorded. See §9 of `DIGITAL_PRESENCE.md` |
 | `MIND_RINGG_CALL_WINDOW` | `09:00-18:00` | Sets **our** quiet-hours floor to match the window configured in Ringg, which enforces its own. If ours is wider the Mind believes a call is allowed and the provider refuses it as an unexplained delivery error instead of a policy refusal. Unparseable keeps the default and warns |
+| `MIND_CHANNEL_AUTOREPLY_ENABLED` | `false` | Whether the daemon polls inbound and answers. **Off by default**: a Mind with credentials can be *reached*; it does not *answer* until this is set. `build_poller` returns `None` both when this is off and when no channel is enabled, so "off" and "on but inert" cannot look the same |
+| `MIND_CHANNEL_GRANTED_SCOPES` | unset | Comma-separated scopes for outbound comms. **A prerequisite, not a formality**: without the scope a reply is refused for `missing_scope` regardless of risk level, so a standing grant cannot apply at all |
+| `MIND_CHANNEL_TENANT_POLICY` | unset | JSON. How an administrator opts into replying without approving each message — it is **tenant policy**, not a channel flag, so it is capped at R2 by `STANDING_GRANT_MAX_RISK` and must name a capability or category. Malformed JSON means **no** standing grant and is logged; a typo must not read as "every reply is auto-approved". See §6 of `CHANNEL_PROVIDERS.md` |
+| `MIND_CHANNEL_POLL_INTERVAL_SECONDS` | `60` | Below ~30s you poll faster than most providers like, and a duplicate is cheap to dismiss while a rate limit is not |
+| `MIND_CHANNEL_LOOKBACK_DAYS` | `3` | How far back the first pass looks. Correctness does not depend on it — the `inbound_events` ledger does that — only on which messages count as new |
 
 > **Naming:** these are `MIND_*`-prefixed because `Settings` has **no `env_prefix`** — a
 > field name *is* the environment variable name. An unprefixed `email_password` would
@@ -609,29 +616,29 @@ something already acting on their behalf.
 
 ### Recommended next three, in order
 
-1. **P2 — contact identity, and a registry on `Mind`.** This is the blocker for
-   everything in `DIGITAL_PRESENCE.md`. The gateway is written and tested, but the
-   only `ContactResolver` is `InMemoryContacts`, so a Mind cannot remember who it
-   has spoken to and every stranger is reply-only forever; and `Mind` has no
-   `channels` attribute, so `action_executor._execute_send_email` — which already
-   reads `getattr(self.mind, "channels", None)` — finds `None` and refuses
-   honestly. Two pieces of scaffolding, and the adapters become reachable.
-2. **Drive the gateway from the daemon** — an inbound poll on the existing
-   scheduler, with a stated approval policy for replies. Without this, a Mind can
-   address someone but can never answer, which is the half of the feature the user
-   actually asked for. Decide the policy first: auto-approve replies to known
-   contacts inside a thread is the defensible default, and everything else keeps
-   its R2/R3 decision.
-3. **Phase C kernel extraction** — split the ~99 KB `Mind`, and define the `Body`
-   protocol while doing it. This is the gate for forking, multi-process daemons
-   and embodiment.
+1. **P2 — contact identity, and a registry on `Mind`.** ✅ **done.** The durable
+   contact store, consent per channel, and `Mind.channels` are in. What remains is
+   per-Mind credentials (P2.4): every Mind on an install still shares one mailbox.
+2. **P3 — the answering loop.** ✅ **mostly done.** Poller, at-most-once ledger,
+   governance authorizer, journal recorder and the drafting responder are built and
+   driven from the daemon. **What is left, in order of value:**
+   - **Inbound events becoming memories.** A Mind answers someone and then forgets
+     them, which makes a conversation impossible. This is the largest gap between
+     what exists and what "reads and responds to its own email" means.
+   - **A durable outbound ledger** (P3.5). The weekly cap and minimum gap are still
+     per-process, so a restart clears them. The inbound half is durable; the outbound
+     half is not, and the asymmetry is the surprising part.
+   - **Webhook ingestion** (P3.1). Polling works, but both providers push, and a
+     webhook is what makes a reply timely rather than up to a minute late.
+3. **Exercise one provider for real.** Both adapters were written from documentation
+   and neither has been called. `verify()` reports per-path verdicts. Until that runs,
+   every claim about email and voice in these docs is a claim about code that has
+   never met a server — and the first real run will find something.
 
 **Deliberately not on this list: more providers.** Twilio, WhatsApp and social
-publishing each need an external human to say yes first, and both of the two
-adapters that exist have never been called. Adding a third unexercised adapter
-would add surface without adding anything a user can do. Run `verify()` against
-one real account — Hostinger is the cheapest of the two to stand up — and close
-the gaps that finds before widening.
+publishing each need an external human to say yes first, and every adapter that
+exists has never been called. Adding a third unexercised adapter would add surface
+without adding anything a user can do.
 
 ---
 
@@ -747,6 +754,8 @@ genesis/
     ringg_voice.py     #   Ringg AI: the Mind picks context, Ringg speaks
     gateway.py         #   inbound -> responder -> floors -> gate -> send
     contacts.py        #   the durable contact store: who a Mind knows, consent per channel
+    poller.py          #   poll -> claim -> gate -> send; at most one reply per message
+    responder.py       #   drafts a reply via Mind.think, and is told nothing about policy
     fake.py            #   FakeChannel: the test double the suite runs on
   api/
     governance_routes.py   # 12 endpoints: approvals, receipts, timeline, e-stop
@@ -757,10 +766,11 @@ alembic/versions/20260928_0800_add_governance_plane.py
 tests/
   governance/        # 305 tests: policy, approvals, audit, SQL store, gate, API,
                      #   correlation, domain events, commitments
-  security/          # 397 tests: sandbox, container escapes, network probe, MCP env,
+  security/          # 467 tests: sandbox, container escapes, network probe, MCP env,
                      #   secrets, the bootstrap admin boundary, and the channels
                      #   substrate itself (test_channels.py 27, test_channel_providers.py 52,
-                     #   test_contact_store.py 34)
+                     #   test_contact_store.py 34, test_channel_poller.py 41,
+                     #   test_channel_responder.py 29)
   test_migrations.py # 31 tests: migration-chain guards
   test_mind_ownership.py # 8 tests: who may access a Mind, and placeholder repair
   security/test_default_admin.py   # 10 tests: the bootstrap-admin boundary
@@ -787,7 +797,7 @@ docs/
 |---|---|---|
 | 9 test failures + 1 collection error | Pre-existing | Reproduce on the pristine tree (`git stash` is how they were classified). Environment/interpreter-specific (`test_emotional_intelligence` ×2, `test_admin`, `test_conversation_api`), the shared ChromaDB store (`test_memory`), and three that look like genuine product defects (`test_environment_access_controls`, `test_mind_gens_coercion`, `test_create_mind_with_auth`) |
 | No channel adapter has been run against a real provider | **Medium** | Written from documentation. Hostinger's send path is quoted verbatim in their SDK docs; its read paths are inferred from a documented convention, and a message's field names are not documented at all. Run `verify()` before the first real send or call, and prefer acting on its verdict over this table |
-| Nothing drives `ChannelGateway` | **Medium** | The loop is implemented and tested; no scheduler or webhook calls it. A Mind does not answer an email today, and should not be assumed to |
+| Nothing drives `ChannelGateway` | ✅ **fixed** | `ChannelPoller` is started by `MindDaemon._channel_loop` when `MIND_CHANNEL_AUTOREPLY_ENABLED` is set. Off by default, and it logs why when it declines to start |
 | Channel credentials are install-level, not per-Mind | **Medium** | `Mind.channels` reads the install's settings, so every Mind on an install shares one mailbox and one phone number. Per-Mind credentials need a store for them; a per-Mind override that read the same settings would look like isolation without being it, which is why it was not added |
 | `Mind` has no `ChannelRegistry` | ✅ **fixed** | `Mind.channels` builds one lazily. `action_executor._execute_send_email` reads it and now names the real variables to set |
 | Order-dependent tests | Low | The ChromaDB half is fixed (A2). `test_memory_user_scoping` fails alone and passes in the suite; the cause is the test, not the store. |

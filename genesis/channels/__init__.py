@@ -50,6 +50,15 @@ from .gateway import (
     InMemoryContacts,
 )
 from .contacts import DatabaseContacts, normalise_handle
+from .poller import (
+    ChannelPoller,
+    DatabaseInboundLedger,
+    GovernanceAuthorizer,
+    InMemoryInboundLedger,
+    InboundLedger,
+    JournalRecorder,
+    PollReport,
+)
 from .limits import (
     ChannelLimits,
     InMemoryOutboundLedger,
@@ -119,6 +128,14 @@ __all__ = [
     "ContactResolver",
     "DatabaseContacts",
     "normalise_handle",
+    # answering loop
+    "ChannelPoller",
+    "DatabaseInboundLedger",
+    "GovernanceAuthorizer",
+    "InMemoryInboundLedger",
+    "InboundLedger",
+    "JournalRecorder",
+    "PollReport",
     # test double
     "FakeChannel",
 ]

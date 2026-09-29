@@ -331,6 +331,51 @@ class ContactChannelRecord(Base):
     )
 
 
+class InboundEventRecord(Base):
+    """One inbound message, claimed exactly once.
+
+    This table exists to stop a poller answering the same email twice. That failure
+    is worse than it sounds: a mailbox is re-read after every restart, so without
+    this the *default* behaviour is to re-answer, and the person receives duplicate
+    replies attributed to a named human administrator. Nothing in the system would
+    look wrong.
+
+    The `UniqueConstraint` is the mechanism, not a tidiness detail. Claiming is an
+    `INSERT` that treats a conflict as "already handled"; a `SELECT` followed by an
+    `INSERT` would be a race, and a race here is precisely the duplicate.
+
+    `outcome` is `''` while a claim is open, and `''` means the process died
+    mid-flight. Those rows are reported by `DatabaseInboundLedger.pending()` and
+    **never retried**, because a retry may answer a message that was already
+    answered before the crash. A human resolves them.
+    """
+
+    __tablename__ = "inbound_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    mind_id = Column(String(50), nullable=False, index=True)
+    channel = Column(String(30), nullable=False)
+    #: The provider's own id for the message. Empty is refused rather than stored:
+    #: booking `''` as handled would silently drop every later message that also
+    #: arrived without an id.
+    provider_message_id = Column(String(255), nullable=False)
+
+    claimed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    #: `''` = claimed and unresolved. Otherwise: delivered | not_sent | failed.
+    outcome = Column(String(40), nullable=False, default="")
+    reason = Column(String(400), nullable=False, default="")
+    completed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mind_id",
+            "channel",
+            "provider_message_id",
+            name="uq_inbound_events_mind_channel_message",
+        ),
+    )
+
+
 class EnvironmentVisit(Base):
     """
     History of Mind visits to environments.

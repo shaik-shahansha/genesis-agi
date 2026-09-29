@@ -265,8 +265,160 @@ the REST API.
 | Limit | Consequence |
 |---|---|
 | Outbound rate limits are **in memory** | `InMemoryOutboundLedger.durable` is `False`. The weekly cap and minimum gap do not survive a restart, so they are a per-process floor, not a durable one |
-| No durable inbound offset | A Telegram `getUpdates` offset resets on restart; duplicates are caught by deduplicating on message id |
 | No webhook ingestion | Inbound is polled. Webhooks are the provider's recommendation and the next phase |
-| No reply automation by default | The gateway exists and is tested, but nothing calls `drain()` on a schedule yet. Wiring it to the daemon is the next step, and it needs an approval policy decision first |
 | Attachments are not downloaded | Attachments are not decoded or stored. Decoding arbitrary attachments is a parsing attack surface that belongs behind the sandbox, not in a channel adapter |
-| A stranger's reply earns no trust | `InMemoryContacts` returns unknown senders as reply-only with no `consent_source`. Someone writing once does not opt in to being contacted weekly |
+| A stranger's reply earns no trust | `DatabaseContacts` returns unknown senders as reply-only with no `consent_source`. Someone writing once does not opt in to being contacted weekly |
+| Channel credentials are install-level | Every Mind on an install shares one mailbox and one phone number. `Mind.channels` says so rather than implying isolation |
+| Call transcripts are not ingested | Ringg's assistant speaks and the transcript arrives later; nothing fetches it, so a call is an action and not yet a memory |
+
+---
+
+## 6. Answering: what happens when the Mind replies
+
+This is the part an operator most often gets wrong, so it is worth reading before
+turning anything on.
+
+### It is off until you turn it on
+
+`MIND_CHANNEL_AUTOREPLY_ENABLED=false` by default. A Mind with credentials can be
+*reached*; it does not *answer* until this is set. The default is not timidity: a
+Mind that starts answering the moment it has credentials, with no approval policy
+configured, raises one approval request per message and looks broken — and with a
+policy configured by accident, sends replies nobody reviewed.
+
+`build_poller` returns `None` when this is off **or** when no channel is enabled, so
+"answering is off" and "answering is on but there is nothing to read" can never look
+the same. Both are logged with the reason.
+
+### Without a standing grant, every reply asks you first
+
+That is the correct default and it is not a bug. `comms.email.reply` is R3, so the
+policy engine returns `require_approval` and the gateway records an approval id. The
+Mind is waiting for a human, once per message.
+
+### An email reply can never be auto-approved, and a Telegram one can
+
+This is the finding worth knowing about, and it comes from the governance plane
+rather than from anything in the channel layer.
+
+`comms.email.reply` declares `data_sensitivity="personal"`, and the policy engine's
+sensitivity floor maps `personal` to **R3**. Standing grants are capped at
+`STANDING_GRANT_MAX_RISK = R2`. So:
+
+| Action | Risk | Standing grant covers it? |
+|---|---|---|
+| `comms.telegram.reply` | R2 | **Yes** — a Mind can hold an autonomous conversation |
+| `comms.email.reply` | R3 | **No** — every reply needs a human |
+| `comms.email.send` / `comms.telegram.send` | R3 | No — starting a conversation always needs a human |
+
+Why the difference is defensible: a reply carries content *outward*, and an email
+reply carries personal data across the trust boundary. A Telegram reply is declared
+not to. The two declarations differ, so the two behaviours differ.
+
+**What was wrong before this was found.** `comms.email.reply` was declared **R2**
+while resolving to **R3**, and the comment beside it said standing grants "already cap
+at R2, so that is handled" — true only while the declaration and the behaviour
+disagreed. A reader consulting `risk.py` would have concluded an email reply could be
+granted standing approval and configured a policy that silently did nothing. The
+declaration is R3 now, and `tests/security/test_channel_poller.py` pins the effective
+risk of every channel action so the two cannot drift apart again.
+
+The same audit found `comms.email.read` declaring **R0** *and*
+`data_sensitivity="personal"`, which resolved to R3 with `require_approval` — a Mind
+that could not read its own inbox without a human, contradicting the R0 rationale
+written directly above it. The sensitivity floor is about data *crossing a boundary*,
+not about data being looked at, so the read no longer declares it.
+
+### If you want autonomous email replies
+
+The change is to `comms.email.reply`'s `data_sensitivity` in
+`genesis/governance/risk.py`. That is a governance decision, not a configuration
+change, and it should be made deliberately: it removes the control that keeps
+personal data from leaving without a human. It is not something to slip in beside a
+provider integration.
+
+---
+
+## 7. Answering twice, and why that is the thing to get right
+
+A mailbox is re-read after every restart. So a poller without a ledger re-answers
+everything it has already handled, by default, and the person receives duplicate
+replies carrying the name of a human administrator. Nothing in the system looks
+wrong.
+
+`inbound_events` exists for that. Claiming a message is an `INSERT` and the unique
+constraint **is** the "already handled" signal — a `SELECT` before the `INSERT` would
+be a race, and two pollers against one mailbox is exactly the configuration where
+that race produces the duplicate.
+
+The ledger claims **before** the gateway sees a message, which gives at-most-once
+and has a real cost: if the process dies between claiming and sending, the reply is
+never sent. The alternatives are worse. Claiming after the send means a crash
+re-answers, and a duplicate is externally visible, attributed to a named person, and
+cannot be retracted. A missing auto-reply is recoverable by a person reading the
+report; a duplicate is not recoverable at all.
+
+A claim with no outcome means the process died mid-flight. Those are reported by
+`ChannelPoller` (and journalled as `channel.reply_not_sent`) and **never retried**,
+because a retry may answer a message that was already answered before the crash.
+Someone has to look. That is the honest option; the alternative is a system that
+quietly re-sends and a bug report nobody can reproduce.
+
+Verified by mutation rather than by reading: making the poller ignore the claim fails
+3 tests, and making the in-memory ledger claim everything fails 2.
+
+### A mailbox that is unreachable is not an empty mailbox
+
+`PollReport.read_failures` is separate from `received == 0`, and the daemon logs the
+difference. Reporting a broken mailbox as "no new mail" is the same class of failure
+as reporting a failed fetch as "no calls recorded".
+
+---
+
+## 8. What the Mind is told when it drafts a reply
+
+`MindResponder` composes the prompt, and what it **omits** matters more than what it
+includes:
+
+- **No risk level, no approval state, no mention that a gate exists.** A prompt that
+  mentioned them invites the model to reason about its own constraints, and a model
+  reasoning about its constraints is a model trying to satisfy them conversationally
+  — the failure where a Mind explains why it *should* be permitted to do something.
+  A test asserts the absence, because an absence is what a reviewer cannot see.
+- **Actions are disabled during a draft.** `enable_actions=True` would let cognition
+  act while composing, which is a second route to acting that bypasses the channel
+  gate: the model could send a message *while drafting* the message.
+- **Boundaries are stated as prohibitions**, because a model cannot respect a boundary
+  it was never told about, and the failure would look like disregard rather than
+  ignorance.
+- **Declining is a first-class answer.** The prompt names a sentinel string, and the
+  responder returns `None` for it. A responder that could only return text would make
+  a Mind that answers everything, including things it should leave alone.
+- **The disclosure is not added here.** `apply_disclosure` runs in the adapter.
+  Duplicating it would be harmless and is still not done, because harmless duplication
+  is how a rule ends up with two definitions.
+
+---
+
+## 9. Turning it on: a checklist
+
+1. Configure a channel (`MIND_HOSTINGER_MAIL_*` or `MIND_TELEGRAM_*`) and confirm
+   `GET` the Mind's channel status shows it `enabled` with no reason.
+2. Set `MIND_CHANNEL_GRANTED_SCOPES` to the scopes for the channels you enabled.
+   Without a scope, every reply is refused for `missing_scope`.
+3. Decide the approval policy. Doing nothing means one approval request per message.
+   `MIND_CHANNEL_TENANT_POLICY` is how you opt into autonomous replies, and it works
+   for Telegram and not for email.
+4. Run `adapter.verify()` against each provider **before** enabling the poller, so
+   the first thing the loop does is not fail in a way you have to read logs to
+   understand.
+5. Set `MIND_CHANNEL_AUTOREPLY_ENABLED=true`.
+6. Watch the first few passes. The log line is
+   `channel poll: N received, N answered, N already handled, N refused, N failed`,
+   and `N already handled` rising is the ledger working.
+7. Check the journal for `channel.` events. Each reply that was refused records why,
+   and each stuck claim is a person who will never get an answer.
+
+**If `N refused` stays at `N received`, read the approval queue.** That is the
+expected state without a standing grant, and it is not a fault.
+

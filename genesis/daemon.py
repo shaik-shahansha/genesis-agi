@@ -181,6 +181,39 @@ class MindDaemon:
                 except Exception as e:
                     logger.error(f"[WARN] Failed to start proactive conversation monitoring: {e}")
 
+            # Start the inbound channel poller, so the Mind answers its own mail.
+            #
+            # Off unless MIND_CHANNEL_AUTOREPLY_ENABLED is set. That default is not
+            # timidity: a Mind that begins answering email the moment it has
+            # credentials, with no approval policy configured, would raise an approval
+            # request per message and look broken — or, with a policy configured by
+            # accident, send replies nobody reviewed.
+            #
+            # A failure here does not stop the daemon. Losing the ability to answer
+            # mail is not a reason to stop thinking.
+            channel_task = None
+            try:
+                from genesis.channels.poller import build_poller
+
+                poller = build_poller(self.mind)
+                if poller is not None:
+                    interval = max(
+                        10, int(get_settings().mind_channel_poll_interval_seconds or 60)
+                    )
+                    channel_task = asyncio.create_task(
+                        self._channel_loop(poller, interval)
+                    )
+                    logger.info(
+                        f"[OK] Inbound channels: polling every {interval}s "
+                        f"(durable ledger: {poller.ledger.durable})"
+                    )
+                else:
+                    logger.info(
+                        "   - Inbound channels: off (MIND_CHANNEL_AUTOREPLY_ENABLED)"
+                    )
+            except Exception as e:
+                logger.error(f"[WARN] Failed to start the inbound channel poller: {e}")
+
             self.is_running = True
             logger.info(f"[ACTIVE] Mind {self.mind.identity.name} is now living 24/7")
             logger.info(f"   - Consciousness: Active")
@@ -197,25 +230,33 @@ class MindDaemon:
             autonomous_task.cancel()
             if proactive_task:
                 proactive_task.cancel()
-            
+            if channel_task:
+                channel_task.cancel()
+
             try:
                 await save_task
             except asyncio.CancelledError:
                 pass
-            
+
             try:
                 await health_task
             except asyncio.CancelledError:
                 pass
-            
+
             try:
                 await autonomous_task
             except asyncio.CancelledError:
                 pass
-            
+
             if proactive_task:
                 try:
                     await proactive_task
+                except asyncio.CancelledError:
+                    pass
+
+            if channel_task:
+                try:
+                    await channel_task
                 except asyncio.CancelledError:
                     pass
 
@@ -544,6 +585,54 @@ class MindDaemon:
             except Exception as e:
                 logger.error(f"Proactive conversation loop error: {e}")
                 continue
+
+    async def _channel_loop(self, poller, interval_seconds: int) -> None:
+        """Poll inbound channels and answer, until the daemon stops.
+
+        A thin wrapper on purpose: `ChannelPoller.run` already owns the loop, the
+        retry-on-failure behaviour and the reporting, and reimplementing any of it
+        here would mean two places to get the duplicate-reply guarantee wrong.
+
+        The report is logged rather than only journalled, because the two answer
+        different questions. The journal is the record of what the Mind did; the log
+        line is how an operator notices that a mailbox has been unreachable for an
+        hour and the Mind has quietly said nothing to anyone.
+        """
+        def report_line(report) -> None:
+            if report.read_failures:
+                logger.warning(
+                    "channel poll: read failures %s", report.read_failures
+                )
+            if report.stuck:
+                # Loud, because each one is a person who wrote to this Mind and will
+                # never get an answer.
+                logger.error(
+                    "channel poll: %d inbound message(s) were claimed but never "
+                    "handled and will NOT be retried; they need a human",
+                    len(report.stuck),
+                )
+            if report.delivered or report.duplicates or report.stuck:
+                logger.info(
+                    "channel poll: %d received, %d answered, %d already handled, "
+                    "%d refused, %d failed",
+                    report.received,
+                    report.delivered,
+                    report.duplicates,
+                    report.refused,
+                    report.failed,
+                )
+
+        try:
+            await poller.run(
+                interval_seconds=interval_seconds, on_report=report_line
+            )
+        except asyncio.CancelledError:
+            logger.info("Inbound channel poller stopped")
+            raise
+        except Exception as e:
+            # Reaching here means the loop itself died, which is worth knowing about
+            # rather than a daemon that appears healthy and answers nothing.
+            logger.error(f"Inbound channel poller failed: {e}", exc_info=True)
 
     def _register_signal_handlers(self):
         """Register handlers for graceful shutdown."""
