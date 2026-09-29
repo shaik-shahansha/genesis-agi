@@ -310,6 +310,74 @@ class Mind:
         # Register memory tools for agent self-editing (Letta pattern)
         self._register_memory_tools()
 
+    # -- channels (the Mind's presence in the outside world) ---------------
+    #
+    # Lazily built rather than constructed in `__init__`, for two reasons.
+    #
+    # It costs a settings read and a handful of object constructions that a Mind
+    # which never sends anything should not pay for on every startup — and more
+    # importantly, `__init__` in this class wraps optional subsystems in
+    # `except Exception: print(warning)` and carries on. Doing that here would mean
+    # a misconfigured channel produced a printed warning and a Mind that reports
+    # "no email channel is configured", which is indistinguishable from one that
+    # was never given credentials. A property raises the first time it is asked,
+    # where the caller can see it.
+    @property
+    def channels(self):
+        """The channels an administrator has provisioned for this Mind.
+
+        Returns a `ChannelRegistry`. A channel that is configured but refused stays
+        in it as `enabled=False` **with a reason**, so "voice is off because the
+        disclosure was never asserted" is visible rather than looking the same as
+        "voice was never set up".
+
+        Credentials come from the install's settings, which means every Mind on
+        this install shares one mailbox. That is the honest state today: per-Mind
+        credentials need a store for them, and inventing a per-Mind override that
+        reads the same settings would look like isolation without being it.
+        """
+        cached = getattr(self, "_channels", None)
+        if cached is not None:
+            return cached
+
+        from genesis.channels import build_registry, credentials_from_settings
+
+        # `get_settings` is imported at module level and caches its result, so this
+        # is a lookup rather than a re-read of the environment.
+        registry = build_registry(
+            self.identity.gmid, credentials_from_settings(get_settings())
+        )
+        self._channels = registry
+        return registry
+
+    def channel_status(self) -> list[dict[str, Any]]:
+        """What each configured channel can do, and why the refused ones are off.
+
+        Separate from the registry so a caller that wants to *report* does not have
+        to build a registry first, and so the reporting shape stays out of the
+        channel layer.
+        """
+        report: list[dict[str, Any]] = []
+        for name in ("email", "telegram", "voice"):
+            registration = self.channels.get(name)
+            if registration is None:
+                continue
+            caps = registration.adapter.capabilities()
+            report.append(
+                {
+                    "channel": name,
+                    "enabled": registration.enabled,
+                    "reason": registration.reason,
+                    "address": registration.identity.address,
+                    "can_receive": caps.can_receive,
+                    "can_send": caps.can_send,
+                    "can_voice": caps.can_voice,
+                    "metered": caps.metered,
+                    "supports_disclosure": caps.supports_disclosure,
+                }
+            )
+        return report
+
     def _load_state_from_db(self) -> None:
         """Load current state and emotional state from database."""
         try:

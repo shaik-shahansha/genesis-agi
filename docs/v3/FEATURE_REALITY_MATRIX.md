@@ -140,6 +140,7 @@
 | Mind sends/reads **email** | new | `channels/email.py` (stdlib IMAP/SMTP), `channels/hostinger_mail.py` (Mail API: scoped token, provider-side threading, allow list) | `ChannelRegistry` | `test_channel_providers.py` (52) | disclosure in the writer; R0 read / R1 draft / R2 reply / R3 initiate | **PT** | **never called a real server.** Hostinger send path documented; read paths inferred. Run `verify()` |
 | Mind **places voice calls** | new | `channels/ringg_voice.py` (Ringg AI) | `ChannelRegistry` | `test_channel_providers.py` | **does not register unless disclosure is asserted** — no Ringg API returns the assistant's prompt, so this is a human assertion, recorded rather than hidden; R3, never a standing grant | **PT** | **never placed a real call.** `can_receive: False`; no transcript ingestion |
 | Mind **receives inbound** comms | new | `channels/gateway.py` (`handle`/`drain`) | not scheduled | `test_channel_providers.py` | refusal on any floor leaves the Mind unable to send; a refused message produces **no** approval card | **PT** | **nothing drives it**; no webhook ingestion |
+| Contact persistence | new | `channels/contacts.py` (`DatabaseContacts`), `contacts` + `contact_channels` tables, migration `010_contacts` | `ContactResolver` on `ChannelGateway` | `tests/security/test_contact_store.py` (34) | **consent per channel, per Mind; unknown sender reply-only with no `consent_source`; `may_initiate()` needs both permission *and* provenance** | **FI** | Per-Mind credentials (P2.4) |
 | Hosted **MCP servers** | "MCP (Model Context Protocol)" | `connect()` implements **stdio only** — HTTP/WS return `False` after a warning; `MCPServerConfig.command` required | plugin | none | inherits the SEC-05 allowlist | **NF** | **HTTP/SSE transport is a prerequisite**; affects `mcp.mail.hostinger.com/mcp` |
 | Notifications (Twilio/Firebase) | "SMS, Push" | `integrations/notification_integration.py`, `core/notification_manager.py` | websocket/API | none | **delivered to spoofable identity (SEC-01)** | **FI** | Phase B fix |
 | Browser automation | "browser automation plugin" | `plugins/browser_use_plugin.py` | plugin | none | **H: model-directed browsing + SOCKS proxy guidance** | **UN** | Phase I |
@@ -165,7 +166,7 @@
 | Maturity | Count |
 |---|---|
 | **PR** Production-ready | 1 |
-| **FI** Functional but incomplete | 32 |
+| **FI** Functional but incomplete | 33 |
 | **PT** Prototype | 17 |
 | **PH** Placeholder | 3 |
 | **DO** Documentation-only | 2 |

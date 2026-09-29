@@ -14,6 +14,7 @@ from sqlalchemy import (
     JSON,
     ForeignKey,
     Index,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -224,6 +225,109 @@ class RelationshipRecord(Base):
     __table_args__ = (
         Index("ix_relationships_from_to", "from_gmid", "to_gmid"),
         Index("ix_relationships_type", "relationship_type"),
+    )
+
+
+class ContactRecord(Base):
+    """An **external person** a Mind can reach, e.g. by email or phone.
+
+    Deliberately not a `RelationshipRecord`. That table links two Minds and its
+    foreign keys point at `minds.gmid`, so a human contact cannot be stored there
+    without inventing a Mind for them — which would then appear in the metaverse,
+    be countable, and be addressable as a peer. A person outside the system is a
+    different kind of entity and gets a different table.
+
+    `trust` is a *dict* of domain → score, and a missing domain is untrusted
+    rather than neutral. The scalar `trust_level` on `RelationshipRecord` defaults
+    to 0.5, which means an unknown domain is half trusted; that is the wrong
+    direction for a fail-closed system, and it is why trust is scoped here.
+    """
+
+    __tablename__ = "contacts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    #: Which Mind knows this person. A contact belongs to one Mind, so two Minds
+    #: writing to the same address reach different conclusions about consent.
+    mind_id = Column(String(50), nullable=False, index=True)
+    #: Stable id used by `ContactRef`. Separate from the row id so it can be a
+    #: meaningful string in receipts and journals.
+    relationship_id = Column(String(160), nullable=False)
+    display_name = Column(String(200), nullable=False, default="")
+
+    #: Domain → score. Absent domain means 0.0, not 0.5.
+    trust = Column(JSON, nullable=False, default=dict)
+    #: Local-time window as `[start_hour, end_hour]`. Null means "use the
+    #: channel's default", which is distinct from a window that happens to equal
+    #: the default.
+    quiet_hours = Column(JSON, nullable=True)
+    #: Null means "use the channel default". Null is not zero: zero would mean
+    #: this person may never be contacted, which is what `outbound="none"` is for.
+    max_outbound_per_week = Column(Integer, nullable=True)
+    #: Things not to mention or share. Enforced by cognition, not by this table.
+    boundaries = Column(JSON, nullable=False, default=list)
+    timezone_offset_hours = Column(Integer, nullable=False, default=0)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True)
+
+    channels = relationship(
+        "ContactChannelRecord",
+        back_populates="contact",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mind_id", "relationship_id", name="uq_contacts_mind_relationship"
+        ),
+    )
+
+
+class ContactChannelRecord(Base):
+    """One way to reach one contact, with the consent that permits it.
+
+    Consent is per **channel**, not per person. Someone who gave their email
+    address has not thereby agreed to be telephoned, and a model that stores
+    "this contact consents" once would let a Mind upgrade an email address into a
+    phone call. The `UniqueConstraint` makes one permission per channel, so the
+    question "may I call this person?" has exactly one answer.
+
+    `consent_source` is the load-bearing field: `ContactRef.may_initiate()`
+    requires it to be non-empty, so a permission row with no recorded provenance
+    grants a reply and not an initiation. That is why it defaults to `""` rather
+    than to something reassuring.
+    """
+
+    __tablename__ = "contact_channels"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    contact_id = Column(
+        Integer,
+        ForeignKey("contacts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    #: Channel name, matching `CommunicationChannel.name` ("email", "voice", ...).
+    channel = Column(String(30), nullable=False)
+    #: The handle on that channel: an address, an E.164 number, a chat id.
+    address = Column(String(320), nullable=False)
+    #: `OutboundPermission` value: "none" | "reply_only" | "initiate".
+    outbound = Column(String(20), nullable=False, default="none")
+    #: How we know contact is permitted — "they wrote first on 2026-09-01",
+    #: "signed the intake form". Required for `initiate`.
+    consent_source = Column(String(400), nullable=False, default="")
+    #: Whether the handle was proven to belong to them. WhatsApp-style flows
+    #: prove it; pasting an address into a settings screen does not.
+    verified = Column(Boolean, nullable=False, default=False)
+    added_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    contact = relationship("ContactRecord", back_populates="channels")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "contact_id", "channel", name="uq_contact_channels_contact_channel"
+        ),
+        Index("ix_contact_channels_lookup", "channel", "address"),
     )
 
 

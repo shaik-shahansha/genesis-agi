@@ -11,7 +11,7 @@
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
 | **Last verified** | 2026-09-29 — full suite; the live sandbox/container checks below still date from 2026-09-28 |
-| **Test suite** | **725 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
+| **Test suite** | **779 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
 | **Container** | Image builds; runs `Up (healthy)`; all 9 governance endpoints verified live in the final image |
 | **Sandbox isolation** | Verified against a real container: 10/10 claims held, 11 escape tests in the suite |
 | **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.2` |
@@ -314,8 +314,8 @@ They were all found by exercising the deployed path and looking at what came bac
 | Item | State |
 |---|---|
 | Test suite runs without paid API keys | ✅ |
-| 725 passing tests, 16 skipped | ✅ |
-| `genesis/channels/` — the digital-presence substrate | ✅ **built** — protocol, registry, enforced disclosure, contactability floors, approval-integrity digest, `ChannelGateway`. 27 substrate tests + 52 provider/gateway tests. Provider setup: `CHANNEL_PROVIDERS.md` |
+| 779 passing tests, 16 skipped | ✅ |
+| `genesis/channels/` — the digital-presence substrate | ✅ **built** — protocol, registry, enforced disclosure, contactability floors, approval-integrity digest, `ChannelGateway`. 27 substrate tests + 52 provider/gateway tests + 34 contact-store tests. Provider setup: `CHANNEL_PROVIDERS.md` |
 | Container sandbox escape tests | ✅ 11 tests, skipped when no runtime/image is present rather than silently passing |
 | Alembic migration for governance tables | ✅ `008_governance_plane`, verified upgrade → downgrade → upgrade → `downgrade base` → upgrade |
 | Migration chain usable from a fresh database | ✅ **fixed** — three earlier revisions created the same index twice (`index=True` *and* an explicit `create_index`), so `alembic upgrade head` aborted partway and every later revision, including the governance one, was unreachable on a new install. Guarded by `tests/test_migrations.py`. |
@@ -746,18 +746,21 @@ genesis/
     hostinger_mail.py  #   Hostinger Mail API: scoped token, threads, allow list
     ringg_voice.py     #   Ringg AI: the Mind picks context, Ringg speaks
     gateway.py         #   inbound -> responder -> floors -> gate -> send
+    contacts.py        #   the durable contact store: who a Mind knows, consent per channel
     fake.py            #   FakeChannel: the test double the suite runs on
   api/
     governance_routes.py   # 12 endpoints: approvals, receipts, timeline, e-stop
   database/
     governance_models.py   # 4 tables
 alembic/versions/20260928_0800_add_governance_plane.py
+  security/test_contact_store.py   # 34 tests: consent per channel, per Mind; the stranger default
 tests/
   governance/        # 305 tests: policy, approvals, audit, SQL store, gate, API,
                      #   correlation, domain events, commitments
-  security/          # 363 tests: sandbox, container escapes, network probe, MCP env,
+  security/          # 397 tests: sandbox, container escapes, network probe, MCP env,
                      #   secrets, the bootstrap admin boundary, and the channels
-                     #   substrate itself (test_channels.py 27, test_channel_providers.py 52)
+                     #   substrate itself (test_channels.py 27, test_channel_providers.py 52,
+                     #   test_contact_store.py 34)
   test_migrations.py # 31 tests: migration-chain guards
   test_mind_ownership.py # 8 tests: who may access a Mind, and placeholder repair
   security/test_default_admin.py   # 10 tests: the bootstrap-admin boundary
@@ -785,7 +788,8 @@ docs/
 | 9 test failures + 1 collection error | Pre-existing | Reproduce on the pristine tree (`git stash` is how they were classified). Environment/interpreter-specific (`test_emotional_intelligence` ×2, `test_admin`, `test_conversation_api`), the shared ChromaDB store (`test_memory`), and three that look like genuine product defects (`test_environment_access_controls`, `test_mind_gens_coercion`, `test_create_mind_with_auth`) |
 | No channel adapter has been run against a real provider | **Medium** | Written from documentation. Hostinger's send path is quoted verbatim in their SDK docs; its read paths are inferred from a documented convention, and a message's field names are not documented at all. Run `verify()` before the first real send or call, and prefer acting on its verdict over this table |
 | Nothing drives `ChannelGateway` | **Medium** | The loop is implemented and tested; no scheduler or webhook calls it. A Mind does not answer an email today, and should not be assumed to |
-| `Mind` has no `ChannelRegistry` | **Medium** | So adapters are unreachable from the API at runtime. `action_executor._execute_send_email` already looks for `getattr(mind, "channels", None)` and finds `None`, which is why it reports honestly rather than claiming to have sent anything |
+| Channel credentials are install-level, not per-Mind | **Medium** | `Mind.channels` reads the install's settings, so every Mind on an install shares one mailbox and one phone number. Per-Mind credentials need a store for them; a per-Mind override that read the same settings would look like isolation without being it, which is why it was not added |
+| `Mind` has no `ChannelRegistry` | ✅ **fixed** | `Mind.channels` builds one lazily. `action_executor._execute_send_email` reads it and now names the real variables to set |
 | Order-dependent tests | Low | The ChromaDB half is fixed (A2). `test_memory_user_scoping` fails alone and passes in the suite; the cause is the test, not the store. |
 | CI quarantine list | Low | 11 tests are deselected with a printed reason each (`.github/workflows/ci.yml`). A CI that is red on arrival gets ignored; an honest short list does not. |
 | `sqlite` URL filename is ignored | Low | Both `database/base.py` and `alembic/env.py` resolve a sqlite URL to `genesis_home/genesis.db`, ignoring the path in `DATABASE_URL`. Consistent, but surprising. |

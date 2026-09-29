@@ -321,8 +321,10 @@ Visual or feature work must not start before this passes.
 | P1.5 | **HTTP/SSE transport for `MCPClient`**, without which no hosted MCP server (including `mcp.mail.hostinger.com/mcp`) is reachable. `MCPServerConfig.command` must become optional for remote servers | `[ ]` prerequisite for the MCP route |
 | P1.6 | `ChannelGateway`: inbound → responder → floors → approval → send → receipt, each outcome recorded | `[x]` logic done; not yet driven by the daemon |
 | P1.7 | Contact resolution behind a `ContactResolver` protocol, with unknown senders reply-only and no `consent_source` | `[x]` in-memory default; durable store is P2.1 |
-| P2.1 | `ContactChannel` + `Contactability` + scoped trust + `consent_source` on `Relationship`; migration | `[ ]` |
-| P2.2 | Attach a `ChannelRegistry` to `Mind`; per-Mind credentials rather than install-level. `action_executor._execute_send_email` already reads `getattr(mind, "channels", None)` and finds nothing | `[ ]` |
+| P2.1 | Contact identity: scoped trust, `consent_source`, quiet hours and a weekly cap per contact | `[x]` **not on `Relationship`** — see P2.3. Consent lives on the channel row, because someone who gave an email address has not agreed to be telephoned |
+| P2.2 | Attach a `ChannelRegistry` to `Mind` | `[x]` `Mind.channels`, lazily built so a misconfigured channel raises where the caller can see it instead of printing a warning like every other optional subsystem in `Mind.__init__` |
+| P2.3 | Durable contact store: `contacts` + `contact_channels`, migration `010_contacts`, `DatabaseContacts` resolving | `[x]` 34 tests. A **new table** rather than columns on `Relationship`: that table's FKs point at `minds.gmid`, so a human contact needs an invented Mind, which would then appear in the metaverse and be addressable as a peer |
+| P2.4 | Per-Mind channel credentials | `[ ]` every Mind on an install currently shares one mailbox, and `Mind.channels` says so rather than implying isolation |
 | P3.1 | Webhook gateway with per-provider signature verification | `[ ]` |
 | P3.2 | IMAP poller as a background task, on the existing scheduler | `[ ]` |
 | P3.3 | Inbound events → journal → memory, so the Mind remembers who wrote and when | `[ ]` |

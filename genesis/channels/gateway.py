@@ -52,7 +52,16 @@ class ContactResolver(Protocol):
     Implemented by the relationship store. The gateway needs only this, so it does
     not depend on `core/relationships.py` — and a resolver that cannot find
     someone returning `None` is what keeps an unknown sender reply-only.
+
+    `mind_id` is part of the protocol because consent is per-Mind. A resolver
+    belonging to another Mind answers "may I contact this person?" with *that*
+    Mind's consent, which would let a Mind it does not apply to initiate a message
+    using someone else's permission. The gateway checks it, because a wiring
+    mistake here is silent and the consequence is exactly what the consent model
+    exists to prevent.
     """
+
+    mind_id: str
 
     def resolve(self, *, channel: str, handle: str, display_name: str = "") -> Optional[ContactRef]: ...
 
@@ -68,6 +77,9 @@ class InMemoryContacts:
     """
 
     known: dict[str, ContactRef] = field(default_factory=dict)
+    #: Matches `ContactResolver`. Empty means "belongs to no particular Mind",
+    #: which is what a test wants; a real store always sets it.
+    mind_id: str = ""
 
     def resolve(self, *, channel: str, handle: str, display_name: str = "") -> Optional[ContactRef]:
         existing = self.known.get(handle)
@@ -160,6 +172,27 @@ class ChannelGateway:
 
     async def handle(self, event: InboundEvent) -> EngagementOutcome:
         """Process one inbound event end to end."""
+        resolver_mind = getattr(self.contacts, "mind_id", "")
+        if self.mind_id and resolver_mind and resolver_mind != self.mind_id:
+            # A wiring mistake, and a silent one: the resolver would answer with
+            # another Mind's consent, so this Mind could initiate a message on
+            # permission that was never granted to it. Refuse rather than
+            # proceed, because there is no safe way to guess which is correct.
+            logger.error(
+                "channel gateway: contact resolver for %r used by %r; refusing",
+                resolver_mind,
+                self.mind_id,
+            )
+            return EngagementOutcome(
+                inbound=event,
+                engaged=False,
+                reason=(
+                    f"contact resolver belongs to {resolver_mind!r}, not "
+                    f"{self.mind_id!r}; consent from another Mind's store is not "
+                    "usable here"
+                ),
+            )
+
         contact = self.contacts.resolve(
             channel=event.channel,
             handle=event.sender_handle,

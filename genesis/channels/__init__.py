@@ -43,7 +43,13 @@ from .disclosure import (
     is_disclosed,
 )
 from .fake import FakeChannel
-from .gateway import ChannelGateway, EngagementOutcome, InMemoryContacts
+from .gateway import (
+    ChannelGateway,
+    ContactResolver,
+    EngagementOutcome,
+    InMemoryContacts,
+)
+from .contacts import DatabaseContacts, normalise_handle
 from .limits import (
     ChannelLimits,
     InMemoryOutboundLedger,
@@ -110,6 +116,9 @@ __all__ = [
     "ChannelGateway",
     "EngagementOutcome",
     "InMemoryContacts",
+    "ContactResolver",
+    "DatabaseContacts",
+    "normalise_handle",
     # test double
     "FakeChannel",
 ]

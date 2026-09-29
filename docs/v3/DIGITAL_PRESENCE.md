@@ -239,8 +239,10 @@ was needed.
 
 ## 6. Contacts, channels and consent
 
-`Relationship` must grow from "a name with trust" to "a person the Mind can
-reach, in specific ways, under specific permission".
+The model below was a sketch; the built version is `genesis/channels/contacts.py`
+plus the `contacts` and `contact_channels` tables (migration `010_contacts`), with
+34 tests in `tests/security/test_contact_store.py`. The differences from the
+sketch are recorded after it, because two of them were architectural.
 
 ```python
 class ContactChannel(BaseModel):
@@ -278,6 +280,48 @@ Design decisions worth defending:
   money?" is a different question from "may I email them at all". A contact with
   no trust recorded for a domain is trusted **zero**, not 0.5 — the scalar this
   replaces defaulted to 0.5, which meant an unknown domain was half trusted.
+
+### Where the built version diverges, and why
+
+**A new table, not columns on `Relationship`.** The sketch said `Relationship`
+must grow these fields. It cannot: `RelationshipRecord.from_gmid` and `to_gmid`
+are foreign keys into `minds.gmid`, so a human contact would need an invented Mind
+to exist. That Mind would then appear in the metaverse, be counted in
+`MetaverseState.total_relationships`, and be addressable as a peer — the system
+would believe a person was a Mind. So `contacts` is a separate table and a person
+outside the system is a different kind of entity.
+
+**`consent_source` moved onto the channel row.** The sketch had it once per
+contact. It has to be per way-of-reaching: someone who gave an email address has
+not thereby agreed to be telephoned, and one verdict per contact would let a Mind
+upgrade an address into a phone call. `uq_contact_channels_contact_channel` makes
+the question "may I call this person?" have exactly one answer.
+
+**`outbound` defaults differently in two places, deliberately.**
+`OutboundPermission.NONE` is the enum default, which is right for a value with no
+context. The SQL `server_default` is also `none`. But a contact **learned from an
+inbound message** gets `reply_only`: a message that arrived proves the address
+works, and answering it is the one thing that should be possible without anyone
+recording anything. The line is that this is reply-only — writing `initiate` there
+would make one inbound message an opt-in to weekly outreach, which is the specific
+bug `record_inbound` exists to avoid.
+
+**`permission` and `consent_source` are independent fields on purpose.** A row may
+say `initiate` and still grant nothing, because `ContactRef.may_initiate()` checks
+both. `remember()` stores such a row rather than refusing it — refusing would lose
+the operator's intent and leave a record indistinguishable from "nobody ever
+asked" — while `set_permission()` raises, because that call comes from a person
+making a decision who should be told it will not take effect.
+
+### What the store deliberately does not do
+
+It enforces nothing: no quiet hours, no rate limits, no governance gate. Those
+live in `BaseChannel` and the governance plane. A store that also enforced would
+be a second place for the rules to live and a second place for them to be wrong.
+
+It also does not treat a database error as "no consent". Errors propagate, because
+"I could not check" is not "the answer is no" — degrading on an outage would make
+a Mind act on a decision nobody answered.
 
 ### Floors the adapter enforces, whatever governance decides
 
@@ -451,7 +495,8 @@ Regardless of approval, configuration, or owner instruction:
 |---|---|---|
 | **P0 — Substrate** | `genesis/channels/`: protocol, identity, registry, normalised inbound/outbound types, enforced disclosure, quiet-hours + weekly-cap + minimum-gap floors, cross-channel opt-out, approval-integrity digest, governance capabilities. Both §2.3 hazards removed. | **done** — 27 tests in `tests/security/test_channels.py` |
 | **P1 — Channels that need no third party** | Email (IMAP/SMTP, stdlib only), Telegram Bot API, plus the **Hostinger Mail API** (preferred email) and **Ringg AI** (voice). All four take credentials an admin already has, so none of them needs anyone else to say yes first. | **adapters written, not yet exercised against a live provider** — see `CHANNEL_PROVIDERS.md` |
-| **P2 — Contact identity** | `ContactChannel` + `Contactability` + scoped trust + `consent_source` on `Relationship`. Migration. Wire a `ChannelRegistry` onto `Mind`. | next |
+| **P2 — Contact identity** | Contacts and their channels, with consent per channel and scoped trust, in durable tables. **A new `contacts` table rather than columns on `Relationship`** — that table's foreign keys point at `minds.gmid`, so a human cannot go there without inventing a Mind for them. A `ChannelRegistry` now hangs off `Mind`. | **done** — migration `010_contacts`, 34 tests in `tests/security/test_contact_store.py` |
+| **P2b — Per-Mind credentials** | Today every Mind on an install shares one mailbox, because credentials come from settings. Real isolation needs a store for them, and a per-Mind override that reads the same settings would look like isolation without being it. | next |
 | **P3 — Inbound at scale** | Webhook gateway with per-provider signature verification; IMAP poller; durable `getUpdates` offset; inbound events → journal → memory; reply flow through the gate. | next |
 | **P4 — Telephony** | Twilio / Sarvam adapters behind the same `RinggVoiceChannel` shape. Needs a funded account, a number, and a real call-flow design. R3, per-message approval, never a standing grant. | planned, needs accounts |
 | **P5 — WhatsApp Business** | Meta Cloud API. Needs business verification and pre-approved message templates; outside a 24-hour service window only templates may be sent. | planned, needs verification |

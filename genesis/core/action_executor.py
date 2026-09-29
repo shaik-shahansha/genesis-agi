@@ -881,10 +881,11 @@ class ActionExecutor:
                 else "no email channel is configured for this Mind"
             )
             return (
-                f"Cannot send email to {to}: {reason}. Set the email channel "
-                "credentials (GENESIS_EMAIL_ADDRESS plus IMAP/SMTP settings) and "
-                "restart, then send through the channel API so the message is "
-                "approved and journalled."
+                f"Cannot send email to {to}: {reason}. Configure an email channel "
+                "and restart — either MIND_HOSTINGER_MAIL_API_TOKEN with "
+                "MIND_HOSTINGER_MAILBOX_ID, or MIND_EMAIL_ADDRESS with "
+                "MIND_EMAIL_PASSWORD. Then send through the channel API so the "
+                "message is approved and journalled."
             )
 
         # A channel exists. Sending still needs an approval, and this action is
