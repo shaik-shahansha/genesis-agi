@@ -226,6 +226,31 @@ class Settings(BaseSettings):
     #: configured, is not a behaviour anyone asked for.
     mind_channel_autoreply_enabled: bool = False
 
+    # --- Proactive outreach -------------------------------------------------
+    #
+    # Whether the Mind acts on commitments that are due or overdue by raising a
+    # message about them. Off by default, for a stronger reason than autoreply: a
+    # Mind that starts contacting people because it decided it owed them something is
+    # a different category of behaviour from one that answers when written to.
+    #
+    # What this actually does today, so nobody is surprised: **it proposes, it does
+    # not send.** `comms.email.send` is R3 and `STANDING_GRANT_MAX_RISK` is R2, so no
+    # standing grant can cover starting a conversation. Every proactive outreach
+    # arrives as an approval request with the obligation attached as its reason.
+    #
+    # That is the correct governance position — starting a conversation is externally
+    # visible and hard to retract — and it means enabling this produces a queue for a
+    # human rather than messages going out. Making it autonomous is a governance
+    # change to `comms.email.send`, not a setting here.
+    mind_outreach_enabled: bool = False
+    #: How often to consider commitments. Slower than the inbound poll on purpose:
+    #: nothing about a deadline changes minute to minute, and the attempts table
+    #: makes the interval a matter of latency rather than of correctness.
+    mind_outreach_interval_seconds: int = 900
+    #: The most commitments considered in one pass. Bounded so a backlog produces a
+    #: readable report rather than a burst of proposals.
+    mind_outreach_max_per_pass: int = 10
+
     #: Gemini model used for realtime / live voice sessions.
     #:
     #: Recorded and surfaced so a deployment can declare its intent, but there is

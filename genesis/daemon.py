@@ -214,6 +214,37 @@ class MindDaemon:
             except Exception as e:
                 logger.error(f"[WARN] Failed to start the inbound channel poller: {e}")
 
+            # Start proactive outreach: commitments that are due or overdue become
+            # proposals for a human.
+            #
+            # Off unless MIND_OUTREACH_ENABLED is set, and what it produces today is
+            # *proposals*, not sends: `comms.email.send` is R3 and standing grants cap
+            # at R2, so no standing grant can cover starting a conversation. The Mind
+            # raises an approval request with the obligation attached as its reason.
+            # That is the governance position, not a missing feature — see
+            # `docs/v3/CHANNEL_PROVIDERS.md`.
+            outreach_task = None
+            try:
+                from genesis.channels.outreach import build_planner
+
+                planner = build_planner(self.mind)
+                if planner is not None:
+                    interval = max(
+                        60, int(get_settings().mind_outreach_interval_seconds or 900)
+                    )
+                    outreach_task = asyncio.create_task(
+                        self._outreach_loop(planner, interval)
+                    )
+                    logger.info(
+                        f"[OK] Proactive outreach: considering commitments every {interval}s"
+                    )
+                else:
+                    logger.info(
+                        "   - Proactive outreach: off (MIND_OUTREACH_ENABLED)"
+                    )
+            except Exception as e:
+                logger.error(f"[WARN] Failed to start proactive outreach: {e}")
+
             self.is_running = True
             logger.info(f"[ACTIVE] Mind {self.mind.identity.name} is now living 24/7")
             logger.info(f"   - Consciousness: Active")
@@ -232,6 +263,8 @@ class MindDaemon:
                 proactive_task.cancel()
             if channel_task:
                 channel_task.cancel()
+            if outreach_task:
+                outreach_task.cancel()
 
             try:
                 await save_task
@@ -257,6 +290,12 @@ class MindDaemon:
             if channel_task:
                 try:
                     await channel_task
+                except asyncio.CancelledError:
+                    pass
+
+            if outreach_task:
+                try:
+                    await outreach_task
                 except asyncio.CancelledError:
                     pass
 
@@ -633,6 +672,58 @@ class MindDaemon:
             # Reaching here means the loop itself died, which is worth knowing about
             # rather than a daemon that appears healthy and answers nothing.
             logger.error(f"Inbound channel poller failed: {e}", exc_info=True)
+
+    async def _outreach_loop(self, planner, interval_seconds: int) -> None:
+        """Consider commitments on a timer, until the daemon stops.
+
+        Thin on purpose: `OutreachPlanner.consider` owns the idempotence and the
+        reporting, and reimplementing any of it here would mean two places to get
+        "do not raise the same obligation twice" wrong.
+
+        Nothing is retried on failure. The attempts table records what was tried, and
+        a retry may contact someone who was already contacted — the same reasoning as
+        the inbound poller's stuck claims. A failure is logged and journalled instead.
+        """
+        while self.is_running:
+            try:
+                await asyncio.sleep(interval_seconds)
+
+                if not self.mind or not self.is_running:
+                    continue
+
+                report = await planner.consider()
+
+                # Only speak up when something happened. A quiet log is the normal
+                # state for a Mind with no commitments falling due.
+                if report.proposed or report.sent or report.failed or report.unreachable:
+                    logger.info(
+                        "outreach: %d considered, %d proposed, %d sent, %d refused, "
+                        "%d unreachable, %d failed",
+                        report.considered,
+                        report.proposed,
+                        report.sent,
+                        report.refused,
+                        report.unreachable,
+                        report.failed,
+                    )
+                for outcome in report.outcomes:
+                    if outcome.outcome in ("unreachable", "failed"):
+                        # Both mean a person who is owed something and did not hear
+                        # about it. Loud, because silence here is the failure mode
+                        # this whole feature exists to remove.
+                        logger.warning(
+                            "outreach: %s %s — %s",
+                            outcome.trigger.kind,
+                            outcome.trigger.ref,
+                            outcome.reason,
+                        )
+
+            except asyncio.CancelledError:
+                logger.info("Proactive outreach stopped")
+                break
+            except Exception as e:
+                logger.error(f"Outreach loop error: {e}", exc_info=True)
+                continue
 
     def _register_signal_handlers(self):
         """Register handlers for graceful shutdown."""

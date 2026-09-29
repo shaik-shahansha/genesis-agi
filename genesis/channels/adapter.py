@@ -187,6 +187,8 @@ class BaseChannel:
             requires_approval_because=requires,
             estimated_cost_usd=caps.unit_cost_usd if caps.metered else 0.0,
             warnings=warnings,
+            trigger=intent.trigger or ("reply" if intent.is_reply else "manual"),
+            trigger_ref=intent.trigger_ref,
         )
 
     async def send(self, approved: ApprovedCommunication) -> DeliveryReceipt:
@@ -253,11 +255,17 @@ class BaseChannel:
             # Only initiated messages count against the weekly cap: answering
             # someone who wrote first is not outreach. Keyed on the relationship,
             # not the handle, so the cap follows the person across addresses.
+            #
+            # The trigger travels with it so the receipt can answer "why did this
+            # being contact me?", and `trigger_ref` is the idempotence key that stops
+            # proactive outreach repeating itself on every planning pass.
             self.ledger.record(
                 mind_id=self._ledger_key,
                 relationship_id=approved.contact.relationship_id,
                 channel=self.name,
                 at=receipt.sent_at,
+                trigger=prepared.trigger,
+                trigger_ref=prepared.trigger_ref,
             )
 
         receipt.disclosed = is_disclosed(prepared.body)

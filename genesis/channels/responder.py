@@ -167,3 +167,70 @@ class MindResponder:
             )
             text = text[: self.max_reply_chars].rstrip()
         return text or None
+
+
+class OutreachResponder(MindResponder):
+    """Drafts a message about an obligation, rather than a reply to one.
+
+    A subclass rather than a flag on `MindResponder`, because the two prompts differ
+    in more than a sentence: a reply is answering a question someone asked, whereas
+    this is starting a conversation about something the Mind said it would do. That
+    changes what the model needs to know and, more importantly, what it must not be
+    told.
+
+    The same guarantees hold unchanged, and they matter more here: no risk level, no
+    approval state, no mention that a gate exists. A model composing an unprompted
+    message is the one most likely to argue for its own justification, and giving it
+    the vocabulary of policy to do that with would be a mistake.
+    """
+
+    def build_prompt(self, trigger: Any, contact: ContactRef) -> str:
+        """Compose the outreach prompt from a trigger rather than an inbound event."""
+        who = contact.display_name or trigger.beneficiary_label or contact.handle
+        lines: list[str] = [
+            f"You owe {who} something, and the time you agreed is at hand.",
+            "",
+            f"Your own note about it: {trigger.reason}",
+            "",
+        ]
+
+        if contact.boundaries:
+            lines.append(
+                "You must not raise or share any of the following with this person:"
+            )
+            for boundary in contact.boundaries:
+                lines.append(f"  - {boundary}")
+            lines.append("")
+
+        lines.extend(
+            [
+                "Write a short message to them about it. A few sentences. Say what "
+                "you said you would do, and where it stands — including if it has "
+                "slipped.",
+                "",
+                f"If a message is not appropriate — if it is already handled, if they "
+                f"would not want to hear from you, or if writing would break one of "
+                f"the prohibitions above — reply with exactly {DECLINE_SENTINEL} and "
+                f"nothing else. Declining is a normal and expected answer.",
+                "",
+                "Write only the body of the message. Do not add a subject line, and do "
+                "not add a signature — one is added for you.",
+            ]
+        )
+        return "\n".join(lines)
+
+    async def __call__(self, trigger: Any, contact: ContactRef) -> Optional[str]:
+        prompt = self.build_prompt(trigger, contact)
+        try:
+            raw = await self.mind.think(
+                prompt,
+                context=None,
+                enable_actions=self.enable_actions,
+                skip_task_detection=True,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "outreach responder: cognition failed for %s: %s", trigger.ref, exc
+            )
+            return None
+        return self.clean(raw)

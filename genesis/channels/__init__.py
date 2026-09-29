@@ -51,6 +51,18 @@ from .gateway import (
 )
 from .contacts import DatabaseContacts, normalise_handle
 from .ledger import DatabaseOptOutRegistry, DatabaseOutboundLedger
+from .outreach import (
+    CommitmentTriggers,
+    ContactStoreBeneficiaries,
+    OutreachAttempts,
+    OutreachPlanner,
+    OutreachReport,
+    OutreachTrigger,
+    TRIGGER_COMMITMENT_AT_RISK,
+    TRIGGER_COMMITMENT_OVERDUE,
+    build_planner,
+)
+from .responder import MindResponder, OutreachResponder
 from .poller import (
     ChannelPoller,
     DatabaseInboundLedger,
@@ -132,6 +144,15 @@ __all__ = [
     # durable ledgers
     "DatabaseOutboundLedger",
     "DatabaseOptOutRegistry",
+    # proactive outreach
+    "CommitmentTriggers",
+    "ContactStoreBeneficiaries",
+    "OutreachAttempts",
+    "OutreachPlanner",
+    "OutreachReport",
+    "OutreachTrigger",
+    "TRIGGER_COMMITMENT_AT_RISK",
+    "TRIGGER_COMMITMENT_OVERDUE",
     # answering loop
     "ChannelPoller",
     "DatabaseInboundLedger",

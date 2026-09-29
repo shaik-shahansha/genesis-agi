@@ -343,7 +343,8 @@ Visual or feature work must not start before this passes.
 | P7.1 | `CapabilityRequest`: the Mind asks for a capability it lacks; admin provisions or declines. The Mind cannot self-grant | `[ ]` |
 | P7.2 | Admin surface for channel credentials and capability requests | `[ ]` |
 | P8.1 | Metered-channel budgeting: estimate from `prepare()`, check the budget before executing, **halt rather than queue** on exhaustion | `[ ]` |
-| P8.2 | Proactivity from triggers (commitment/deadline/event), each recorded as the message's reason | `[ ]` |
+| P8.2 | Proactivity from triggers (commitment/deadline/event), each recorded as the message's reason | `[x]` `channels/outreach.py`. Commitment due within 24h and past-deadline only; the trigger is a fact, never model initiative. **Proposes rather than sends**, because `comms.email.send` is R3 and standing grants cap at R2 |
+| P8.3 | Outreach idempotence: one attempt per trigger instance, ever | `[x]` `outreach_attempts`, migration `014_outreach_attempts`. Claimed **before** the attempt, so a crash loses a proposal rather than repeating one |
 
 **Anti-requirements, tested rather than documented:**
 

@@ -454,3 +454,113 @@ includes:
 **If `N refused` stays at `N received`, read the approval queue.** That is the
 expected state without a standing grant, and it is not a fault.
 
+---
+
+## 10. Proactive outreach: the Mind reaches out because a fact says it should
+
+Everything above is about answering. This is the other half — the Mind starting a
+conversation because it owes someone something.
+
+`MIND_OUTREACH_ENABLED=false` by default, for a stronger reason than autoreply: a
+Mind that contacts people because it *decided* it owed them something is a different
+category of behaviour from one that answers when written to.
+
+### It proposes. It does not send.
+
+This is the thing to understand before enabling it.
+
+`comms.email.send` is **R3** and `STANDING_GRANT_MAX_RISK` is **R2**, so no standing
+grant can cover starting a conversation. Every proactive outreach therefore arrives as
+an **approval request**, with the obligation attached as its reason.
+
+That is the governance position rather than a missing feature: starting a
+conversation is externally visible and hard to retract, so a human decides. Making it
+autonomous is a change to `comms.email.send` in `genesis/governance/risk.py`, and it
+should be deliberate rather than discovered.
+
+What you get today is a queue of well-explained proposals. That is genuinely useful —
+the Mind notices it is about to miss something and tells you, with the reason — and it
+is honest about who is deciding.
+
+### A trigger must be a fact, never a vibe
+
+Two things qualify, and both are already recorded:
+
+| Trigger | When |
+|---|---|
+| `commitment_overdue` | Past its deadline, not yet decided about |
+| `commitment_at_risk` | Due within 24 hours |
+
+A commitment that is merely **open** produces nothing, and neither does one with no
+deadline: "at risk" is meaningless without a date, and treating undated obligations as
+urgent would mean contacting people about things no time was ever agreed for. A Mind
+with forty open commitments would otherwise produce forty contacts.
+
+`OutreachTrigger` **refuses to exist** without a `ref` and a `reason`. The ref is what
+makes the trigger deduplicable; the reason is what the approver reads. Random model
+initiative is out of scope — "the being felt like it" is not an accountable trigger.
+
+### The failure that is worse than sending twice
+
+A commitment at risk for 24 hours is noticed on every pass. A planner that only
+deduplicated *sends* would raise an approval request every 15 minutes — 96 of them in
+a day, all about the same obligation. Every request individually compliant, the
+aggregate a person being nagged, and an approver who sees the same card 96 times
+learns to click it without reading. That destroys the control the card exists to
+provide.
+
+`outreach_attempts` claims **before** the attempt, with a unique constraint on
+`(mind_id, trigger, trigger_ref)`, so one trigger instance produces exactly one
+attempt — proposed, sent, refused, failed or unreachable alike. A new commitment has a
+new id and therefore a new attempt; the same commitment never produces a second one.
+
+Recorded before rather than after, for the same reason the inbound ledger claims
+before dispatch: a process that dies mid-flight leaves a record and the next pass does
+not repeat it. A missing outreach is recoverable by a human reading `pending()`; a
+repeated one is not recoverable at all.
+
+### What is recorded, and why it is worth reading
+
+Every attempt is journalled and readable via `OutreachAttempts.recent()`. An operator
+asking "why has this Mind gone quiet?" or "why did it contact this person?" should not
+have to reconstruct it from timing.
+
+The outcomes are distinct on purpose:
+
+| Outcome | Meaning |
+|---|---|
+| `proposed` | Waiting for a human. **Not a fault** — the expected state |
+| `sent` | A standing grant or an existing approval permitted it |
+| `refused` | A floor or the policy engine said no. Not retried; policy will not change between passes |
+| `unreachable` | No channel, or no way to reach them. **A person owed something who did not hear about it** — logged loudly |
+| `failed` | The send failed, or governance was unreachable. Recorded, not retried |
+
+`unreachable` and `failed` are the two an operator should actually watch. Both mean
+silence where there should have been a message, which is the failure this whole
+feature exists to remove.
+
+### The floors still apply
+
+Proactive outreach is sent with `is_reply=False`, which is what makes the weekly cap,
+the minimum gap and R3 all apply. Sending it as a reply would bypass every one of
+them, and a test asserts the flag. Two obligations do not authorise two messages in
+one afternoon — the minimum gap decides that, and the second attempt is recorded as
+`refused`.
+
+A contact who is not open to contact is **not** approached, even for a commitment: a
+commitment does not override someone's stated preference.
+
+---
+
+## 11. What the Mind is told when it drafts an outreach message
+
+`OutreachResponder` subclasses `MindResponder`, and the guarantees are unchanged and
+matter more here: no risk level, no approval state, no mention that a gate exists. A
+model composing an *unprompted* message is the one most likely to argue for its own
+justification, and handing it the vocabulary of policy is handing it the vocabulary to
+do that with.
+
+It is told what it owes and to whom, the boundaries set for that person, and that
+declining is a normal answer — a commitment may already have been fulfilled in
+conversation, and a Mind that always produces text would always send.
+

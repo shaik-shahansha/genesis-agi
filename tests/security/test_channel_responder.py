@@ -386,3 +386,256 @@ def test_the_poller_receives_the_configured_policy_and_scopes():
     authorizer = poller.gateway.authorizer
     assert authorizer.tenant_policy["auto_approve_risk_levels"] == ["R2"]
     assert "comms.telegram.send" in authorizer.granted_scopes
+
+
+# ---------------------------------------------------------------------------
+# Outreach: drafting about an obligation, with the same guarantees
+# ---------------------------------------------------------------------------
+
+
+class StubTrigger:
+    def __init__(self, *, ref="cm-1", reason="a commitment to Dana is due soon: send the update"):
+        self.kind = "commitment_at_risk"
+        self.ref = ref
+        self.reason = reason
+        self.beneficiary_label = "Dana"
+
+
+def test_the_outreach_prompt_does_not_mention_policy_either():
+    """The same absence, and it matters more here.
+
+    A model composing an *unprompted* message is the one most likely to argue for its
+    own justification, and handing it the vocabulary of policy is handing it the
+    vocabulary to do that with.
+    """
+    from genesis.channels.responder import OutreachResponder
+
+    prompt = (
+        OutreachResponder(mind=StubMind())
+        .build_prompt(StubTrigger(), contact())
+        .lower()
+    )
+
+    for forbidden in (
+        "approval",
+        "approve",
+        "risk",
+        "policy",
+        "governance",
+        "permission",
+        "gate",
+        "r2",
+        "r3",
+    ):
+        assert forbidden not in prompt, f"the prompt mentions {forbidden!r}"
+
+
+def test_the_outreach_prompt_states_the_obligation():
+    """The model has to know what it owes, or the message is generic."""
+    from genesis.channels.responder import OutreachResponder
+
+    prompt = OutreachResponder(mind=StubMind()).build_prompt(StubTrigger(), contact())
+
+    assert "send the update" in prompt
+    assert "Dana" in prompt
+
+
+def test_the_outreach_prompt_states_the_boundaries():
+    from genesis.channels.responder import OutreachResponder
+
+    prompt = OutreachResponder(mind=StubMind()).build_prompt(
+        StubTrigger(), contact(boundaries=["do not mention the invoice"])
+    )
+
+    assert "do not mention the invoice" in prompt
+
+
+def test_the_outreach_prompt_permits_declining():
+    """A commitment may already have been handled, and a Mind that always produces
+    text would always send."""
+    from genesis.channels.responder import OutreachResponder
+    from genesis.channels.responder import DECLINE_SENTINEL as SENTINEL
+
+    prompt = OutreachResponder(mind=StubMind()).build_prompt(StubTrigger(), contact())
+
+    assert SENTINEL in prompt
+    assert "normal and expected" in prompt
+
+
+def test_the_outreach_prompt_asks_for_the_body_only():
+    from genesis.channels.responder import OutreachResponder
+
+    prompt = (
+        OutreachResponder(mind=StubMind())
+        .build_prompt(StubTrigger(), contact())
+        .lower()
+    )
+
+    assert "only the body" in prompt
+    assert "do not add a signature" in prompt
+
+
+def test_outreach_actions_are_disabled_during_a_draft():
+    """Same reasoning as the reply: enabling actions would let the model act while
+    composing, which is a route that bypasses the gate."""
+    from genesis.channels.responder import OutreachResponder
+
+    mind = StubMind()
+    run(OutreachResponder(mind=mind)(StubTrigger(), contact()))
+
+    assert mind.calls[0]["enable_actions"] is False
+
+
+def test_an_outreach_draft_can_decline():
+    from genesis.channels.responder import DECLINE_SENTINEL as SENTINEL
+    from genesis.channels.responder import OutreachResponder
+
+    mind = StubMind(reply=SENTINEL)
+    assert run(OutreachResponder(mind=mind)(StubTrigger(), contact())) is None
+
+
+def test_an_outreach_model_failure_means_no_message():
+    from genesis.channels.responder import OutreachResponder
+
+    mind = StubMind(raises=True)
+    assert run(OutreachResponder(mind=mind)(StubTrigger(), contact())) is None
+
+
+def test_the_outreach_responder_does_not_add_a_signature():
+    """`apply_disclosure` runs in the adapter. A second definition here is how a rule
+    ends up with two definitions that disagree."""
+    from genesis.channels.responder import OutreachResponder
+
+    mind = StubMind(reply="About that thing I said I would do.")
+    result = run(OutreachResponder(mind=mind)(StubTrigger(), contact()))
+
+    assert result == "About that thing I said I would do."
+    assert "AI-operated" not in result
+
+
+# ---------------------------------------------------------------------------
+# Assembling the planner
+# ---------------------------------------------------------------------------
+
+
+def test_outreach_is_off_unless_an_operator_turns_it_on():
+    """A Mind that starts contacting people because it decided it owed them something
+    is a different category of behaviour from one that answers when written to."""
+    from genesis.channels.outreach import build_planner
+
+    db_base.init_db()
+    mind = StubMind()
+    mind._channels = ChannelRegistry(mind.identity.gmid)
+
+    assert build_planner(mind, settings=_settings(mind_outreach_enabled=False)) is None
+
+
+def test_outreach_with_no_channel_reports_that_there_is_nowhere_to_raise_it():
+    from genesis.channels.outreach import build_planner
+
+    db_base.init_db()
+    mind = StubMind()
+    mind._channels = ChannelRegistry(mind.identity.gmid)
+
+    assert build_planner(mind, settings=_settings(mind_outreach_enabled=True)) is None
+
+
+def test_outreach_with_no_commitment_manager_reports_that_there_is_nothing_to_raise():
+    from genesis.channels.outreach import build_planner
+
+    db_base.init_db()
+    mind = StubMind()
+    registry = ChannelRegistry(mind.identity.gmid)
+    registry.register(make_channel())
+    mind._channels = registry
+    # No `commitments` attribute.
+
+    assert build_planner(mind, settings=_settings(mind_outreach_enabled=True)) is None
+
+
+def test_a_channel_and_commitments_produce_a_planner():
+    from genesis.channels.outreach import build_planner
+
+    db_base.init_db()
+    mind = StubMind()
+    registry = ChannelRegistry(mind.identity.gmid)
+    registry.register(make_channel())
+    mind._channels = registry
+
+    class Commitments:
+        def list_commitments(self, *, open_only=False):
+            return []
+
+    mind.commitments = Commitments()
+
+    planner = build_planner(
+        mind,
+        settings=_settings(
+            mind_outreach_enabled=True,
+            mind_channel_granted_scopes="comms.email.send",
+        ),
+    )
+
+    assert planner is not None
+    assert planner.mind_id == mind.identity.gmid
+    assert planner.attempts.durable is True
+    assert planner.recorder is not None
+    assert planner.channel == "email"
+
+
+def test_the_outreach_planner_receives_the_configured_policy():
+    from genesis.channels.outreach import build_planner
+
+    db_base.init_db()
+    mind = StubMind()
+    registry = ChannelRegistry(mind.identity.gmid)
+    registry.register(make_channel())
+    mind._channels = registry
+
+    class Commitments:
+        def list_commitments(self, *, open_only=False):
+            return []
+
+    mind.commitments = Commitments()
+
+    planner = build_planner(
+        mind,
+        settings=_settings(
+            mind_outreach_enabled=True,
+            mind_channel_granted_scopes="comms.email.send",
+            mind_channel_tenant_policy=(
+                '{"auto_approve_risk_levels":["R2"],'
+                '"auto_approve_categories":["COMMUNICATION"]}'
+            ),
+        ),
+    )
+
+    assert planner.authorizer.tenant_policy["auto_approve_risk_levels"] == ["R2"]
+
+
+def test_a_malformed_policy_means_no_standing_grant_for_outreach_too():
+    """Both builders read the same parser, so a typo cannot mean "no grant" for
+    replies and "grant" for outreach."""
+    from genesis.channels.outreach import build_planner
+
+    db_base.init_db()
+    mind = StubMind()
+    registry = ChannelRegistry(mind.identity.gmid)
+    registry.register(make_channel())
+    mind._channels = registry
+
+    class Commitments:
+        def list_commitments(self, *, open_only=False):
+            return []
+
+    mind.commitments = Commitments()
+
+    planner = build_planner(
+        mind,
+        settings=_settings(
+            mind_outreach_enabled=True,
+            mind_channel_tenant_policy="{not json",
+        ),
+    )
+
+    assert planner.authorizer.tenant_policy == {}

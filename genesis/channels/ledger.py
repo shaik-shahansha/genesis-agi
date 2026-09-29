@@ -93,13 +93,23 @@ class DatabaseOutboundLedger:
     # -- writes ------------------------------------------------------------
 
     def record(
-        self, *, mind_id: str, relationship_id: str, channel: str, at: datetime
+        self,
+        *,
+        mind_id: str,
+        relationship_id: str,
+        channel: str,
+        at: datetime,
+        trigger: str = "manual",
+        trigger_ref: Optional[str] = None,
     ) -> None:
         """Record one initiated message.
 
         Commits immediately and independently of any other work, because this is a
         rate-limit record: if it were rolled back with a later failure, allowance
         would be handed back for a message that was actually delivered.
+
+        `trigger` and `trigger_ref` say *why*, and `trigger_ref` doubles as the
+        idempotence key for proactive outreach — see `already_reached_out`.
         """
         from genesis.database.models import OutboundMessageRecord
 
@@ -111,12 +121,62 @@ class DatabaseOutboundLedger:
                     relationship_id=relationship_id,
                     channel=channel,
                     sent_at=_as_naive_utc(at),
+                    trigger=trigger or "manual",
+                    trigger_ref=trigger_ref,
                 )
             )
             session.commit()
         except Exception:
             session.rollback()
             raise
+        finally:
+            session.close()
+
+    def already_reached_out(
+        self, *, mind_id: str, trigger: str, trigger_ref: str
+    ) -> bool:
+        """Whether this Mind has already contacted someone about this trigger.
+
+        The idempotence check that makes proactive outreach safe to run on a loop.
+
+        Without it, a commitment that is at risk for 24 hours would be noticed on
+        every poll — 1,440 times a day — and the floors would then permit three
+        reminders in a week, all about the same obligation, all saying the same
+        thing. The rate limit would be doing its job and the behaviour would still
+        be wrong, because the person is being nagged about one thing rather than
+        being contacted about three.
+
+        Keyed on the trigger *and* its ref, so a new commitment with a new id
+        produces a new reminder while the same one does not repeat. This is the
+        same class of failure as the duplicate reply the inbound ledger prevents:
+        each individual send is compliant, and the aggregate is the harm.
+        """
+        from genesis.database.models import OutboundMessageRecord
+
+        if not trigger_ref:
+            # No ref means the trigger cannot be identified, so it cannot be
+            # deduplicated. Saying "no" here would let an unidentifiable trigger fire
+            # repeatedly; saying "yes" would suppress a first contact. Neither is
+            # safe, so callers are required to supply a ref — see
+            # `OutreachPlanner`, which refuses a trigger without one.
+            logger.warning(
+                "outbound ledger: %r has no trigger_ref, so it cannot be deduplicated",
+                trigger,
+            )
+            return False
+
+        session = self._session()
+        try:
+            return (
+                session.query(OutboundMessageRecord)
+                .filter(
+                    OutboundMessageRecord.mind_id == mind_id,
+                    OutboundMessageRecord.trigger == trigger,
+                    OutboundMessageRecord.trigger_ref == trigger_ref,
+                )
+                .first()
+                is not None
+            )
         finally:
             session.close()
 

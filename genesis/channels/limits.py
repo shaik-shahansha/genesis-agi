@@ -113,7 +113,16 @@ class OutboundLedger(Protocol):
         holds over time.
         """
 
-    def record(self, *, mind_id: str, relationship_id: str, channel: str, at: datetime) -> None: ...
+    def record(
+        self,
+        *,
+        mind_id: str,
+        relationship_id: str,
+        channel: str,
+        at: datetime,
+        trigger: str = "manual",
+        trigger_ref: Optional[str] = None,
+    ) -> None: ...
 
     def count_since(self, *, mind_id: str, relationship_id: str, since: datetime) -> int: ...
 
@@ -126,6 +135,15 @@ class InMemoryOutboundLedger:
 
     Useful for tests and for a single long-lived process, and explicitly not a
     substitute for a durable one. `durable` is False so callers can tell.
+
+    `trigger` and `trigger_ref` are accepted and **discarded**. That is deliberate
+    and it is the honest behaviour for this implementation: the idempotence check
+    (`already_reached_out` on the durable ledger) is what stops proactive outreach
+    repeating, and a process-local version of it would reset on restart and let the
+    same obligation be raised again. Silently pretending to deduplicate would be
+    worse than not offering it, so this class simply does not implement
+    `already_reached_out` — a caller that needs it gets an `AttributeError` rather
+    than a wrong answer.
     """
 
     _entries: list[tuple[str, str, str, datetime]] = field(default_factory=list)
@@ -134,7 +152,16 @@ class InMemoryOutboundLedger:
     def durable(self) -> bool:
         return False
 
-    def record(self, *, mind_id: str, relationship_id: str, channel: str, at: datetime) -> None:
+    def record(
+        self,
+        *,
+        mind_id: str,
+        relationship_id: str,
+        channel: str,
+        at: datetime,
+        trigger: str = "manual",
+        trigger_ref: Optional[str] = None,
+    ) -> None:
         self._entries.append((mind_id, relationship_id, channel, at))
 
     def count_since(self, *, mind_id: str, relationship_id: str, since: datetime) -> int:

@@ -280,6 +280,15 @@ class PreparedMessage:
     requires_approval_because: list[str] = field(default_factory=list)
     estimated_cost_usd: float = 0.0
     warnings: list[str] = field(default_factory=list)
+    #: Why this message exists: "reply" | "manual" | a `TRIGGER_*` kind. Carried
+    #: through to the outbound ledger so "why did this being contact me?" is
+    #: answerable from the record rather than reconstructed from the timing.
+    trigger: str = "manual"
+    #: The specific fact that triggered it, which doubles as the idempotence key for
+    #: proactive outreach. Not part of the approval digest — see `digest_of`: a
+    #: trigger is provenance, not message content, and a human approving a body has
+    #: not approved a trigger string.
+    trigger_ref: Optional[str] = None
 
     @property
     def body_bytes(self) -> int:

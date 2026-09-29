@@ -414,6 +414,14 @@ class OutboundMessageRecord(Base):
     #: When the provider accepted it. Not when we decided to send: a message that
     #: sat in an approval queue for a day must count against the day it went out.
     sent_at = Column(DateTime, nullable=False, index=True)
+    #: Why this message was sent: "reply" | "commitment_at_risk" | "commitment_overdue"
+    #: | "manual". Recorded because "why did this being contact me?" is the first
+    #: question anyone asks, and a receipt that cannot answer it is not a receipt.
+    trigger = Column(String(40), nullable=False, default="manual")
+    #: Which specific fact triggered it — a commitment id, an event id. This is what
+    #: makes proactive outreach idempotent: the same at-risk commitment cannot
+    #: produce a second reminder, because a row already exists for that trigger.
+    trigger_ref = Column(String(160), nullable=True)
 
     __table_args__ = (
         # The hot query is "how many to this person since last week", so the index
@@ -423,6 +431,61 @@ class OutboundMessageRecord(Base):
             "mind_id",
             "relationship_id",
             "sent_at",
+        ),
+        # The idempotence check: "have we already reached out about this trigger?"
+        Index(
+            "ix_outbound_messages_trigger",
+            "mind_id",
+            "trigger",
+            "trigger_ref",
+        ),
+    )
+
+
+class OutreachAttemptRecord(Base):
+    """One attempt to reach out about one trigger. Recorded **before** the attempt.
+
+    The problem this solves is the same shape as the duplicate reply, and it is worth
+    stating because the failure looks like success: a commitment at risk for 24 hours
+    is noticed on every poll. Without a record, the planner raises an approval request
+    on each pass — 96 of them at a 15-minute interval — all about the same obligation,
+    all saying the same thing. Every individual request is compliant and the aggregate
+    is the harm. It is also precisely the noise that trains an approver to click
+    through without reading, which is a control being destroyed by a side effect.
+
+    Recorded before the attempt, not after, for the same reason the inbound ledger
+    claims before dispatch: if the process dies mid-flight, the record exists and the
+    next pass does not repeat it. A missing outreach is recoverable by a human reading
+    `pending()`; a repeated one is not recoverable at all.
+
+    `UniqueConstraint` on `(mind_id, trigger, trigger_ref)` means **one attempt per
+    trigger instance, ever**. A new commitment gets a new id and therefore a new
+    attempt; the same commitment never produces a second one. That is what makes the
+    planner safe to run on a loop.
+
+    Deliberately separate from `outbound_messages`: that table is the *rate-limit*
+    record and counts only messages that were actually sent. Recording a proposal
+    there would consume allowance for a message nobody received.
+    """
+
+    __tablename__ = "outreach_attempts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    mind_id = Column(String(50), nullable=False, index=True)
+    #: "commitment_at_risk" | "commitment_overdue" | ...
+    trigger = Column(String(40), nullable=False)
+    #: The specific fact: a commitment id, an event id.
+    trigger_ref = Column(String(160), nullable=False)
+    relationship_id = Column(String(160), nullable=False, default="")
+    channel = Column(String(30), nullable=False, default="")
+    #: "proposed" | "sent" | "refused" | "failed" | "unreachable".
+    outcome = Column(String(40), nullable=False, default="")
+    reason = Column(String(400), nullable=False, default="")
+    attempted_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mind_id", "trigger", "trigger_ref", name="uq_outreach_mind_trigger_ref"
         ),
     )
 

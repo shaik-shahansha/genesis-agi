@@ -48,6 +48,13 @@ def upgrade() -> None:
         sa.Column('relationship_id', sa.String(length=160), nullable=False),
         sa.Column('channel', sa.String(length=30), nullable=False),
         sa.Column('sent_at', sa.DateTime(), nullable=False),
+        # Why this message was sent, and which specific fact triggered it. The ref is
+        # the idempotence key for proactive outreach: a commitment that is at risk for
+        # a day is noticed on every poll, and without a record of "we already reminded
+        # them about this one" the floors would permit three reminders about the same
+        # obligation. Both default sensibly for a manual send.
+        sa.Column('trigger', sa.String(length=40), nullable=False, server_default='manual'),
+        sa.Column('trigger_ref', sa.String(length=160), nullable=True),
         sa.PrimaryKeyConstraint('id'),
     )
     # `mind_id` and `relationship_id` are `index=True` on the columns and
@@ -69,9 +76,16 @@ def upgrade() -> None:
         ['mind_id', 'relationship_id', 'sent_at'],
         unique=False,
     )
+    op.create_index(
+        'ix_outbound_messages_trigger',
+        'outbound_messages',
+        ['mind_id', 'trigger', 'trigger_ref'],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
+    op.drop_index('ix_outbound_messages_trigger', table_name='outbound_messages')
     op.drop_index('ix_outbound_messages_window', table_name='outbound_messages')
     op.drop_index('ix_outbound_messages_sent_at', table_name='outbound_messages')
     op.drop_index('ix_outbound_messages_relationship_id', table_name='outbound_messages')

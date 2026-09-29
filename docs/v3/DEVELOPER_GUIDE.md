@@ -11,7 +11,7 @@
 | **Branch** | `feature/v3-digital-beings-os` |
 | **Baseline** | `main` @ `c730c6d` (v0.1.5-alpha, Jan 2025 framework) |
 | **Last verified** | 2026-09-29 — full suite; the live sandbox/container checks below still date from 2026-09-28 |
-| **Test suite** | **888 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
+| **Test suite** | **945 passed, 16 skipped, 9 failed, 1 error.** The 9 failures and the error are pre-existing and unchanged — each confirmed by re-running against a stashed pristine tree. See §10 |
 | **Container** | Image builds; runs `Up (healthy)`; all 9 governance endpoints verified live in the final image |
 | **Sandbox isolation** | Verified against a real container: 10/10 claims held, 11 escape tests in the suite |
 | **Governance version** | policy `genesis-policy-2026.09.1`, charter `genesis-charter-2026.09.2` |
@@ -314,7 +314,7 @@ They were all found by exercising the deployed path and looking at what came bac
 | Item | State |
 |---|---|
 | Test suite runs without paid API keys | ✅ |
-| 888 passing tests, 16 skipped | ✅ |
+| 945 passing tests, 16 skipped | ✅ |
 | `genesis/channels/` — the digital-presence substrate | ✅ **built** — protocol, registry, enforced disclosure, contactability floors, approval-integrity digest, `ChannelGateway`. 27 substrate + 52 provider/gateway + 34 contact-store + 70 answering-loop tests. Provider setup: `CHANNEL_PROVIDERS.md` |
 | Container sandbox escape tests | ✅ 11 tests, skipped when no runtime/image is present rather than silently passing |
 | Alembic migration for governance tables | ✅ `008_governance_plane`, verified upgrade → downgrade → upgrade → `downgrade base` → upgrade |
@@ -448,6 +448,9 @@ alembic downgrade -1      # drops the four governance tables
 | `MIND_CHANNEL_TENANT_POLICY` | unset | JSON. How an administrator opts into replying without approving each message — it is **tenant policy**, not a channel flag, so it is capped at R2 by `STANDING_GRANT_MAX_RISK` and must name a capability or category. Malformed JSON means **no** standing grant and is logged; a typo must not read as "every reply is auto-approved". See §6 of `CHANNEL_PROVIDERS.md` |
 | `MIND_CHANNEL_POLL_INTERVAL_SECONDS` | `60` | Below ~30s you poll faster than most providers like, and a duplicate is cheap to dismiss while a rate limit is not |
 | `MIND_CHANNEL_LOOKBACK_DAYS` | `3` | How far back the first pass looks. Correctness does not depend on it — the `inbound_events` ledger does that — only on which messages count as new |
+| `MIND_OUTREACH_ENABLED` | `false` | Whether the Mind acts on commitments that are due or overdue. **Off by default**, and **it proposes rather than sends**: `comms.email.send` is R3 and standing grants cap at R2, so every proactive outreach is an approval request with the obligation as its reason. Making it autonomous is a governance change, not a setting |
+| `MIND_OUTREACH_INTERVAL_SECONDS` | `900` | How often commitments are considered. Slower than the inbound poll on purpose: nothing about a deadline changes minute to minute, and `outreach_attempts` makes the interval a matter of latency rather than of correctness |
+| `MIND_OUTREACH_MAX_PER_PASS` | `10` | The most commitments considered in one pass, so a backlog produces a readable report rather than a burst of proposals |
 
 > **Naming:** these are `MIND_*`-prefixed because `Settings` has **no `env_prefix`** — a
 > field name *is* the environment variable name. An unprefixed `email_password` would
@@ -755,8 +758,9 @@ genesis/
     gateway.py         #   inbound -> responder -> floors -> gate -> send
     contacts.py        #   the durable contact store: who a Mind knows, consent per channel
     ledger.py          #   durable weekly cap + durable cross-channel opt-out
+    outreach.py        #   proactive outreach from commitments; proposes, never sends
     poller.py          #   poll -> claim -> gate -> send; at most one reply per message
-    responder.py       #   drafts a reply via Mind.think, and is told nothing about policy
+    responder.py       #   drafts a reply or an outreach message; told nothing about policy
     fake.py            #   FakeChannel: the test double the suite runs on
   api/
     governance_routes.py   # 12 endpoints: approvals, receipts, timeline, e-stop
@@ -767,11 +771,12 @@ alembic/versions/20260928_0800_add_governance_plane.py
 tests/
   governance/        # 305 tests: policy, approvals, audit, SQL store, gate, API,
                      #   correlation, domain events, commitments
-  security/          # 497 tests: sandbox, container escapes, network probe, MCP env,
+  security/          # 551 tests: sandbox, container escapes, network probe, MCP env,
                      #   secrets, the bootstrap admin boundary, and the channels
                      #   substrate itself (test_channels.py 27, test_channel_providers.py 52,
                      #   test_contact_store.py 34, test_channel_poller.py 41,
-                     #   test_channel_responder.py 29, test_channel_ledgers.py 30)
+                     #   test_channel_responder.py 44, test_channel_ledgers.py 30,
+                     #   test_channel_outreach.py 39)
   test_migrations.py # 31 tests: migration-chain guards
   test_mind_ownership.py # 8 tests: who may access a Mind, and placeholder repair
   security/test_default_admin.py   # 10 tests: the bootstrap-admin boundary
