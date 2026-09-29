@@ -93,6 +93,43 @@ class Settings(BaseSettings):
     #: when both this and `gemini_api_key` are set.
     gemini_image_model: Optional[str] = None
 
+    # ------------------------------------------------------------------ #
+    # Digital presence: the Mind's own communications (docs/v3/DIGITAL_PRESENCE.md)
+    #
+    # The administrator supplies these; the Mind never holds a credential. It
+    # holds an intent to communicate, the channel adapter holds the secret, and
+    # the policy holds the veto.
+    #
+    # Install-level (one Mind per installation) is the documented default. Per-Mind
+    # provisioning — each Mind with its own address — is a later phase and will
+    # override these rather than replace them, so a single-Mind install keeps
+    # working with no configuration change.
+    # ------------------------------------------------------------------ #
+    #: Name shown in every AI disclosure. Required in practice: an anonymous AI is
+    #: worse than an undisclosed one, because there is nobody to hold responsible.
+    mind_administrator_name: str = ""
+
+    #: The email address the Mind owns.
+    #:
+    #: Named `mind_*` rather than `email_*` deliberately. `Settings` has no
+    #: `env_prefix`, so a field name *is* the environment variable name, and
+    #: `EMAIL_PASSWORD` or `EMAIL_ADDRESS` would collide with whatever the host
+    #: already sets — silently taking the Mind's credentials from an unrelated
+    #: service. The rest of this file uses specific names for the same reason.
+    mind_email_address: Optional[str] = None
+    mind_email_display_name: Optional[str] = None
+    mind_email_username: Optional[str] = None
+    mind_email_password: Optional[str] = None
+    mind_email_imap_host: Optional[str] = None
+    mind_email_imap_port: int = 993
+    mind_email_smtp_host: Optional[str] = None
+    mind_email_smtp_port: int = 587
+    mind_email_use_tls: bool = True
+
+    #: Telegram bot identity. A token from @BotFather; no business verification.
+    mind_telegram_bot_token: Optional[str] = None
+    mind_telegram_bot_username: Optional[str] = None
+
     #: Gemini model used for realtime / live voice sessions.
     #:
     #: Recorded and surfaced so a deployment can declare its intent, but there is

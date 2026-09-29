@@ -295,6 +295,57 @@ Visual or feature work must not start before this passes.
 
 ---
 
+## Phase P — Digital presence: the Mind's own life outside the container
+
+> Design and rationale: [`DIGITAL_PRESENCE.md`](DIGITAL_PRESENCE.md).
+>
+> This phase exists because the previous plan treated external communications as
+> "integrations" — adapters bolted to the side — when they are the Mind's body.
+> A Mind with its own email address, phone number and messaging identity is a
+> different product from a Mind inside a chat window, and the governance work
+> already completed is what makes it deployable rather than the thing it is.
+
+| ID | Task | Status |
+|---|---|---|
+| P0.1 | `CommunicationChannel` protocol: `receive` / `prepare` / `send` / `get_thread` / `sync_contacts`, with `send` accepting only an approved message | `[x]` |
+| P0.2 | Enforced AI disclosure in the writer; a channel that cannot disclose is refused at registration | `[x]` |
+| P0.3 | Contactability floors in the adapter: quiet hours (wrapping midnight), weekly initiated cap, minimum gap, cross-channel opt-out | `[x]` |
+| P0.4 | Approval integrity: a digest over the approved body, verified at send, so a persisted-then-edited approval cannot send | `[x]` |
+| P0.5 | Channel capabilities in the governance registry; `comms.broadcast`, `account.create`, `circumvent_human_verification`, `impersonate_human`, `undisclosed_outreach` prohibited | `[x]` |
+| P0.6 | Remove the ungoverned auto-reply loop and the false "Email sent" claim in `action_executor` | `[x]` |
+| P0.7 | `ChannelRegistry` with per-channel enable/disable **and a reason**, so a refused channel is visible rather than absent | `[x]` |
+| P1.1 | Email adapter (IMAP/SMTP, stdlib only) | `[~]` written; never exercised against a live server |
+| P1.2 | Telegram Bot API adapter | `[~]` written; never exercised against a live bot |
+| P2.1 | `ContactChannel` + `Contactability` + scoped trust + `consent_source` on `Relationship`; migration | `[ ]` |
+| P2.2 | Attach a `ChannelRegistry` to `Mind`; per-Mind credentials rather than install-level | `[ ]` |
+| P3.1 | Webhook gateway with per-provider signature verification | `[ ]` |
+| P3.2 | IMAP poller as a background task, on the existing scheduler | `[ ]` |
+| P3.3 | Inbound events → journal → memory, so the Mind remembers who wrote and when | `[ ]` |
+| P3.4 | Reply flow: inbound → cognition → intent → gate → send, with the receipt as the reply's record | `[ ]` |
+| P3.5 | Durable outbound ledger (replaces the in-memory default, which resets on restart) | `[ ]` |
+| P3.6 | Durable Telegram `getUpdates` offset, or dedup by message id | `[ ]` |
+| P4.1 | Telephony adapter (Twilio / Ringg.ai / Sarvam), R3, per-message approval, never a standing grant | `[ ]` |
+| P4.2 | Spoken AI disclosure at call open, not configurable off | `[ ]` |
+| P4.3 | Call recording requires disclosure and is off by default | `[ ]` |
+| P5.1 | WhatsApp Business via Meta Cloud API; template-based outside the 24-hour window | `[ ]` |
+| P6.1 | Social publishing adapters, disclosure in bio, per-platform OAuth | `[ ]` |
+| P7.1 | `CapabilityRequest`: the Mind asks for a capability it lacks; admin provisions or declines. The Mind cannot self-grant | `[ ]` |
+| P7.2 | Admin surface for channel credentials and capability requests | `[ ]` |
+| P8.1 | Metered-channel budgeting: estimate from `prepare()`, check the budget before executing, **halt rather than queue** on exhaustion | `[ ]` |
+| P8.2 | Proactivity from triggers (commitment/deadline/event), each recorded as the message's reason | `[ ]` |
+
+**Anti-requirements, tested rather than documented:**
+
+| ID | Anti-requirement | Status |
+|---|---|---|
+| P-A1 | No path from model output to a provider that does not pass the gate | `[x]` |
+| P-A2 | No undisclosed outbound message, on any channel | `[x]` |
+| P-A3 | No bulk unsolicited outreach, at any approval level | `[x]` |
+| P-A4 | No automated circumvention of CAPTCHA, KYC, age checks or ToS | `[x]` |
+| P-A5 | No contact with someone who opted out — on any channel, by any address | `[x]` |
+
+---
+
 ## First release gate (V3 §48)
 
 The 20-step scenario must pass end-to-end, including:

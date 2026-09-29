@@ -461,12 +461,27 @@ pre,
 
 .lede {
   margin-top: 20px;
-  max-width: 40ch;
+  max-width: 46ch;
   font-size: 1.06rem;
   color: var(--fg-muted);
 }
 
 .lede strong {
+  color: var(--fg);
+}
+
+/* The positioning line. Deliberately quieter than the lede above it and the H1
+   above that: it states the claim the page supports, and at heading weight it
+   competed with the title instead. The left rule marks it as a statement rather
+   than more description. */
+.hero-sub {
+  margin-top: 18px;
+  padding-left: 14px;
+  max-width: 34ch;
+  border-left: 2px solid var(--accent);
+  font-size: 0.96rem;
+  font-weight: 500;
+  line-height: 1.5;
   color: var(--fg);
 }
 

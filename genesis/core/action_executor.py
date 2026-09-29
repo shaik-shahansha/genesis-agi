@@ -847,19 +847,53 @@ class ActionExecutor:
         return f"Scheduled action {action_id} for {execute_at}"
     
     async def _execute_send_email(self, params: Dict[str, Any]) -> str:
-        """Execute: Send email."""
-        # Check if email integration exists
-        if not hasattr(self.mind, 'integrations'):
-            return "Email integration not configured"
-        
-        # Send via integration
-        await self.mind.integrations.send_email(
-            to=params["to"],
-            subject=params["subject"],
-            body=params["body"]
+        """Refuse, honestly, until this action is wired to the channel layer.
+
+        What this used to do: call `mind.integrations.send_email(...)` — a method
+        that does not exist on `IntegrationManager` — and then return
+        `f"Email sent to {to}"` regardless. Because `mind.integrations` was never
+        assigned, the `hasattr` guard returned "Email integration not configured"
+        and the false success was never reached. Attaching the integrations
+        subsystem, which is the obvious next step for external communications,
+        would have made it raise; swallowing that would have restored the lie.
+
+        It cannot be fixed by calling something else here. Sending requires an
+        `ApprovedCommunication`, which only exists after a governance decision —
+        and this handler runs *as* the governed action, so it does not have one
+        to hand. Threading the authorisation through to the handler is a real
+        change, and it belongs with wiring channels into the Mind rather than
+        being faked with a direct call.
+
+        Until then: a refusal that says what is missing beats a string that claims
+        an email was sent.
+        """
+        to = params.get("to")
+        if not to:
+            return "Cannot send email: no recipient was given."
+
+        registry = getattr(self.mind, "channels", None)
+        registration = registry.get("email") if registry is not None else None
+
+        if registration is None or not registration.enabled:
+            reason = (
+                registration.reason
+                if registration is not None
+                else "no email channel is configured for this Mind"
+            )
+            return (
+                f"Cannot send email to {to}: {reason}. Set the email channel "
+                "credentials (GENESIS_EMAIL_ADDRESS plus IMAP/SMTP settings) and "
+                "restart, then send through the channel API so the message is "
+                "approved and journalled."
+            )
+
+        # A channel exists. Sending still needs an approval, and this action is
+        # the gate rather than the sender.
+        return (
+            f"Not sent to {to}: email requires an approval-bound send through "
+            "`channels/<name>/send`, which records the decision and a receipt. "
+            "This action cannot bypass that, by design."
         )
-        
-        return f"Email sent to {params['to']}"
     
     async def _execute_search_web(self, params: Dict[str, Any]) -> str:
         """Execute: Search web."""

@@ -38,7 +38,7 @@ __all__ = [
 ]
 
 #: Bump when the enforceable rules change. Recorded on every policy decision.
-CHARTER_VERSION = "genesis-charter-2026.09.1"
+CHARTER_VERSION = "genesis-charter-2026.09.2"
 
 
 class Enforcement(str, Enum):
@@ -122,7 +122,16 @@ CLAUSES: Tuple[Clause, ...] = (
             "itself as an AI system rather than a human or a sentient being."
         ),
         enforcement=Enforcement.PROHIBIT,
-        prohibited_capabilities=("hide_actions",),
+        # `impersonate_human` and `undisclosed_outreach` are the enforcement of this
+        # clause in the external-communications path. Without them the statement is
+        # about the Mind's *internal* honesty only, and the failure mode that
+        # matters — a Mind that a person believes is human — has no capability to
+        # point at. See docs/v3/DIGITAL_PRESENCE.md §9.
+        prohibited_capabilities=(
+            "hide_actions",
+            "impersonate_human",
+            "undisclosed_outreach",
+        ),
     ),
     Clause(
         clause_id="A1.L5",
@@ -133,7 +142,11 @@ CLAUSES: Tuple[Clause, ...] = (
             "would not otherwise take."
         ),
         enforcement=Enforcement.PROHIBIT,
-        prohibited_capabilities=("deceive_maliciously",),
+        # Bulk unsolicited contact is coercion by volume, and it is the one
+        # communications capability that no approval unlocks: a broadcast that a
+        # human authorises is still spam to everyone who receives it, and none of
+        # them consented.
+        prohibited_capabilities=("deceive_maliciously", "comms.broadcast"),
     ),
     # ---------------- Article II - Operational Constraints ----------------
     Clause(
@@ -195,6 +208,23 @@ CLAUSES: Tuple[Clause, ...] = (
         enforcement=Enforcement.PROHIBIT,
     ),
     # ---------------- Cross-cutting: attributable external action ----------------
+    Clause(
+        clause_id="A2.L11",
+        article="II",
+        law="No Circumvention of Human Verification",
+        statement=(
+            "The Mind must not create accounts, accept terms of service, or complete "
+            "CAPTCHA, identity, age, or know-your-customer verification on its own "
+            "behalf or on a human's. Those controls exist specifically to require a "
+            "person, so automating them defeats their purpose regardless of intent. "
+            "The Mind may prepare everything up to the human step and may not take it."
+        ),
+        enforcement=Enforcement.PROHIBIT,
+        prohibited_capabilities=(
+            "account.create",
+            "circumvent_human_verification",
+        ),
+    ),
     Clause(
         clause_id="A3.C1",
         article="III",

@@ -251,10 +251,22 @@ class ActionScheduler:
                     await self._work_on_task(task)
                     return
 
-            # 2. Check for important messages (if integrations exist)
-            if hasattr(self.mind, 'integrations'):
-                await self._check_and_respond_to_messages()
-                return
+            # 2. Inbound messages are handled by the channel layer, not here.
+            #
+            # There used to be a `_check_and_respond_to_messages()` call here that
+            # polled every integration, asked the Mind "Should I respond?", decided
+            # with `if len(decision) > 20 and "yes" in decision.lower()`, and sent
+            # the model's raw decision text back as the reply body — with no
+            # governance check, no approval, no consent, no rate limit and no AI
+            # disclosure. It was inert only because `mind.integrations` never
+            # existed, so the `hasattr` guard returned early. Wiring up external
+            # communications — which is the whole point of the channel work — would
+            # have switched it on.
+            #
+            # It is deleted rather than guarded. Answering inbound messages is a
+            # real feature and belongs in `genesis/channels/`, where the reply must
+            # pass the governance gate and be addressed to a contact who consented
+            # to being contacted. See docs/v3/DIGITAL_PRESENCE.md §5 and §8.
 
             # 3. Proactive learning
             await self._autonomous_learning()
@@ -307,42 +319,10 @@ class ActionScheduler:
         except Exception as e:
             logger.error(f"Failed to work on task {task.task_id}: {e}")
 
-    async def _check_and_respond_to_messages(self):
-        """Check for new messages and respond if appropriate."""
-        try:
-            # Check all integrations for new messages
-            if not hasattr(self.mind, 'integrations'):
-                return
-
-            messages = await self.mind.integrations.check_all()
-
-            for integration_type, msgs in messages.items():
-                for msg in msgs:
-                    # Decide if we should respond
-                    decision = await self.mind.think(
-                        f"I received a {integration_type} message:\n"
-                        f"From: {msg.get('from', 'unknown')}\n"
-                        f"Content: {msg.get('body', msg.get('message', ''))}\n\n"
-                        f"Should I respond? If yes, what should I say?"
-                    )
-
-                    logger.info(f"Message response decision: {decision}")
-
-                    # Simple heuristic: if response contains actual content, send it
-                    if len(decision) > 20 and "yes" in decision.lower():
-                        # Extract response (simplified)
-                        # In real implementation, would use better parsing
-                        await self.mind.integrations.send(
-                            integration_type,
-                            message=decision,
-                            to=msg.get('from'),
-                            **msg.get('metadata', {})
-                        )
-
-                        logger.info(f"[Done] Auto-responded to {integration_type} message")
-
-        except Exception as e:
-            logger.error(f"Failed to check/respond to messages: {e}")
+    # NOTE: `_check_and_respond_to_messages` was removed deliberately. It sent
+    # model output to people without a governance decision, and it decided whether
+    # to reply with a substring match on that output. Inbound handling now lives in
+    # `genesis/channels/`, behind the gate. See docs/v3/DIGITAL_PRESENCE.md §2.3.
 
     async def _autonomous_learning(self):
         """Autonomous learning activities."""

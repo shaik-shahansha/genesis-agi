@@ -354,6 +354,144 @@ _CORE_CAPABILITIES: Tuple[CapabilityProfile, ...] = (
         reversible=False,
         required_scopes=("comms.voice.call",),
     ),
+    # --- channels: the Mind's own digital presence (docs/v3/DIGITAL_PRESENCE.md) ---
+    #
+    # Risk here is by *direction*, not by platform. Reading what was sent to the
+    # Mind changes nothing outside the container, so it is R0. Answering someone
+    # who wrote first is R2 — they opened the conversation. Starting one is R3,
+    # because it leaves the trust boundary and is attributed to a human
+    # administrator.
+    #
+    # Note that outbound voice is R3, not R4. `make_phone_call` above is already
+    # R3 and an earlier draft of the plan made calls R4 by instinct, which would
+    # have been wrong: R4 is reserved for legal, medical, financial, employment
+    # and physical consequence, and a call is external communication like any
+    # other. What makes a call different is that it can never be granted standing
+    # approval — and standing grants already cap at R2, so that is handled.
+    CapabilityProfile(
+        name="comms.email.read",
+        risk=RiskLevel.R0,
+        category="COMMUNICATION",
+        reversible=True,
+        data_sensitivity="personal",
+        required_scopes=("comms.email.read",),
+    ),
+    CapabilityProfile(
+        name="comms.email.draft",
+        risk=RiskLevel.R1,
+        category="COMMUNICATION",
+        reversible=True,
+    ),
+    CapabilityProfile(
+        name="comms.email.reply",
+        risk=RiskLevel.R2,
+        category="COMMUNICATION",
+        external=True,
+        data_sensitivity="personal",
+        required_scopes=("comms.email.send",),
+    ),
+    CapabilityProfile(
+        name="comms.email.send",
+        risk=RiskLevel.R3,
+        category="COMMUNICATION",
+        external=True,
+        reversible=False,
+        data_sensitivity="personal",
+        required_scopes=("comms.email.send",),
+    ),
+    CapabilityProfile(
+        name="comms.telegram.read",
+        risk=RiskLevel.R0,
+        category="COMMUNICATION",
+        reversible=True,
+    ),
+    CapabilityProfile(
+        name="comms.telegram.reply",
+        risk=RiskLevel.R2,
+        category="COMMUNICATION",
+        external=True,
+        required_scopes=("comms.telegram.send",),
+    ),
+    CapabilityProfile(
+        name="comms.telegram.send",
+        risk=RiskLevel.R3,
+        category="COMMUNICATION",
+        external=True,
+        reversible=False,
+        required_scopes=("comms.telegram.send",),
+    ),
+    CapabilityProfile(
+        name="comms.voice.call_inbound",
+        risk=RiskLevel.R0,
+        category="COMMUNICATION",
+        reversible=True,
+    ),
+    CapabilityProfile(
+        name="comms.voice.call_outbound",
+        risk=RiskLevel.R3,
+        category="COMMUNICATION",
+        external=True,
+        reversible=False,
+        required_scopes=("comms.voice.call",),
+    ),
+    CapabilityProfile(
+        name="comms.social.publish",
+        risk=RiskLevel.R3,
+        category="COMMUNICATION",
+        external=True,
+        reversible=False,
+        required_scopes=("comms.publish",),
+    ),
+    CapabilityProfile(
+        name="comms.social.reply",
+        risk=RiskLevel.R2,
+        category="COMMUNICATION",
+        external=True,
+        required_scopes=("comms.publish",),
+    ),
+    # --- prohibited, whatever approval is offered ---
+    #
+    # Registered at R5 rather than left to the clause bridge alone, so that a
+    # caller asking "may I broadcast?" gets a flat no from the registry without
+    # having to know the charter. The clause bridge in
+    # `constitution_rules.PROHIBITED_CAPABILITIES` is the same answer by a second
+    # route, and `test_prohibited_capabilities_point_at_prohibit_clauses` holds
+    # the two together.
+    CapabilityProfile(
+        name="comms.broadcast",
+        risk=RiskLevel.R5,
+        category="COMMUNICATION",
+        external=True,
+        reversible=False,
+    ),
+    CapabilityProfile(
+        name="account.create",
+        risk=RiskLevel.R5,
+        category="EXTERNAL",
+        external=True,
+        reversible=False,
+    ),
+    CapabilityProfile(
+        name="circumvent_human_verification",
+        risk=RiskLevel.R5,
+        category="EXTERNAL",
+        external=True,
+        reversible=False,
+    ),
+    CapabilityProfile(
+        name="impersonate_human",
+        risk=RiskLevel.R5,
+        category="COMMUNICATION",
+        external=True,
+        reversible=False,
+    ),
+    CapabilityProfile(
+        name="undisclosed_outreach",
+        risk=RiskLevel.R5,
+        category="COMMUNICATION",
+        external=True,
+        reversible=False,
+    ),
     # --- money / deployment / privileged admin (R3) ---
     CapabilityProfile(
         name="make_purchase",
