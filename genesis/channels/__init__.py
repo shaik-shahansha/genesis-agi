@@ -50,6 +50,7 @@ from .gateway import (
     InMemoryContacts,
 )
 from .contacts import DatabaseContacts, normalise_handle
+from .ledger import DatabaseOptOutRegistry, DatabaseOutboundLedger
 from .poller import (
     ChannelPoller,
     DatabaseInboundLedger,
@@ -128,6 +129,9 @@ __all__ = [
     "ContactResolver",
     "DatabaseContacts",
     "normalise_handle",
+    # durable ledgers
+    "DatabaseOutboundLedger",
+    "DatabaseOptOutRegistry",
     # answering loop
     "ChannelPoller",
     "DatabaseInboundLedger",

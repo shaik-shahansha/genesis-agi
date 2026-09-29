@@ -264,12 +264,44 @@ the REST API.
 
 | Limit | Consequence |
 |---|---|
-| Outbound rate limits are **in memory** | `InMemoryOutboundLedger.durable` is `False`. The weekly cap and minimum gap do not survive a restart, so they are a per-process floor, not a durable one |
 | No webhook ingestion | Inbound is polled. Webhooks are the provider's recommendation and the next phase |
 | Attachments are not downloaded | Attachments are not decoded or stored. Decoding arbitrary attachments is a parsing attack surface that belongs behind the sandbox, not in a channel adapter |
 | A stranger's reply earns no trust | `DatabaseContacts` returns unknown senders as reply-only with no `consent_source`. Someone writing once does not opt in to being contacted weekly |
 | Channel credentials are install-level | Every Mind on an install shares one mailbox and one phone number. `Mind.channels` says so rather than implying isolation |
 | Call transcripts are not ingested | Ringg's assistant speaks and the transcript arrives later; nothing fetches it, so a call is an action and not yet a memory |
+
+### Two controls that used to reset on restart, and no longer do
+
+Both were process-local, and both failed in the same direction — silently, by
+becoming *more permissive* after a restart. Neither was visible by reading the code,
+because each channel was individually correct:
+
+**The weekly cap was per channel.** `BaseChannel` builds its own ledger when none is
+injected, and nothing injected one. So a Mind could send three emails, three Telegram
+messages and three calls — **nine contacts in a week against a documented limit of
+three**, with every channel reporting compliance. Now one `DatabaseOutboundLedger` is
+shared by every channel of a Mind, so the cap follows the person rather than the
+channel.
+
+**Opt-out was per channel.** Someone who said "stop" by email could be telephoned.
+That is precisely the behaviour the opt-out exists to prevent, and it was invisible
+on any install with one channel configured. Now one `DatabaseOptOutRegistry` is
+shared, keyed by relationship **and** by normalised handle so the same person
+reaching the Mind through a different address is still caught.
+
+Why the opt-out was the more serious of the two: a rate limit that resets is
+generous, whereas an opt-out that resets is harassment. Someone says "stop", the
+daemon restarts, and the Mind writes to them again — the exact behaviour they asked
+to end, repeated, with nothing in the logs to explain it.
+
+**A trap worth knowing about if you touch this code.** `channels.base.utcnow()`
+returns an *aware* datetime and every other datetime here is naive, and SQLite stores
+no offset. So an aware value written to these tables reads back naive, and comparing
+it to `utcnow()` raises `TypeError: can't compare offset-naive and offset-aware
+datetimes` — but only on the **second** run, because the first write has nothing to
+compare against. It would have worked in testing and failed in the second week of
+real use. `ledger.py` normalises in both directions explicitly, and two tests reach it
+through the real floor rather than through the raw accessor.
 
 ---
 

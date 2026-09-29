@@ -376,13 +376,108 @@ class InboundEventRecord(Base):
     )
 
 
+class OutboundMessageRecord(Base):
+    """One message a Mind **initiated**. Never a reply.
+
+    Only initiated messages are stored, because only initiated messages are capped.
+    Answering someone who wrote first is not outreach, and counting it would make a
+    Mind unable to hold a conversation — so a reply is not a row here at all, and
+    the absence is the design rather than an omission.
+
+    This table exists because the weekly cap and the minimum gap were held in a
+    process-local list. For *replies* that barely mattered. For *initiated* contact
+    it is the entire control: a restart cleared the counts, so a Mind that had
+    already used its three messages this week could start over by restarting, and
+    "the being that contacted you four times in a week" is exactly what the cap
+    exists to prevent. A cap that a restart removes is not a cap.
+
+    `relationship_id` rather than a contact foreign key: the cap follows the
+    *person*, not an address, so an opt-out or a cap recorded on one channel cannot
+    be sidestepped by reaching them on another. It is also a plain string because
+    the ledger must keep working for a relationship id that no longer resolves to a
+    row — deleting a contact must not silently reset their cap.
+
+    No `UniqueConstraint`. Two identical sends are a real thing that happens (a
+    retry after an ambiguous provider response), and they must both be counted:
+    deduplicating here would undercount and hand back allowance that was spent.
+    The inbound ledger deduplicates because a duplicate *reply* is a visible harm;
+    here the count is the point.
+    """
+
+    __tablename__ = "outbound_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    mind_id = Column(String(50), nullable=False, index=True)
+    #: The person, so the cap survives an address change and applies across channels.
+    relationship_id = Column(String(160), nullable=False, index=True)
+    channel = Column(String(30), nullable=False)
+    #: When the provider accepted it. Not when we decided to send: a message that
+    #: sat in an approval queue for a day must count against the day it went out.
+    sent_at = Column(DateTime, nullable=False, index=True)
+
+    __table_args__ = (
+        # The hot query is "how many to this person since last week", so the index
+        # is ordered by what narrows fastest: the Mind, then the person, then time.
+        Index(
+            "ix_outbound_messages_window",
+            "mind_id",
+            "relationship_id",
+            "sent_at",
+        ),
+    )
+
+
+class CommunicationOptOutRecord(Base):
+    """Someone has asked this Mind not to contact them. Durable, and cross-channel.
+
+    This existed only in a process-local set, which made it the most dangerous
+    non-durable control in the codebase: someone says "stop", the daemon restarts,
+    and the Mind writes to them again. That is not a rate limit being slightly
+    generous — it is the exact behaviour a person is trying to escape, repeated
+    after they explicitly asked for it to end. It also failed silently, because
+    nothing about a restart looks like a policy change.
+
+    **Two subject kinds in one table, because opt-out is keyed two ways.** A person
+    may say "stop" against the *relationship* (the Mind knows who they are) or
+    against a bare *handle* (they wrote from an address with no contact record). Both
+    must work, and both must apply on **every** channel — otherwise the Mind simply
+    moves to another address the person also has, which is the behaviour the whole
+    mechanism exists to prevent.
+
+    A single table with a `subject_kind` discriminator rather than two tables,
+    because every read is "is this person opted out, by either key" and that is one
+    query here instead of two that could drift apart.
+    """
+
+    __tablename__ = "communication_opt_outs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    mind_id = Column(String(50), nullable=False, index=True)
+    #: "relationship" or "handle". A string rather than an Enum column so adding a
+    #: third key later is additive rather than a migration of every row.
+    subject_kind = Column(String(20), nullable=False)
+    #: The relationship id or the normalised handle, depending on `subject_kind`.
+    subject = Column(String(320), nullable=False)
+    #: Why, when the person said why. "stop" and "this is harassment" are the same
+    #: decision and different records, and only one of them needs a human to look.
+    reason = Column(String(400), nullable=False, default="")
+    recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        # Idempotent: asking twice is one opt-out, not two. Without this, a person
+        # repeating themselves would grow the table and change nothing.
+        UniqueConstraint(
+            "mind_id", "subject_kind", "subject", name="uq_opt_outs_mind_subject"
+        ),
+    )
+
+
 class EnvironmentVisit(Base):
     """
     History of Mind visits to environments.
 
     Tracks when Minds enter/leave environments for analytics and presence.
     """
-
     __tablename__ = "environment_visits"
 
     # Primary identification

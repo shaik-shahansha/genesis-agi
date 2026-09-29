@@ -329,10 +329,11 @@ Visual or feature work must not start before this passes.
 | P3.2 | IMAP poller as a background task, on the existing scheduler | `[x]` `ChannelPoller`, driven from `MindDaemon` via `_channel_loop`. Off unless `MIND_CHANNEL_AUTOREPLY_ENABLED` |
 | P3.3 | Inbound events → journal → memory, so the Mind remembers who wrote and when | `[~]` journal `[x]` (`channel.*` event family); **memory `[ ]`** — an inbound message is not yet something the Mind remembers |
 | P3.4 | Reply flow: inbound → cognition → intent → gate → send, with the receipt as the reply's record | `[x]` `MindResponder` → `GovernanceAuthorizer` → `ChannelGateway`. The responder is told nothing about policy, and actions are disabled during a draft |
-| P3.5 | Durable outbound ledger (replaces the in-memory default, which resets on restart) | `[ ]` |
+| P3.5 | Durable outbound ledger (replaces the in-memory default, which resets on restart) | `[x]` `outbound_messages`, migration `012_outbound_messages`. **One ledger shared by every channel** — before this the weekly cap was per channel, so nine contacts a week passed a documented limit of three |
 | P3.6 | Durable Telegram `getUpdates` offset, or dedup by message id | `[~]` dedup by message id `[x]` (`inbound_events`); the offset itself is still per-process |
 | P3.7 | Durable **inbound** ledger: at most one reply per message across restarts | `[x]` `inbound_events`, migration `011_inbound_events`. Claims before dispatch, so a crash loses a reply rather than duplicating one. Verified by mutation |
 | P3.8 | Stuck claims surfaced and journalled rather than retried | `[x]` `PollReport.stuck` + `channel.reply_not_sent` |
+| P3.9 | Durable **opt-out**, shared across channels | `[x]` `communication_opt_outs`, migration `013_opt_outs`. Keyed by relationship *and* normalised handle. Before this it was per channel, so "stop" on email did not stop Telegram |
 | P4.1 | Telephony adapters (Ringg.ai done; Twilio / Sarvam behind the same channel shape), R3, per-message approval, never a standing grant | `[~]` Ringg written; others `[ ]` |
 | P4.2 | Spoken AI disclosure at call open, not configurable off. Done for Ringg by passing `ai_disclosure` as a prompt variable and refusing to register until the operator asserts the prompt speaks it | `[x]` for Ringg, with the assertion recorded rather than hidden |
 | P4.3 | Call transcript → memory, so a call becomes something the Mind remembers rather than only an action it took | `[ ]` |

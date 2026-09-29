@@ -27,6 +27,7 @@ from .base import (
     CommunicationChannel,
     InboundEvent,
 )
+from .ledger import DatabaseOptOutRegistry, DatabaseOutboundLedger
 from .limits import ChannelLimits, parse_call_window
 
 logger = logging.getLogger(__name__)
@@ -289,9 +290,30 @@ def build_registry(mind_id: str, credentials: ChannelCredentials) -> ChannelRegi
     for us, and an outgoing allow list can reject a misaddressed send at the
     provider even if our own code is wrong. Plain IMAP/SMTP is the fallback for
     anyone with a mailbox elsewhere.
+
+    **The ledger and the opt-out registry are created once here and shared by every
+    channel.** That is load-bearing, not tidiness. `BaseChannel.__init__` builds its
+    own when none is injected, so before this both controls were per-channel:
+
+    * the weekly cap was enforced *per channel*, so a Mind could send three emails,
+      three Telegram messages and three calls — nine contacts in a week against a
+      documented limit of three, with each channel individually compliant;
+    * an opt-out recorded on one channel did not apply on another, so someone who
+      said "stop" by email could be telephoned. That is the precise behaviour the
+      opt-out exists to prevent, and it was invisible because it worked in the
+      common case of a Mind that only had one channel configured.
+
+    Both were verified by observing the behaviour rather than by reading the code,
+    which is the only way this class of bug is ever found: each channel was
+    individually correct.
     """
     registry = ChannelRegistry(mind_id)
     administrator = credentials.administrator
+
+    # One ledger and one opt-out registry for the whole Mind, so the cap follows the
+    # person rather than the channel, and "stop" means stop everywhere.
+    ledger = DatabaseOutboundLedger()
+    optouts = DatabaseOptOutRegistry(mind_id=mind_id)
 
     email_cfg = credentials.for_channel("email")
     if email_cfg and email_cfg.get("api_token"):
@@ -307,6 +329,8 @@ def build_registry(mind_id: str, credentials: ChannelCredentials) -> ChannelRegi
                 api_version=email_cfg.get("api_version") or "",
                 administrator=administrator,
                 mind_id=mind_id,
+                ledger=ledger,
+                optouts=optouts,
             )
         )
     elif email_cfg:
@@ -325,6 +349,8 @@ def build_registry(mind_id: str, credentials: ChannelCredentials) -> ChannelRegi
                 use_tls=bool(email_cfg.get("use_tls", True)),
                 administrator=administrator,
                 mind_id=mind_id,
+                ledger=ledger,
+                optouts=optouts,
             )
         )
 
@@ -338,6 +364,8 @@ def build_registry(mind_id: str, credentials: ChannelCredentials) -> ChannelRegi
                 bot_username=telegram_cfg.get("address") or "",
                 administrator=administrator,
                 mind_id=mind_id,
+                ledger=ledger,
+                optouts=optouts,
             )
         )
 
@@ -364,6 +392,8 @@ def build_registry(mind_id: str, credentials: ChannelCredentials) -> ChannelRegi
                 ),
                 administrator=administrator,
                 mind_id=mind_id,
+                ledger=ledger,
+                optouts=optouts,
             )
         )
 
