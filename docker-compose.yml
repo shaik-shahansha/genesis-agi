@@ -73,6 +73,16 @@ services:
       # Generate with:  openssl rand -hex 32
       API_SECRET_KEY: "${API_SECRET_KEY:?API_SECRET_KEY must be set in .env - run: openssl rand -hex 32}"
 
+      # Also required, and easy to miss: `Settings.assert_secure_secrets()` checks
+      # BOTH `api_secret_key` and `secret_key`, and refuses to boot in production
+      # while either is still the placeholder from .env.example. Compose only ever
+      # documented/forwarded API_SECRET_KEY, and entrypoint.sh only *warns* about
+      # it, so `secret_key` kept its placeholder default and the API crash-looped
+      # with "Refusing to start: SECRET_KEY is still the placeholder value".
+      # Default it to API_SECRET_KEY so a single documented secret suffices, while
+      # still allowing a distinct SECRET_KEY to be set deliberately.
+      SECRET_KEY: "${SECRET_KEY:-${API_SECRET_KEY}}"
+
       # Required. Bootstraps the first administrator account.
       #
       # This used to be implicit: the app seeded `admin` with the password
@@ -106,6 +116,11 @@ services:
       # --- firebase admin (optional) --------------------------------------
       FIREBASE_ENABLED: "${FIREBASE_ENABLED:-false}"
       FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID:-}"
+      # Required for token verification: `firebase_auth.verify_firebase_token()`
+      # calls the Identity Toolkit REST API with `settings.firebase_api_key`.
+      # Without this line the key never reaches the container, so Firebase would
+      # look enabled (project id present) while every token failed to verify.
+      FIREBASE_API_KEY: "${FIREBASE_API_KEY:-${NEXT_PUBLIC_FIREBASE_API_KEY:-}}"
 
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]

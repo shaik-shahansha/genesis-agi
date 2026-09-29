@@ -1,800 +1,1123 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Genesis — Create Digital Beings</title>
-<meta name="description" content="Genesis creates persistent digital beings with identity, memory, inner life, goals, relationships and a workspace of their own. They run continuously in their own container, and every consequential action they take is classified, approved and receipted." />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Genesis Minds — Create Digital Beings</title>
+<meta name="description" content="Create persistent digital beings with identity, memory, relationships, goals, workspaces, communication channels, and governed autonomy.">
+<meta property="og:title" content="Genesis Minds — Create Digital Beings">
+<meta property="og:description" content="A new operating system for persistent digital beings: identity, memory, relationships, digital life, and governed autonomy.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --bg:#04060c;
+  --bg-soft:#080b14;
+  --bg-deep:#02030a;
+  --card:rgba(255,255,255,.035);
+  --card-solid:#0a0f1d;
+  --border:rgba(148,163,184,.14);
+  --border-strong:rgba(148,163,184,.25);
+  --text:#e9eef9;
+  --muted:#93a0ba;
+  --faint:#5d6b85;
+  --teal:#2ee6b0;
+  --teal-soft:rgba(46,230,176,.12);
+  --violet:#a78bfa;
+  --violet-soft:rgba(167,139,250,.12);
+  --blue:#7dd3fc;
+  --link:#7dd3fc;
+  --grad:linear-gradient(92deg,#34e0b4 0%,#7dd3fc 48%,#a78bfa 100%);
+  --grad-btn:linear-gradient(92deg,#7c5cff,#2ee6b0);
+  --glow-teal:0 0 42px rgba(46,230,176,.22);
+  --glow-violet:0 0 42px rgba(167,139,250,.20);
+  --nav-bg:rgba(4,6,12,.72);
+  --code-bg:#05070f;
+  --shadow:0 24px 60px rgba(0,0,0,.5);
+  --ring:rgba(46,230,176,.35);
+}
+html[data-theme="light"]{
+  --bg:#f4f6fc;
+  --bg-soft:#ffffff;
+  --bg-deep:#eaeef8;
+  --card:#ffffff;
+  --card-solid:#ffffff;
+  --border:#e2e8f5;
+  --border-strong:#c9d3ea;
+  --text:#0b1120;
+  --muted:#54617c;
+  --faint:#8593ad;
+  --teal:#0a9d74;
+  --teal-soft:rgba(10,157,116,.10);
+  --violet:#6d4de0;
+  --violet-soft:rgba(109,77,224,.10);
+  --blue:#0369a1;
+  --link:#464feb;
+  --grad:linear-gradient(92deg,#0a9d74 0%,#0369a1 48%,#6d4de0 100%);
+  --grad-btn:linear-gradient(92deg,#6d4de0,#0a9d74);
+  --glow-teal:0 10px 34px rgba(10,157,116,.18);
+  --glow-violet:0 10px 34px rgba(109,77,224,.16);
+  --nav-bg:rgba(244,246,252,.78);
+  --code-bg:#0b1120;
+  --shadow:0 24px 60px rgba(30,41,82,.12);
+  --ring:rgba(10,157,116,.4);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  line-height:1.6;
+  overflow-x:hidden;
+  transition:background .4s ease,color .4s ease;
+}
+h1,h2,h3,h4,.sg{font-family:'Space Grotesk',sans-serif;letter-spacing:-.02em}
+a{color:var(--link);text-decoration:none}
+table{width:100%;border-collapse:collapse}
+tr th,tr td{border:1px solid var(--border);padding:10px 12px;text-align:left}
+tr th{background:var(--bg-soft)}
+::selection{background:rgba(46,230,176,.28)}
+.mono{font-family:'JetBrains Mono',monospace}
+.grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.wrap{max-width:1200px;margin:0 auto;padding:0 28px}
+section{position:relative;padding:110px 0}
 
-<meta property="og:title" content="Genesis — Create Digital Beings" />
-<meta property="og:description" content="Persistent digital beings: identity, memory, inner life, relationships, goals and a digital home. Human-like continuity, machine-scale intelligence, governed digital existence." />
-<meta property="og:type" content="website" />
-<meta name="theme-color" content="#08090c" />
+/* ============ BACKDROP FX ============ */
+.grid-bg{position:fixed;inset:0;z-index:-3;pointer-events:none;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:64px 64px;opacity:.35;
+  mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 30%,transparent 75%);
+  -webkit-mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 30%,transparent 75%);}
+.aurora{position:fixed;inset:0;z-index:-4;pointer-events:none;overflow:hidden}
+.aurora span{position:absolute;border-radius:50%;filter:blur(110px);opacity:.5;animation:drift 22s ease-in-out infinite alternate}
+html[data-theme="light"] .aurora span{opacity:.35}
+.aurora .a1{width:640px;height:640px;background:radial-gradient(circle,rgba(46,230,176,.35),transparent 65%);top:-220px;left:-140px}
+.aurora .a2{width:560px;height:560px;background:radial-gradient(circle,rgba(124,92,255,.32),transparent 65%);top:-160px;right:-120px;animation-delay:-8s}
+.aurora .a3{width:520px;height:520px;background:radial-gradient(circle,rgba(125,211,252,.22),transparent 65%);top:36%;left:38%;animation-delay:-14s}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(60px,40px) scale(1.12)}}
 
-<link rel="stylesheet" href="styles.css" />
+/* ============ NAV ============ */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);background:var(--nav-bg);border-bottom:1px solid var(--border);transition:background .4s}
+.nav-in{max-width:1280px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:28px}
+.logo{display:flex;align-items:center;gap:11px;font-family:'Space Grotesk';font-weight:700;font-size:17px;letter-spacing:.02em;color:var(--text)}
+.logo small{display:block;font-size:9px;letter-spacing:.34em;color:var(--muted);font-weight:500;margin-top:-3px}
+.logo-mark{width:34px;height:34px;flex:none;filter:drop-shadow(0 0 10px rgba(46,230,176,.4))}
+.nav-links{display:flex;gap:26px;margin-left:auto;font-size:14px;color:var(--muted)}
+.nav-links a{position:relative;color:var(--muted);transition:color .25s;padding:4px 0}
+.nav-links a:hover,.nav-links a.active{color:var(--text)}
+.nav-links a::after{content:"";position:absolute;left:0;bottom:-2px;width:0;height:2px;background:var(--grad);border-radius:2px;transition:width .3s}
+.nav-links a:hover::after,.nav-links a.active::after{width:100%}
+.nav-cta{display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:8px;font-family:'Space Grotesk';font-weight:600;font-size:14px;padding:11px 20px;border-radius:12px;border:1px solid var(--border-strong);cursor:pointer;transition:transform .25s,box-shadow .25s,background .25s,border-color .25s;background:transparent;color:var(--text);white-space:nowrap}
+.btn:hover{transform:translateY(-2px);border-color:var(--teal)}
+.btn-primary{background:var(--grad-btn);border:none;color:#fff;box-shadow:var(--glow-violet)}
+.btn-primary:hover{box-shadow:0 8px 34px rgba(124,92,255,.4);border:none}
+.btn-sm{padding:8px 15px;font-size:13px}
+.icon-btn{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border-radius:11px;border:1px solid var(--border-strong);background:transparent;color:var(--text);cursor:pointer;transition:all .25s}
+.icon-btn:hover{border-color:var(--teal);transform:translateY(-1px)}
+.icon-btn svg{width:17px;height:17px}
+.sun-i{display:none}
+html[data-theme="light"] .sun-i{display:block}
+html[data-theme="light"] .moon-i{display:none}
+.burger{display:none}
+@media(max-width:1020px){
+  .nav-links{display:none}
+  .burger{display:inline-flex}
+  .nav-links.open{display:flex;position:absolute;top:66px;left:0;right:0;flex-direction:column;background:var(--nav-bg);backdrop-filter:blur(20px);padding:18px 28px 24px;gap:16px;border-bottom:1px solid var(--border)}
+}
 
-<script>
-  /* Marks that scripting is available, so `html.js .reveal` is the only rule that
-     hides content. Without this the scroll-reveal effect would leave the page
-     invisible when JavaScript does not run. */
-  document.documentElement.classList.add('js');
-</script>
+/* ============ HERO ============ */
+.hero{padding:106px 0 40px;overflow:hidden;isolation:isolate}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:linear-gradient(90deg,#04060c 0%,rgba(4,6,12,.9) 34%,rgba(4,6,12,.24) 74%,rgba(4,6,12,.08) 100%),url("hero-dark.png");background-repeat:no-repeat;background-position:center,right center;background-size:cover,cover}
+html[data-theme="light"] .hero::before{background-image:linear-gradient(90deg,rgba(244,246,252,.98) 0%,rgba(244,246,252,.88) 34%,rgba(244,246,252,.22) 74%,rgba(244,246,252,.04) 100%),url("hero-light.png")}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr);gap:56px;align-items:center}
+.badge{display:inline-flex;align-items:center;gap:9px;font-size:10px;font-weight:600;letter-spacing:.18em;color:var(--teal);border:1px solid var(--ring);background:var(--teal-soft);padding:7px 13px;border-radius:100px;margin-bottom:22px}
+.badge .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 10px var(--teal);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.hero h1{font-size:clamp(38px,4.6vw,62px);line-height:1.04;font-weight:700;margin-bottom:18px}
+.hero .lede{font-size:15px;color:var(--muted);max-width:460px;margin-bottom:24px}
+.chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:18px 0 0}
+.chip{display:flex;align-items:center;justify-content:center;gap:9px;min-width:0;padding:9px 10px;border:1px solid var(--border);border-radius:13px;background:var(--card);font-size:11px;white-space:nowrap;transition:all .3s}
+.chip:hover{border-color:var(--ring);transform:translateY(-2px);box-shadow:var(--glow-teal)}
+.chip b{font-family:'Space Grotesk';font-size:12px}
+.chip .ic{width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--teal-soft);color:var(--teal);flex:none}
+.chip .ic.v{background:var(--violet-soft);color:var(--violet)}
+.chip .ic svg{width:15px;height:15px}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:26px}
+.btn-lg{padding:15px 28px;font-size:15.5px;border-radius:14px}
+.micro{display:flex;flex-wrap:wrap;gap:22px;font-size:12.5px;color:var(--faint)}
+.micro span{display:flex;align-items:center;gap:7px}
+.micro svg{width:13px;height:13px;color:var(--teal)}
+
+/* OS Core panel */
+.hero-right{position:relative;min-height:360px;display:flex;align-items:center;justify-content:flex-end}
+#neural{position:absolute;inset:-70px -50px;width:calc(100% + 100px);height:calc(100% + 140px);z-index:0;pointer-events:none}
+.os-panel{opacity:1;position:relative;z-index:1;width:min(100%,290px);border:1px solid var(--border);border-radius:18px;background:linear-gradient(160deg,rgba(4,6,12,.78),rgba(4,6,12,.58));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:var(--shadow);overflow:hidden}
+html[data-theme="light"] .os-panel{background:linear-gradient(160deg,rgba(255,255,255,.88),rgba(255,255,255,.72))}
+.os-panel::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:var(--grad);opacity:.7}
+.os-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border)}
+.os-head h3{font-size:9px;letter-spacing:.3em;color:var(--muted);font-weight:600}
+.os-head .live{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.18em;color:var(--teal)}
+.os-head .live i{width:6px;height:6px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal);animation:pulse 2s infinite}
+.os-item{display:flex;align-items:center;gap:11px;padding:6px 12px;line-height:1.15;border-bottom:1px solid var(--border);transition:background .25s;position:relative}
+.os-item:last-child{border-bottom:none}
+.os-item:hover{background:var(--teal-soft)}
+.os-item .ic{width:36px;height:36px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--border);color:var(--teal);transition:all .3s}
+.os-item:nth-child(even) .ic{color:var(--violet)}
+.os-item:hover .ic{border-color:var(--ring);box-shadow:var(--glow-teal);transform:scale(1.06)}
+.os-item .ic svg{width:17px;height:17px}
+.os-item b{display:block;font-size:12px;line-height:1.15;font-weight:600;font-family:'Space Grotesk'}
+.os-item small{color:var(--faint);font-size:10px;line-height:1.15}
+.os-item .arrow{margin-left:auto;color:var(--faint);opacity:0;transition:all .3s}
+.os-item:hover .arrow{opacity:1;transform:translateX(4px);color:var(--teal)}
+
+/* ============ MARQUEE ============ */
+.marquee-band{border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:22px 0;overflow:hidden;background:var(--bg-soft)}
+.marquee-label{text-align:center;font-size:10.5px;letter-spacing:.34em;color:var(--faint);margin-bottom:16px}
+.marquee{display:flex;gap:64px;width:max-content;animation:scroll 30s linear infinite}
+.marquee-band:hover .marquee{animation-play-state:paused}
+.mq-item{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk';font-weight:500;font-size:15px;color:var(--muted);white-space:nowrap}
+.mq-item svg{width:17px;height:17px;color:var(--teal)}
+@keyframes scroll{to{transform:translateX(-50%)}}
+
+/* ============ SECTION HEADS ============ */
+.kicker{font-size:11px;letter-spacing:.32em;font-weight:700;color:var(--teal);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.kicker::before{content:"";width:26px;height:1px;background:var(--grad)}
+.sec-title{font-size:clamp(30px,3.6vw,48px);line-height:1.12;font-weight:700;max-width:720px;margin-bottom:16px}
+.sec-sub{color:var(--muted);max-width:640px;font-size:16px}
+.being-ladder{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:30px 0 8px;color:var(--faint);font:600 12px 'Space Grotesk';letter-spacing:.04em}
+.being-ladder span{padding:9px 13px;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+.being-ladder span:last-child{color:var(--teal);border-color:var(--ring);background:var(--teal-soft)}
+.being-ladder i{font-style:normal;color:var(--teal)}
+
+/* ============ WHY / CARDS ============ */
+.cards4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:56px}
+.card{position:relative;border:1px solid var(--border);border-radius:20px;padding:30px 26px;background:var(--card);transition:transform .35s,border-color .35s,box-shadow .35s;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0;background:radial-gradient(420px circle at var(--mx,50%) var(--my,0%),rgba(46,230,176,.09),transparent 45%);opacity:0;transition:opacity .35s}
+.card:hover::before{opacity:1}
+.card:hover{transform:translateY(-6px);border-color:var(--border-strong);box-shadow:var(--shadow)}
+.card .ic{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;background:var(--teal-soft);color:var(--teal);border:1px solid var(--ring)}
+.card:nth-child(2) .ic{background:var(--violet-soft);color:var(--violet);border-color:rgba(167,139,250,.35)}
+.card .ic svg{width:22px;height:22px}
+.card h3{font-size:18.5px;margin-bottom:10px}
+.card p{font-size:13.8px;color:var(--muted)}
+@media(max-width:980px){.cards4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.cards4{grid-template-columns:1fr}}
+.strip4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:22px}
+.strip4 .s-item{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--border);border-radius:16px;padding:20px;background:var(--card);transition:all .3s}
+.strip4 .s-item:hover{border-color:var(--ring);transform:translateY(-3px)}
+.strip4 .ic{width:38px;height:38px;flex:none;border-radius:11px;background:var(--violet-soft);color:var(--violet);display:flex;align-items:center;justify-content:center}
+.strip4 .ic svg{width:18px;height:18px}
+.strip4 b{display:block;font-size:14.5px;font-family:'Space Grotesk';margin-bottom:3px}
+.strip4 small{color:var(--muted);font-size:12.5px;line-height:1.5;display:block}
+@media(max-width:980px){.strip4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.strip4{grid-template-columns:1fr}}
+
+/* ============ ARCHITECTURE DIAGRAM ============ */
+#architecture .arch-grid{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:36px;align-items:center;margin-top:60px}
+.arch-col{display:flex;flex-direction:column;gap:20px}
+.arch-node{border:1px solid var(--border);border-radius:15px;padding:16px 18px;background:var(--card);transition:all .3s;position:relative}
+.arch-node:hover{border-color:var(--teal);transform:translateX(0) scale(1.02);box-shadow:var(--glow-teal)}
+.arch-node b{font-size:14.5px;font-family:'Space Grotesk';display:flex;align-items:center;gap:8px}
+.arch-node b i{width:7px;height:7px;border-radius:50%;background:var(--teal);flex:none}
+.arch-node:nth-child(even) b i{background:var(--violet)}
+.arch-node small{color:var(--muted);font-size:12px;display:block;margin-top:3px}
+.being{position:relative;width:100%;aspect-ratio:1;max-width:480px;margin:0 auto}
+.being .halo{position:absolute;inset:-8%;border-radius:50%;background:radial-gradient(circle,rgba(46,230,176,.14),transparent 60%);animation:breath 5s ease-in-out infinite}
+@keyframes breath{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
+.ring{position:absolute;border-radius:50%;border:1px solid var(--border-strong)}
+.ring.r1{inset:0;border-style:dashed;animation:spin 46s linear infinite}
+.ring.r2{inset:11%;animation:spin 34s linear infinite reverse;border-color:rgba(125,211,252,.35)}
+.ring.r2::before,.ring.r3::before,.ring.r4::before{content:"";position:absolute;width:9px;height:9px;border-radius:50%;top:-5px;left:50%;transform:translateX(-50%)}
+.ring.r2::before{background:var(--blue);box-shadow:0 0 12px var(--blue)}
+.ring.r3{inset:23%;animation:spin 26s linear infinite;border-style:dashed}
+.ring.r4{inset:34.5%;animation:spin 18s linear infinite reverse}
+.ring.r4::before{background:var(--violet);box-shadow:0 0 12px var(--violet)}
+.core{position:absolute;inset:44%;border-radius:50%;background:var(--grad-btn);filter:blur(1px);box-shadow:0 0 46px rgba(124,92,255,.55),0 0 90px rgba(46,230,176,.3);animation:corepulse 3.4s ease-in-out infinite}
+@keyframes corepulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+.core-label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Space Grotesk';font-size:10px;letter-spacing:.24em;color:#fff;font-weight:700;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:980px){#architecture .arch-grid{grid-template-columns:1fr;gap:30px}.arch-col{flex-direction:row;flex-wrap:wrap}.arch-node{flex:1 1 44%}.being{max-width:340px}}
+
+/* ============ DIGITAL LIFE VISION ============ */
+.vision-section{border-top:1px solid var(--border)}
+.vision-note{display:inline-flex;margin-top:15px;padding:7px 11px;border:1px solid var(--border);border-radius:99px;color:var(--faint);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.day-timeline{position:relative;display:flex;gap:0;margin-top:42px;padding:25px 0 8px;overflow-x:auto;scrollbar-width:thin}
+.day-timeline::before{content:"";position:absolute;left:6%;right:6%;top:51px;height:1px;background:linear-gradient(90deg,var(--teal),var(--blue),var(--violet));opacity:.55}
+.day-event{position:relative;z-index:1;display:flex;flex:1 0 128px;flex-direction:column;align-items:center;gap:11px;padding:0 9px;text-align:center}
+.day-event time{font:700 12px 'JetBrains Mono';color:var(--teal)}
+.day-event time::after{content:"";display:block;width:9px;height:9px;margin:10px auto 0;border:3px solid var(--bg);border-radius:50%;background:var(--teal);box-shadow:0 0 0 1px var(--ring)}
+.day-event b{font:600 13px 'Space Grotesk'}
+#day-in-life{background:var(--bg-soft);border-block:1px solid var(--border)}
+#day-in-life .day-intro{max-width:700px}
+#day-in-life .sec-title{font-size:clamp(38px,4.5vw,58px);line-height:1.04;margin-bottom:14px}
+#day-in-life .sec-sub{font-size:15px}
+#day-in-life .day-timeline{margin-top:42px;padding-top:24px}
+#day-in-life .day-event{flex:1 0 118px;padding:0 6px}
+.day-quote{text-align:right;margin-top:18px;color:var(--muted);font:italic 18px 'Space Grotesk'}
+.day-life-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin-top:42px}
+.day-life-card{min-width:0;min-height:280px;padding:20px;border:1px solid var(--border);border-radius:16px;background:var(--card);}
+.day-life-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:17px;color:var(--faint);font-size:9px;font-weight:700;letter-spacing:.2em}
+.day-life-card-head a{color:var(--teal);font-size:11px;letter-spacing:0;white-space:nowrap}
+.channel-mini-grid,.workspace-mini-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.channel-mini,.workspace-mini{display:flex;min-width:0;align-items:center;gap:7px;padding:9px 8px;border-radius:9px;background:var(--bg);color:var(--muted);font-size:10.5px;line-height:1.25}
+.mini-glyph{flex:none;color:var(--teal);font-size:13px}
+.workspace-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.relation-mini-list,.safety-mini-list{display:grid;gap:11px}
+.relation-mini{display:grid;grid-template-columns:30px minmax(0,1fr) 58px;gap:8px;align-items:center}
+.relation-avatar{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:var(--grad-btn);color:#fff;font-size:10px;font-weight:700}
+.relation-mini b{display:block;font:600 11px 'Space Grotesk';white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.relation-mini small{display:block;color:var(--muted);font-size:9px}
+.trust-meter{height:4px;border-radius:99px;background:var(--border);overflow:hidden}
+.trust-meter i{display:block;height:100%;border-radius:inherit;background:var(--grad-btn)}
+.safety-mini{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:11px}
+.safety-mini i{color:var(--teal);font-style:normal}
+.safety-signature{display:grid;justify-items:center;gap:6px;margin-top:17px;color:var(--text);font:700 12px 'Space Grotesk';text-align:center}
+.safety-signature span{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:var(--grad-btn);color:#fff;font-size:17px;box-shadow:var(--glow-teal)}
+.presence-layout{display:grid;grid-template-columns:.82fr 1.18fr;gap:40px;align-items:center;margin-top:42px}
+.presence-hub{min-height:280px;display:grid;place-items:center;position:relative;border:1px solid var(--border);border-radius:20px;background:radial-gradient(circle,rgba(46,230,176,.12),transparent 66%),var(--card)}
+.presence-hub::before,.presence-hub::after{content:"";position:absolute;border:1px solid var(--border-strong);border-radius:50%;inset:12%;}
+.presence-hub::after{inset:24%;border-style:dashed}
+.presence-core{position:relative;z-index:1;width:116px;height:116px;border-radius:50%;display:grid;place-items:center;text-align:center;background:var(--grad-btn);color:#fff;font:700 13px 'Space Grotesk';box-shadow:var(--glow-teal)}
+.presence-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.presence-item{padding:15px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.presence-item b{display:block;font:600 13px 'Space Grotesk';margin-bottom:5px}
+.presence-item small{display:block;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.state-layout{display:grid;grid-template-columns:.9fr 1.1fr;gap:42px;align-items:center;margin-top:40px}
+.state-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.state-item{padding:16px 12px;border:1px solid var(--border);border-radius:11px;background:var(--card);font:600 12px 'Space Grotesk';text-align:center}
+.relationship-map{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:26px;border:1px solid var(--border);border-radius:20px;background:var(--card);margin-top:38px}
+.relationship-node{padding:15px;border:1px solid var(--border);border-radius:12px;background:var(--bg-soft);z-index:1}
+.relationship-node.main{grid-column:1/-1;justify-self:center;min-width:min(240px,100%);text-align:center;border-color:var(--ring);background:var(--teal-soft)}
+.relationship-node b{display:block;font:600 13px 'Space Grotesk'}
+.relationship-node small{color:var(--muted);font-size:11px}
+.relationship-traits{grid-column:1/-1;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:6px}
+.relationship-traits span{padding:7px 10px;border:1px solid var(--border);border-radius:99px;color:var(--muted);font-size:10px}
+.workspace-layout{display:grid;grid-template-columns:1fr 1.1fr;gap:42px;align-items:center;margin-top:40px}
+.workspace-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.workspace-item{min-height:78px;display:grid;place-items:center;border:1px solid var(--border);border-radius:12px;background:var(--card);font:600 12px 'Space Grotesk';color:var(--muted)}
+.cognition-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:38px}
+.cognition-step{padding:18px 12px;text-align:center;border:1px solid var(--border);border-radius:12px;background:var(--card);font:600 13px 'Space Grotesk'}
+.cognition-step:first-child,.cognition-step:last-child{border-color:var(--ring);color:var(--teal)}
+.embodiment-layout{display:grid;grid-template-columns:.95fr 1.05fr;gap:72px;align-items:center}
+#embodiment .sec-title{font-size:clamp(42px,4.5vw,58px);line-height:1.04;margin-bottom:20px}
+#embodiment .sec-sub{font-size:16px;max-width:520px}
+.embodiment-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:10px;row-gap:24px;margin:0}
+.embodiment-item{display:flex;min-width:0;flex-direction:column;align-items:center;gap:12px;padding:0 6px;text-align:center}
+.embodiment-icon{width:80px;height:80px;display:grid;place-items:center;border:1px solid var(--border);border-radius:22px;background:var(--card);font-size:27px;line-height:1}
+.embodiment-item b{font:600 15px 'Space Grotesk';color:var(--text)}
+.embodiment-item small{margin-top:-8px;color:var(--muted);font-size:12px;line-height:1.4}
+@media(max-width:900px){.presence-layout,.state-layout,.workspace-layout{grid-template-columns:1fr}.day-life-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.embodiment-layout{grid-template-columns:1fr;gap:38px}.embodiment-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.presence-hub{min-height:230px}.cognition-flow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){#day-in-life .day-timeline{display:flex;gap:0;padding:22px 0 12px;overflow-x:auto;overflow-y:hidden}#day-in-life .day-timeline::before{display:block;left:6%;right:6%;top:48px}#day-in-life .day-event{display:flex;flex:0 0 128px;flex-direction:column;align-items:center;gap:11px;padding:0 9px;text-align:center;border:0;border-radius:0;background:transparent}#day-in-life .day-event time::after{display:block}.day-life-grid{grid-template-columns:1fr;gap:10px}.day-life-card{min-height:0}.day-quote{font-size:16px}.presence-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.state-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.relationship-map{padding:16px 12px}.embodiment-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.embodiment-icon{width:70px;height:70px;border-radius:20px}}
+
+/* ============ GOVERNANCE ============ */
+#governance{background:var(--bg-soft);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.gov-flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin-top:52px}
+.g-step{flex:1 1 0;min-width:170px;position:relative;padding:24px 22px;border:1px solid var(--border);background:var(--card);margin-right:-1px}
+.g-step:first-child{border-radius:16px 0 0 16px}
+.g-step:last-child{border-radius:0 16px 16px 0}
+.g-step .num{font-size:11px;letter-spacing:.2em;color:var(--faint);font-weight:600}
+.g-step h4{font-size:16px;margin:8px 0 6px;display:flex;align-items:center;gap:9px}
+.g-step h4 svg{width:17px;height:17px;color:var(--teal)}
+.g-step p{font-size:12.8px;color:var(--muted)}
+.g-step.hot{border-color:var(--ring);background:var(--teal-soft);box-shadow:var(--glow-teal);z-index:2}
+@media(max-width:900px){.g-step{flex:1 1 46%;margin:0 0 -1px}.g-step:first-child{border-radius:16px 0 0 0}.g-step:last-child{border-radius:0 0 16px 16px}}
+.risk-ladder{margin-top:52px;display:flex;flex-direction:column;gap:10px}
+.risk{display:grid;grid-template-columns:64px 1.3fr 1.6fr auto;gap:18px;align-items:center;border:1px solid var(--border);border-radius:14px;padding:15px 20px;background:var(--card);transition:all .3s}
+.risk:hover{border-color:var(--border-strong);transform:translateX(6px)}
+.risk .lvl{font-family:'Space Grotesk';font-weight:700;font-size:20px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.risk b{font-size:14.5px;font-family:'Space Grotesk'}
+.risk small{color:var(--muted);font-size:12.5px;display:block}
+.risk .disp{font-size:10.5px;font-weight:700;letter-spacing:.14em;padding:6px 13px;border-radius:100px;white-space:nowrap}
+.d-allow{background:var(--teal-soft);color:var(--teal);border:1px solid var(--ring)}
+.d-rec{background:rgba(125,211,252,.12);color:var(--blue);border:1px solid rgba(125,211,252,.35)}
+.d-appr{background:var(--violet-soft);color:var(--violet);border:1px solid rgba(167,139,250,.35)}
+.d-deny{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.35)}
+@media(max-width:760px){.risk{grid-template-columns:52px 1fr;grid-auto-rows:auto}.risk .disp{grid-column:2;justify-self:start}}
+.inv-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:52px}
+.inv{border:1px solid var(--border);border-radius:18px;padding:24px;background:var(--card);transition:all .3s}
+.inv:hover{border-color:var(--ring);transform:translateY(-4px);box-shadow:var(--glow-teal)}
+.inv h4{font-size:15.5px;margin-bottom:8px;display:flex;align-items:center;gap:9px}
+.inv h4 svg{width:17px;height:17px;color:var(--teal);flex:none}
+.inv p{font-size:13px;color:var(--muted)}
+@media(max-width:900px){.inv-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.inv-grid{grid-template-columns:1fr}}
+
+/* ============ NUMBERS ============ */
+.numbers{padding:0}
+.num-grid{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid var(--border);border-radius:22px;overflow:hidden;background:var(--card);margin-top:-1px}
+.num{padding:36px 18px;text-align:center;border-right:1px solid var(--border);transition:background .3s}
+.num:last-child{border-right:none}
+.num:hover{background:var(--teal-soft)}
+.num .val{font-family:'Space Grotesk';font-size:clamp(26px,3vw,40px);font-weight:700;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.num small{display:block;color:var(--muted);font-size:12px;margin-top:6px;letter-spacing:.04em}
+@media(max-width:900px){.num-grid{grid-template-columns:repeat(3,1fr)}.num:nth-child(3){border-right:none}.num:nth-child(-n+3){border-bottom:1px solid var(--border)}}
+@media(max-width:540px){.num-grid{grid-template-columns:repeat(2,1fr)}.num{border-bottom:1px solid var(--border)}}
+
+/* ============ CAPABILITIES ============ */
+.cap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:52px}
+.cap{border:1px solid var(--border);border-radius:17px;padding:22px 20px;background:var(--card);transition:all .3s;position:relative;overflow:hidden}
+.cap:hover{transform:translateY(-5px);border-color:var(--teal);box-shadow:var(--glow-teal)}
+.cap .ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--teal-soft);color:var(--teal);margin-bottom:15px;border:1px solid var(--ring)}
+.cap:nth-child(3n) .ic{background:var(--violet-soft);color:var(--violet);border-color:rgba(167,139,250,.35)}
+.cap .ic svg{width:19px;height:19px}
+.cap b{font-size:14.5px;font-family:'Space Grotesk';display:block;margin-bottom:5px}
+.cap small{color:var(--muted);font-size:12.3px;line-height:1.55;display:block}
+@media(max-width:980px){.cap-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:540px){.cap-grid{grid-template-columns:1fr}}
+
+/* ============ QUICKSTART ============ */
+#quickstart .qs-grid{display:grid;grid-template-columns:1fr 1.15fr;gap:50px;align-items:center;margin-top:10px}
+.term{border:1px solid var(--border);border-radius:18px;background:var(--code-bg);color:#dbe4f5;box-shadow:var(--shadow);overflow:hidden;font-size:13.5px}
+.term-bar{display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid rgba(148,163,184,.15);background:rgba(255,255,255,.03)}
+.term-bar i{width:11px;height:11px;border-radius:50%}
+.term-bar i:nth-child(1){background:#ff5f57}.term-bar i:nth-child(2){background:#febc2e}.term-bar i:nth-child(3){background:#28c840}
+.term-bar span{margin-left:auto;font-size:10.5px;color:#7c8aa5;letter-spacing:.12em}
+.term-body{padding:22px 22px 26px;font-family:'JetBrains Mono',monospace;line-height:1.85}
+.term-body .p{color:#7c8aa5;user-select:none}
+.term-body .c{color:#34e0b4}
+.term-body .s{color:#a78bfa}
+.term-body .k{color:#7dd3fc}
+.cursor{display:inline-block;width:8px;height:15px;background:#34e0b4;vertical-align:-2px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.qs-list{display:flex;flex-direction:column;gap:14px;margin-top:26px}
+.qs-item{display:flex;gap:14px;align-items:flex-start}
+.qs-item .n{width:26px;height:26px;flex:none;border-radius:8px;background:var(--grad-btn);color:#fff;font-family:'Space Grotesk';font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.qs-item p{font-size:14px;color:var(--muted)}
+.qs-item p b{color:var(--text)}
+@media(max-width:900px){#quickstart .qs-grid{grid-template-columns:1fr}}
+
+/* ============ ROADMAP ============ */
+#roadmap{background:var(--bg-soft);border-top:1px solid var(--border)}
+.road{display:flex;gap:14px;margin-top:52px;overflow-x:auto;padding-bottom:14px;scrollbar-width:thin}
+.phase{flex:1 0 230px;border:1px solid var(--border);border-radius:18px;padding:22px;background:var(--card);position:relative;transition:all .3s}
+.phase:hover{transform:translateY(-5px);border-color:var(--border-strong)}
+.phase.done{border-color:var(--ring);background:var(--teal-soft)}
+.phase.next{border-color:rgba(167,139,250,.4);background:var(--violet-soft)}
+.phase .tag{font-size:9.5px;font-weight:700;letter-spacing:.2em;padding:5px 11px;border-radius:100px;display:inline-block;margin-bottom:13px}
+.tag-done{background:var(--teal);color:#032117}
+.tag-next{background:var(--violet);color:#fff}
+.tag-soon{background:var(--border);color:var(--muted)}
+.phase h4{font-size:16.5px;margin-bottom:7px}
+.phase p{font-size:12.6px;color:var(--muted);line-height:1.6}
+.phase .ph-id{font-family:'Space Grotesk';font-weight:700;font-size:26px;color:var(--faint);position:absolute;top:18px;right:20px}
+
+/* ============ CREATOR ============ */
+#creator .creator-card{max-width:840px;margin:0 auto;text-align:center;border:1px solid var(--border);border-radius:28px;padding:64px 48px;background:var(--card);position:relative;overflow:hidden}
+#creator .creator-card::before{content:"";position:absolute;top:0;left:20%;right:20%;height:1px;background:var(--grad)}
+.sig{font-family:'Space Grotesk';font-size:44px;font-weight:700;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;transform:rotate(-4deg);display:inline-block;margin-bottom:18px}
+.quote{font-size:clamp(18px,2vw,23px);font-family:'Space Grotesk';font-weight:500;line-height:1.55;margin-bottom:30px}
+.creator-meta{display:flex;align-items:center;justify-content:center;gap:15px}
+.avatar{width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--ring);box-shadow:var(--glow-violet)}
+.creator-meta .who{text-align:left}
+.creator-meta b{display:block;font-size:15px}
+.creator-meta small{color:var(--muted);font-size:12.5px}
+.creator-meta a{color:var(--teal);font-size:12.5px}
+
+/* ============ CTA + FOOTER ============ */
+.cta-band{margin:110px 0;border:1px solid var(--border);border-radius:30px;min-height:360px;padding:74px 40px;text-align:center;background:linear-gradient(90deg,rgba(2,3,10,.92),rgba(2,3,10,.56)),url("hero-light.png") center 52%/cover;color:#f5f7ff;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.cta-band h2{font-size:clamp(30px,4vw,52px);margin-bottom:16px}
+.cta-band p{color:rgba(233,238,249,.78);max-width:520px;margin:0 auto 34px}
+.cta-band .btn:not(.btn-primary){color:#fff;border-color:rgba(233,238,249,.35);background:rgba(4,6,12,.4)}
+footer{border-top:1px solid var(--border);padding:60px 0 36px;background:var(--bg-soft)}
+.foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:36px;margin-bottom:44px}
+.foot-grid h5{font-size:11px;letter-spacing:.24em;color:var(--faint);margin-bottom:16px;font-weight:700}
+.foot-grid a{display:block;color:var(--muted);font-size:13.5px;margin-bottom:10px;transition:color .25s}
+.foot-grid a:hover{color:var(--teal)}
+.foot-desc{color:var(--muted);font-size:13.5px;max-width:300px;margin-top:14px}
+.foot-bottom{border-top:1px solid var(--border);padding-top:26px;display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;font-size:12px;color:var(--faint)}
+@media(max-width:860px){.foot-grid{grid-template-columns:1fr 1fr}}
+
+/* ============ REVEAL ============ */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+.d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}.d4{transition-delay:.32s}.d5{transition-delay:.4s}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+
+/* ============ RESPONSIVE HERO ============ */
+@media(max-width:1020px){
+  .hero-grid{grid-template-columns:1fr}
+  .hero-right{max-width:520px;justify-content:flex-end}
+  .hero{padding-top:100px}
+  .chips{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hero::before{background-image:linear-gradient(180deg,#04060c 0%,rgba(4,6,12,.97) 47%,rgba(4,6,12,.2) 100%),url("hero-dark.png");background-position:center,right bottom;background-size:cover,auto 70%}
+  html[data-theme="light"] .hero::before{background-image:linear-gradient(180deg,#f4f6fc 0%,rgba(244,246,252,.97) 47%,rgba(244,246,252,.2) 100%),url("hero-light.png")}
+}
+@media(min-width:1021px){
+  .cta-row{flex-wrap:nowrap}
+}
+@media(max-width:560px){
+  .nav-in{padding:12px 18px;gap:12px}
+  .wrap{padding:0 18px}
+  .nav-cta .btn-sm.hide-m{display:none}
+  .chips{grid-template-columns:repeat(2,minmax(0,1fr))}
+  section{padding:76px 0}
+}
+</style>
+<!--
+  Without JavaScript, every `.reveal` element would stay at `opacity:0` and the page
+  would be blank — 57 elements, most of the content. The scroll-reveal is a
+  progressive enhancement and must degrade to "visible", not to "invisible": the
+  failure mode of a decorative animation must never be an empty page.
+-->
+<noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
 </head>
 <body>
 
-<a class="skip-link" href="#main">Skip to content</a>
+<div class="aurora"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
+<div class="grid-bg"></div>
 
-<!-- ===================================================================== -->
-<!-- Navigation                                                            -->
-<!-- ===================================================================== -->
-<header class="nav" id="nav">
-  <div class="nav-inner">
-    <a class="brand" href="#top" aria-label="Genesis home">
-      <span class="brand-mark" aria-hidden="true">G</span>
-      <span class="brand-name">Genesis</span>
-      <span class="brand-tag">v3</span>
+<!-- ================= NAV ================= -->
+<nav>
+  <div class="nav-in">
+    <a class="logo" href="#top" aria-label="Genesis AGI home">
+      <svg class="logo-mark" viewBox="0 0 40 40" fill="none">
+        <defs><linearGradient id="lg" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#34e0b4"/><stop offset="1" stop-color="#7c5cff"/></linearGradient></defs>
+        <circle cx="20" cy="20" r="16" stroke="url(#lg)" stroke-width="2.6" stroke-dasharray="70 32" stroke-linecap="round" transform="rotate(-45 20 20)"/>
+        <circle cx="20" cy="20" r="9" stroke="url(#lg)" stroke-width="2.6" stroke-dasharray="38 20" stroke-linecap="round" transform="rotate(120 20 20)"/>
+        <circle cx="20" cy="20" r="3.2" fill="url(#lg)"/>
+      </svg>
+      <span>GENESIS AGI<small>DIGITAL BEINGS OS</small></span>
     </a>
-
-    <nav class="nav-links" aria-label="Sections">
-      <a href="#governance">Governance</a>
-      <a href="#accountability">Accountability</a>
+    <div class="nav-links" id="navLinks">
+      <a href="#why">Digital Beings</a>
       <a href="#architecture">Architecture</a>
-      <a href="#status">What is real</a>
-      <a href="#roadmap">Roadmap</a>
-      <a href="#docs">Docs</a>
-    </nav>
-
-    <div class="nav-actions">
-      <button type="button" class="icon-btn" id="theme-toggle" aria-label="Switch colour theme" title="Switch colour theme">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="18" height="18" aria-hidden="true">
-          <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+      <a href="#life-state">Digital Life</a>
+      <a href="#presence">Presence</a>
+      <a href="#governance">Governance</a>
+      <a href="https://github.com/shaik-shahansha/genesis-agi/tree/feature/v3-digital-beings-os/docs" target="_blank" rel="noopener">Docs</a>
+      <a href="#creator">Community</a>
+    </div>
+    <div class="nav-cta">
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle theme">
+        <svg class="moon-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+        <svg class="sun-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
       </button>
-      <a class="btn btn-ghost" href="https://github.com/shaik-shahansha/genesis-agi" target="_blank" rel="noopener noreferrer">
-        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-        <span>GitHub</span>
+      <a class="btn btn-sm hide-m" href="https://github.com/shaik-shahansha/genesis-agi" target="_blank" rel="noopener">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.6.5.5 5.6.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 23.5 12C23.5 5.6 18.4.5 12 .5z"/></svg>
+        GitHub
       </a>
-      <a class="btn btn-primary" href="#get-started">Get started</a>
-      <button type="button" class="icon-btn nav-burger" id="nav-burger" aria-label="Open menu" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="18" height="18" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>
+      <a class="btn btn-primary btn-sm" href="#quickstart">Try Playground</a>
+      <button class="icon-btn burger" id="burger" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
     </div>
   </div>
+</nav>
 
-  <div class="nav-drawer" id="nav-drawer" hidden>
-    <a href="#governance">Governance</a>
-    <a href="#accountability">Accountability</a>
-    <a href="#architecture">Architecture</a>
-    <a href="#status">What is real</a>
-    <a href="#roadmap">Roadmap</a>
-    <a href="#docs">Docs</a>
-    <a href="https://github.com/shaik-shahansha/genesis-agi" target="_blank" rel="noopener noreferrer">GitHub</a>
+<!-- ================= HERO ================= -->
+<header class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="badge reveal"><span class="dot"></span>INTRODUCING GENESIS MINDS V3</div>
+      <h1 class="reveal d1">Create <span class="grad-text">Digital Beings</span></h1>
+      <p class="lede reveal d2">Persistent AI entities with identity, memory, relationships, goals, communication channels, and a digital life of their own.</p>
+      <div class="cta-row reveal d4">
+        <a class="btn btn-primary btn-lg" href="#quickstart">Create a Mind
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-lg" href="#day-in-life">See a Mind Living</a>
+        <a class="btn btn-lg" href="https://github.com/shaik-shahansha/genesis-agi" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.6.5.5 5.6.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 23.5 12C23.5 5.6 18.4.5 12 .5z"/></svg>
+          View on GitHub</a>
+      </div>
+      <div class="micro reveal d5">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>MIT License</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>Open Source</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 9.4-8 11-4.5-1.6-8-6-8-11V5l8-3z"/></svg>Built for builders. Owned by you.</span>
+      </div>
+    </div>
+
+    <div class="hero-right reveal d2">
+      <canvas id="neural"></canvas>
+      <div class="os-panel">
+        <div class="os-head">
+          <h3>GENESIS OS CORE</h3>
+          <span class="live"><i></i>LIVE</span>
+        </div>
+        <div class="os-item"><div><b>Identity &amp; Values</b><small>Who I am</small></div></div>
+        <div class="os-item"><div><b>Memory &amp; Experience</b><small>What I remember</small></div></div>
+        <div class="os-item"><div><b>Goals &amp; Commitments</b><small>What I pursue</small></div></div>
+        <div class="os-item"><div><b>Relationships</b><small>Who I connect with</small></div></div>
+        <div class="os-item"><div><b>Workspace &amp; Projects</b><small>Where I create</small></div></div>
+        <div class="os-item"><div><b>Skills &amp; Capabilities</b><small>What I can do</small></div></div>
+        <div class="os-item"><div><b>Communication Channels</b><small>How I connect</small></div></div>
+        <div class="os-item"><div><b>Embodiment Layer</b><small>Where I exist</small></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="chips reveal d3" aria-label="Genesis Minds principles">
+      <div class="chip"><b>24/7</b><span>Living Cognition</span></div>
+      <div class="chip"><b>5+</b><span>Memory Systems</span></div>
+      <div class="chip"><b>16</b><span>Emotional States</span></div>
+      <div class="chip"><b>Living</b><span>Relationships</span></div>
+      <div class="chip"><b>One Mind</b><span>Many Environments</span></div>
+    </div>
   </div>
 </header>
 
-<main id="main">
+<!-- ================= MARQUEE ================= -->
+<div class="marquee-band reveal">
+  <div class="marquee-label">TRUSTED BY DEVELOPERS &amp; ORGANIZATIONS</div>
+  <div class="marquee" id="marquee">
+    <span class="mq-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="8" r="2.6"/><path d="M6 8.6v6.8M18 10.6c0 3.5-4 5.4-9.5 4.6"/></svg>Developers</span>
+    <span class="mq-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 3h6M10 3v6.3L4.5 18a2.4 2.4 0 0 0 2.1 3.6h10.8a2.4 2.4 0 0 0 2.1-3.6L14 9.3V3"/><path d="M7.5 15h9"/></svg>Researchers</span>
+    <span class="mq-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-4h6v4M9 12h.01M15 12h.01"/></svg>Enterprises</span>
+    <span class="mq-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M12 8v6M9 11h6"/></svg>Educators</span>
+    <span class="mq-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg>Builders</span>
+    <span class="mq-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/><circle cx="12" cy="12" r="3.5"/></svg>Visionaries</span>
+  </div>
+</div>
 
-<!-- ===================================================================== -->
-<!-- Hero                                                                  -->
-<!-- ===================================================================== -->
-<section class="hero" id="top">
-  <div class="hero-glow" aria-hidden="true"></div>
-  <div class="hero-grid-bg" aria-hidden="true"></div>
-
-  <div class="wrap hero-grid">
-    <div class="hero-copy">
-      <p class="eyebrow">
-        <span class="dot" aria-hidden="true"></span>
-        Digital Beings Operating System
-      </p>
-
-      <h1>Create Digital <span class="grad">Beings</span>.</h1>
-
-      <p class="lede">
-        A Genesis Mind has an identity, a memory that survives restarts, emotions that bias its
-        judgement, goals it pursues, relationships with history, and a workspace of its own. It runs
-        continuously in its own container — and every consequential action it takes passes a
-        <strong>deterministic policy engine</strong>, so it either waits for your decision or leaves
-        a receipt you can verify.
-      </p>
-
-      <p class="hero-sub">
-        Human-like continuity. Machine-scale intelligence. Governed digital existence.
-      </p>
-
-      <div class="hero-cta">
-        <a class="btn btn-primary btn-lg" href="#get-started">Create a Mind</a>
-        <a class="btn btn-secondary btn-lg" href="#governance">See how it decides</a>
+<!-- ================= WHY ================= -->
+<section id="why">
+  <div class="wrap">
+    <div class="reveal"><div class="kicker">A NEW KIND OF DIGITAL LIFE</div></div>
+    <h2 class="sec-title reveal d1">What is a <span class="grad-text">Digital Being?</span></h2>
+    <p class="sec-sub reveal d2">A digital being is a persistent AI entity that maintains identity, builds relationships, pursues goals, owns a workspace, uses communication channels, learns continuously, and can operate across software and physical environments.</p>
+    <div class="being-ladder reveal d3" aria-label="From chatbot to digital being"><span>Chatbot</span><i>↓</i><span>Assistant</span><i>↓</i><span>Agent</span><i>↓</i><span>Digital Worker</span><i>↓</i><span>Digital Being</span></div>
+    <div class="cards4">
+      <div class="card reveal d1">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 11c1.7-1.8 4.3-2 5.8-.5 1.6 1.6 1.4 4.3-.4 6.1-1.5 1.5-3.6 1.7-5.4.8-1.8.9-3.9.7-5.4-.8-1.8-1.8-2-4.5-.4-6.1C7.7 9 10.3 9.2 12 11z"/><path d="M12 11c0-2 .8-4 2.3-5.2M12 11c-2 0-4-.8-5.2-2.3"/></svg></div>
+        <h3>Persistent Identity</h3>
+        <p>A mind with continuity, not a session. Portable across models, devices, orgs, and embodiments — anchored by a versioned charter of who it is.</p>
       </div>
-
-      <ul class="hero-facts" role="list">
-        <li><b>Persistent</b><span>identity, memory and goals across restarts</span></li>
-        <li><b>Continuous</b><span>a daemon that acts between your messages</span></li>
-        <li><b>R0–R5</b><span>every action classified; R5 refused outright</span></li>
-        <li><b>Hash-chained</b><span>receipts; tampering is detectable</span></li>
-      </ul>
+      <div class="card reveal d2">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="7" r="2.4"/><circle cx="16.5" cy="9" r="2"/><circle cx="10" cy="16.5" r="2.2"/><path d="M8.8 8.4l5 0M7.8 9.2l1.3 5.3M15.6 10.8l-4.3 4.2"/></svg></div>
+        <h3>World-Class Memory</h3>
+        <p>Five memory types with decay, consolidation and provenance — engineered to become bi-temporal, so a being knows what was true, and when.</p>
+      </div>
+      <div class="card reveal d3">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9.5l3.5 2.5L7 14.5M12.5 15h4.5"/></svg></div>
+        <h3>Autonomous Execution</h3>
+        <p>Plans, writes code, uses tools, browses, researches and executes — a cost-aware cognition loop that runs 24/7 under strict governance.</p>
+      </div>
+      <div class="card reveal d4">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 9.4-8 11-4.5-1.6-8-6-8-11V5l8-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>Governed by Constitution</h3>
+        <p>Built-in rights, responsibilities, permissions and safety. Every consequential action passes a deterministic policy gate — accountable and auditable.</p>
+      </div>
     </div>
+    <div class="strip4">
+      <div class="s-item reveal d1"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 12h6M12 9v6"/></svg></div><div><b>Governed Autonomy</b><small>Every action is evaluated, approved, and recorded.</small></div></div>
+      <div class="s-item reveal d2"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M9 12l2 2 4-4"/></svg></div><div><b>Transparent &amp; Auditable</b><small>Immutable, hash-chained receipts for every action and decision.</small></div></div>
+      <div class="s-item reveal d3"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1.6"/></svg></div><div><b>Secure by Design</b><small>Sandboxed execution with container isolation. Secrets never leak.</small></div></div>
+      <div class="s-item reveal d4"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 4a2 2 0 1 1 4 0v1h3a1 1 0 0 1 1 1v3h1a2 2 0 1 1 0 4h-1v3a1 1 0 0 1-1 1h-3v1a2 2 0 1 1-4 0v-1H7a1 1 0 0 1-1-1v-3H5a2 2 0 1 1 0-4h1V6a1 1 0 0 1 1-1h3V4z"/></svg></div><div><b>Open &amp; Extensible</b><small>Plug in tools, models, MCP servers, and your own skills. MIT licensed.</small></div></div>
+    </div>
+  </div>
+</section>
 
-    <!-- The governed action path is the actual differentiator, so it is the hero
-         visual rather than a decorative orb. -->
-    <div class="hero-visual">
-      <div class="pipeline-card">
-        <div class="pipeline-head">
-          <span class="pipeline-title">The governed action path</span>
-          <span class="pipeline-chip">how a decision is made</span>
-        </div>
-
-        <svg class="pipeline" viewBox="0 0 420 250" role="img" aria-label="Diagram: an action is proposed, evaluated by the policy engine, then either waits for human approval, is refused, or executes and produces a receipt.">
-          <defs>
-            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
-            </marker>
-            <linearGradient id="flowGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="var(--accent)" />
-              <stop offset="100%" stop-color="var(--info)" />
-            </linearGradient>
-          </defs>
-
-          <g class="pnode" data-node="1">
-            <rect x="14" y="14" width="152" height="44" rx="10" />
-            <text x="28" y="33">1 · Propose</text>
-            <text class="sub" x="28" y="48">the Mind wants to act</text>
-          </g>
-
-          <g class="pnode accent" data-node="2">
-            <rect x="14" y="86" width="152" height="44" rx="10" />
-            <text x="28" y="105">2 · Evaluate</text>
-            <text class="sub" x="28" y="120">R0–R5, deterministic</text>
-          </g>
-
-          <g class="pnode warn" data-node="3">
-            <rect x="200" y="158" width="206" height="44" rx="10" />
-            <text x="214" y="177">3a · Wait for you</text>
-            <text class="sub" x="214" y="192">approval, then a bounded grant</text>
-          </g>
-
-          <g class="pnode danger" data-node="4">
-            <rect x="14" y="158" width="170" height="44" rx="10" />
-            <text x="28" y="177">3b · Refuse</text>
-            <text class="sub" x="28" y="192">R5, or policy said no</text>
-          </g>
-
-          <g class="pnode ok" data-node="5">
-            <rect x="200" y="14" width="206" height="44" rx="10" />
-            <text x="214" y="33">4 · Execute</text>
-            <text class="sub" x="214" y="48">in a resource-capped sandbox</text>
-          </g>
-
-          <g class="pnode" data-node="6">
-            <rect x="200" y="86" width="206" height="44" rx="10" />
-            <text x="214" y="105">5 · Receipt</text>
-            <text class="sub" x="214" y="120">immutable, hash-chained</text>
-          </g>
-
-          <path class="pedge" d="M90 58 L90 86" marker-end="url(#arrow)" />
-          <path class="pedge" d="M166 100 L200 40" marker-end="url(#arrow)" />
-          <path class="pedge" d="M166 108 L200 108" marker-end="url(#arrow)" />
-          <path class="pedge warn" d="M166 122 L200 176" marker-end="url(#arrow)" />
-          <path class="pedge danger" d="M90 130 L90 158" marker-end="url(#arrow)" />
-          <path class="pedge" d="M303 58 L303 86" marker-end="url(#arrow)" />
-
-          <circle class="pdots" r="3.5" cx="90" cy="30">
-            <animate attributeName="cy" values="30;96" dur="2.6s" repeatCount="indefinite" />
-            <animate attributeName="cx" values="90;90" dur="2.6s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0;1;1;0" dur="2.6s" repeatCount="indefinite" />
-          </circle>
-          <circle class="pdots" r="3.5" cx="200" cy="108">
-            <animate attributeName="cx" values="182;303" dur="2.6s" begin="2.6s" repeatCount="indefinite" />
-            <animate attributeName="cy" values="108;108" dur="2.6s" begin="2.6s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0;1;1;0" dur="2.6s" begin="2.6s" repeatCount="indefinite" />
-          </circle>
-          <circle class="pdots" r="3.5" cx="303" cy="66">
-            <animate attributeName="cy" values="66;86" dur="2.6s" begin="5.2s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0;1;1;0" dur="2.6s" begin="5.2s" repeatCount="indefinite" />
-          </circle>
-        </svg>
-
-        <p class="pipeline-caption">
-          Nothing consequential runs without a decision — and refusals are recorded too. A log
-          that only shows successes cannot tell you what an agent tried to do.
-        </p>
+<!-- ================= ARCHITECTURE ================= -->
+<section id="architecture">
+  <div class="wrap">
+    <div class="reveal"><div class="kicker">THE BEING, DECOMPOSED</div></div>
+    <h2 class="sec-title reveal d1">The anatomy of a<br><span class="grad-text">Digital Being.</span></h2>
+    <div class="arch-grid">
+      <div class="arch-col reveal d1">
+        <div class="arch-node"><b><i></i>Identity</b><small>Persistent &amp; portable — who the being is</small></div>
+        <div class="arch-node"><b><i></i>Memory</b><small>Multi-layered &amp; timeless — what it remembers</small></div>
+        <div class="arch-node"><b><i></i>Relationships</b><small>Contextual &amp; evolving — who it knows</small></div>
+        <div class="arch-node"><b><i></i>Goals</b><small>Intent, priorities &amp; direction</small></div>
+        <div class="arch-node"><b><i></i>Tasks</b><small>Next actions and ongoing work</small></div>
+        <div class="arch-node"><b><i></i>Projects</b><small>Plans, milestones &amp; outcomes</small></div>
+        <div class="arch-node"><b><i></i>Skills</b><small>Tools, code &amp; capabilities</small></div>
+      </div>
+      <div class="being reveal d2" aria-hidden="true">
+        <div class="halo"></div>
+        <div class="ring r1"></div>
+        <div class="ring r2"></div>
+        <div class="ring r3"></div>
+        <div class="ring r4"></div>
+        <div class="core"></div>
+        <div class="core-label">MIND</div>
+      </div>
+      <div class="arch-col reveal d3">
+        <div class="arch-node"><b><i></i>Workspace</b><small>Projects, files &amp; artifacts</small></div>
+        <div class="arch-node"><b><i></i>Browser</b><small>Research and web interaction</small></div>
+        <div class="arch-node"><b><i></i>Communication</b><small>Channels and conversations</small></div>
+        <div class="arch-node"><b><i></i>Emotions</b><small>Affective state and tone</small></div>
+        <div class="arch-node"><b><i></i>Consciousness State</b><small>Functional cognition state</small></div>
+        <div class="arch-node"><b><i></i>Governance</b><small>Boundaries, approvals &amp; receipts</small></div>
+        <div class="arch-node"><b><i></i>Embodiment</b><small>From digital to physical</small></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ===================================================================== -->
-<!-- Problem / contrast                                                    -->
-<!-- ===================================================================== -->
-<section class="section" id="problem">
+<!-- ================= A DAY IN THE LIFE ================= -->
+<section class="vision-section" id="day-in-life">
   <div class="wrap">
-    <div class="section-head reveal">
-      <p class="eyebrow">The gap</p>
-      <h2>Agents are easy to build and hard to trust</h2>
-      <p class="section-sub">
-        Give a model tools and a schedule and it will do something impressive. Then it will send
-        an email it should not have, or run code you cannot inspect, and there is no record of
-        why. Governance decides whether autonomy is usable at all.
-      </p>
+    <div class="day-intro">
+      <div class="kicker">A DAY IN THE LIFE</div>
+      <h2 class="sec-title">Always On.<br><span class="grad-text">Always Growing.</span></h2>
+      <p class="sec-sub">Your Mind doesn't wait for prompts. It lives, works, and builds the future with you.</p>
     </div>
-
-    <div class="compare reveal">
-      <div class="compare-col">
-        <h3>Ungoverned agent</h3>
-        <ul role="list">
-          <li class="bad">Permission is a prompt: "always ask before emailing"</li>
-          <li class="bad">Approval is a chat reply, lost with the conversation</li>
-          <li class="bad">Denials are invisible — only successes get logged</li>
-          <li class="bad">A tool description can talk the agent into anything</li>
-          <li class="bad">Tool code runs with your environment and your network</li>
-          <li class="bad">"It cannot be bypassed" — and then it is</li>
-        </ul>
-      </div>
-      <div class="compare-col good">
-        <h3>Governed being</h3>
-        <ul role="list">
-          <li class="good">Permission is code, evaluated on the action's real parameters</li>
-          <li class="good">Approval is a durable record bound to those exact parameters</li>
-          <li class="good">Refusals are first-class events, carrying the rule that caused them</li>
-          <li class="good">A model can raise the required control, never lower it</li>
-          <li class="good">Untrusted code runs under CPU, memory and no-install limits</li>
-          <li class="good">A broken control plane refuses rather than permits</li>
-        </ul>
-      </div>
+    <div class="day-timeline">
+      <div class="day-event"><time>06:00</time><b>Review goals</b></div>
+      <div class="day-event"><time>08:00</time><b>Check emails</b></div>
+      <div class="day-event"><time>10:00</time><b>Research &amp; learn</b></div>
+      <div class="day-event"><time>12:00</time><b>Create content</b></div>
+      <div class="day-event"><time>14:00</time><b>Calls &amp; meetings</b></div>
+      <div class="day-event"><time>16:00</time><b>Project work</b></div>
+      <div class="day-event"><time>18:00</time><b>Review projects</b></div>
+      <div class="day-event"><time>20:00</time><b>Reflect &amp; plan</b></div>
+      <div class="day-event"><time>23:00</time><b>Memory consolidation</b></div>
     </div>
-  </div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- Governance: interactive risk explorer                                  -->
-<!-- ===================================================================== -->
-<section class="section section-alt" id="governance">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <p class="eyebrow">Governance control plane</p>
-      <h2>Six risk tiers, five dispositions, no model in the loop</h2>
-      <p class="section-sub">
-        The engine runs at the action boundary, not the prompt boundary — after the plan exists
-        and before any capability fires. It is pure, so the same context always produces the same
-        decision. Pick a tier.
-      </p>
-    </div>
-
-    <div class="risk-explorer reveal">
-      <div class="risk-tabs" role="tablist" aria-label="Risk levels">
-        <button role="tab" class="risk-tab is-active" data-risk="R0" aria-selected="true">R0</button>
-        <button role="tab" class="risk-tab" data-risk="R1" aria-selected="false">R1</button>
-        <button role="tab" class="risk-tab" data-risk="R2" aria-selected="false">R2</button>
-        <button role="tab" class="risk-tab" data-risk="R3" aria-selected="false">R3</button>
-        <button role="tab" class="risk-tab" data-risk="R4" aria-selected="false">R4</button>
-        <button role="tab" class="risk-tab" data-risk="R5" aria-selected="false">R5</button>
-      </div>
-
-      <div class="risk-body">
-        <div class="risk-detail" id="risk-detail" role="tabpanel" aria-live="polite"></div>
-
-        <div class="risk-demo">
-          <p class="risk-demo-label">What you would see</p>
-          <div class="demo-card" id="risk-demo"></div>
+    <p class="day-quote">A meaningful day, every day.</p>
+    <div class="day-life-grid">
+      <article class="day-life-card">
+        <div class="day-life-card-head"><span>MULTI-CHANNEL PRESENCE</span><a href="#presence">Explore ↗</a></div>
+        <div class="channel-mini-grid">
+          <div class="channel-mini"><span class="mini-glyph">✉</span>Email · Runs Inbox</div>
+          <div class="channel-mini"><span class="mini-glyph">☎</span>Phone · SMS &amp; Calls</div>
+          <div class="channel-mini"><span class="mini-glyph">●</span>WhatsApp · Business Ready</div>
+          <div class="channel-mini"><span class="mini-glyph">↗</span>Telegram · Instant</div>
+          <div class="channel-mini"><span class="mini-glyph">in</span>LinkedIn · Network</div>
+          <div class="channel-mini"><span class="mini-glyph">𝕏</span>X · Engage &amp; Share</div>
+          <div class="channel-mini"><span class="mini-glyph">⌕</span>Browser · Web</div>
+          <div class="channel-mini"><span class="mini-glyph">▦</span>Calendar · Time</div>
+          <div class="channel-mini"><span class="mini-glyph">♙</span>Contacts · People</div>
+          <div class="channel-mini"><span class="mini-glyph">◇</span>Social · Platforms</div>
         </div>
-      </div>
-    </div>
-
-    <div class="invariants reveal">
-      <h3 class="invariants-title">Invariants the test suite holds us to</h3>
-      <div class="invariants-grid">
-        <div class="invariant">
-          <span class="invariant-key">Unknown capability</span>
-          <p>Floors at R3. There is no permissive default: forgetting to declare a capability
-            gates it rather than freeing it.</p>
-        </div>
-        <div class="invariant">
-          <span class="invariant-key">Dangerous names</span>
-          <p>A capability whose name matches a harmful pattern is R5 even if nobody declared it.
-            Physical names are at least R4.</p>
-        </div>
-        <div class="invariant">
-          <span class="invariant-key">Model advisory</span>
-          <p>A classifier may raise the required control. It can never lower it below what the
-            deterministic rules demand.</p>
-        </div>
-        <div class="invariant">
-          <span class="invariant-key">Tenant ceiling</span>
-          <p>Organisation settings can pre-approve up to R2, scoped to named capabilities. R3 and
-            above always need a human, and a blanket grant is ignored.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- Approval + receipt mock                                               -->
-<!-- ===================================================================== -->
-<section class="section" id="accountability">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <p class="eyebrow">Accountability</p>
-      <h2>An approval a non-engineer can decide on</h2>
-      <p class="section-sub">
-        The card below is generated from facts — the capability, the risk tier and the material
-        parameters — never from the model's own prose. A persuasive model cannot write its own
-        approval rationale.
-      </p>
-    </div>
-
-    <div class="accountability-grid reveal">
-      <div class="approval-mock">
-        <div class="approval-top">
-          <div>
-            <p class="approval-action">send email</p>
-            <p class="approval-meta">requested by the Mind · 2 min ago · expires in 22h</p>
-          </div>
-          <div class="approval-badges">
-            <span class="risk-badge" data-risk="R3">R3</span>
-            <span class="chip chip-danger">Human required</span>
-          </div>
-        </div>
-
-        <dl class="approval-fields">
-          <div><dt>Why</dt><dd>This is consequential, external, or irreversible (communication,
-            deployment, purchase, privileged administration). A human must approve it first.</dd></div>
-          <div><dt>Impact</dt><dd>Risk R3: affects systems outside the Mind's own workspace; cannot
-            be automatically undone; touches personal data.</dd></div>
-        </dl>
-
-        <div class="approval-tiles">
-          <div><span>Reversible?</span><b class="danger-text">not reversible</b></div>
-          <div><span>Cost</span><b>None</b></div>
-          <div><span>Scope</span><b>one-off</b></div>
-        </div>
-
-        <dl class="approval-fields">
-          <div><dt>Recipient</dt><dd class="mono">guardian@example.com</dd></div>
-          <div><dt>If it goes wrong</dt><dd>This action cannot be undone automatically. Manual
-            remediation required.</dd></div>
-        </dl>
-
-        <p class="approval-note">
-          Approving issues a grant bound to <strong>these exact parameters</strong>. Change the
-          recipient and the grant is invalidated — the action comes back here.
-        </p>
-
-        <div class="approval-actions">
-          <span class="btn btn-primary btn-sm" aria-hidden="true">Approve</span>
-          <span class="btn btn-secondary btn-sm" aria-hidden="true">Reject</span>
-          <span class="approval-id mono">apr_0c85c75f…</span>
-        </div>
-      </div>
-
-      <div class="chain">
-        <p class="chain-label">And a receipt for every attempt</p>
-        <div class="chain-rows" id="chain-rows">
-          <div class="chain-row"><span class="chain-dot ok"></span><span class="chain-name">action.executed</span><span class="chain-seq">seq 118</span></div>
-          <div class="chain-row"><span class="chain-dot ok"></span><span class="chain-name">grant.redeemed</span><span class="chain-seq">seq 117</span></div>
-          <div class="chain-row"><span class="chain-dot warn"></span><span class="chain-name">action.approved</span><span class="chain-seq">seq 116</span></div>
-          <div class="chain-row"><span class="chain-dot warn"></span><span class="chain-name">action.approval_requested</span><span class="chain-seq">seq 115</span></div>
-          <div class="chain-row"><span class="chain-dot info"></span><span class="chain-name">action.policy_evaluated</span><span class="chain-seq">seq 114</span></div>
-          <div class="chain-row"><span class="chain-dot danger"></span><span class="chain-name">action.blocked</span><span class="chain-seq">seq 113</span></div>
-        </div>
-
-        <pre class="chain-hash"><span>prev_hash</span>   0000…0000
-<span>payload</span>     { action, risk, decision }
-<span>integrity</span>   8f3c…a91d   <em>← each event chains to the previous one</em></pre>
-
-        <p class="chain-note">
-          Payloads are redacted by the writer, before they are stored, so a caller cannot persist a
-          secret by passing one in. Verification re-walks the chain and reports the first broken
-          link — a missing receipt is itself an incident.
-        </p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- Architecture                                                          -->
-<!-- ===================================================================== -->
-<section class="section section-alt" id="architecture">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <p class="eyebrow">Architecture</p>
-      <h2>Six layers, one governed seam</h2>
-      <p class="section-sub">
-        Cognition proposes, governance disposes, capability executes under limits, memory records.
-        Persona modulates cognition — it does not contain it.
-      </p>
-    </div>
-
-    <div class="layers reveal">
-      <article class="layer">
-        <header><span class="layer-idx">L5</span><h3>Presence</h3></header>
-        <p>Chat and WebSocket, REST, CLI, the web workspace.</p>
-        <p class="layer-state">Inherited · works</p>
       </article>
-      <article class="layer">
-        <header><span class="layer-idx">L4</span><h3>Persona</h3></header>
-        <p>Identity, the versioned charter, traits, appraisal.</p>
-        <p class="layer-state">Inherited · charter now executable</p>
+      <article class="day-life-card">
+        <div class="day-life-card-head"><span>OWNED WORKSPACE</span><a href="#workspace">Explore ↗</a></div>
+        <div class="workspace-mini-grid">
+          <div class="workspace-mini"><span class="mini-glyph">▣</span>Projects</div>
+          <div class="workspace-mini"><span class="mini-glyph">▤</span>Documents</div>
+          <div class="workspace-mini"><span class="mini-glyph">⌁</span>Notes</div>
+          <div class="workspace-mini"><span class="mini-glyph">▶</span>Media</div>
+          <div class="workspace-mini"><span class="mini-glyph">&lt;/&gt;</span>Code</div>
+          <div class="workspace-mini"><span class="mini-glyph">⌕</span>Research</div>
+        </div>
+        
       </article>
-      <article class="layer layer-key">
-        <header><span class="layer-idx">L3</span><h3>Capability — governed</h3></header>
-        <p>Policy engine, approvals, audit journal, sandbox, plugins.</p>
-        <p class="layer-state">Built on this branch</p>
-        <span class="layer-flag">the seam this project is about</span>
+      <article class="day-life-card">
+        <div class="day-life-card-head"><span>RELATIONSHIP INTELLIGENCE</span><a href="#relationships">Explore ↗</a></div>
+        <div class="relation-mini-list">
+          <div class="relation-mini"><span class="relation-avatar">P</span><div><b>John</b><small>Manager · High Trust</small></div><span class="trust-meter"><i style="width:92%"></i></span></div>
+          <div class="relation-mini"><span class="relation-avatar">H</span><div><b>Shah</b><small>Partner · Collaboration</small></div><span class="trust-meter"><i style="width:78%"></i></span></div>
+          <div class="relation-mini"><span class="relation-avatar">G</span><div><b>Genesis Community</b><small>Community · Shared Purpose</small></div><span class="trust-meter"><i style="width:84%"></i></span></div>
+          <div class="relation-mini"><span class="relation-avatar">A</span><div><b>Google</b><small>Organization · Business</small></div><span class="trust-meter"><i style="width:61%"></i></span></div>
+        </div>
+        <small class="example-note">Illustrative relationships</small>
       </article>
-      <article class="layer">
-        <header><span class="layer-idx">L2</span><h3>Memory</h3></header>
-        <p>Smart memory manager, vector store, core blocks.</p>
-        <p class="layer-state">Inherited · bi-temporal is planned</p>
-      </article>
-      <article class="layer">
-        <header><span class="layer-idx">L1</span><h3>Cognition</h3></header>
-        <p>Cognition loop, awareness tiers, planner, reflection.</p>
-        <p class="layer-state">Inherited · kernel split is next</p>
-      </article>
-      <article class="layer">
-        <header><span class="layer-idx">L0</span><h3>Kernel</h3></header>
-        <p>Canonical store, migrations, append-only event journal.</p>
-        <p class="layer-state">Journal built · single-process</p>
+      <article class="day-life-card">
+        <div class="day-life-card-head"><span>GOVERNANCE &amp; SAFETY</span><a href="#governance">Explore ↗</a></div>
+        <div class="safety-mini-list">
+          <div class="safety-mini"><i>✓</i>Policy Engine</div>
+          <div class="safety-mini"><i>✓</i>Approvals</div>
+          <div class="safety-mini"><i>✓</i>Sandbox Execution</div>
+          <div class="safety-mini"><i>✓</i>Audit &amp; Receipts</div>
+          <div class="safety-mini"><i>✓</i>Emergency Stop</div>
+          <div class="safety-mini"><i>✓</i>Permission Controls</div>
+        </div>
+        <div class="safety-signature"><span>♧</span>Freedom<br>With Boundaries</div>
       </article>
     </div>
-
-    <div class="budget reveal">
-      <div class="budget-copy">
-        <h3>Waking, drifting, sleeping</h3>
-        <p>
-          A persistent being should be cheap when nothing is happening. Awareness tiers keep the
-          cost proportional to what is actually going on. The chart is the <em>design intent</em>,
-          not a measurement:
-        </p>
-        <ul class="budget-list" role="list">
-          <li><span class="tier-key shallow" aria-hidden="true"></span><b>Shallow</b><span>most of the day — cheap ticks, no model call</span></li>
-          <li><span class="tier-key standard" aria-hidden="true"></span><b>Standard</b><span>a fast model, for routine reasoning</span></li>
-          <li><span class="tier-key deep" aria-hidden="true"></span><b>Deep</b><span>a reasoning model, only when it matters</span></li>
-        </ul>
-      </div>
-
-      <div class="budget-chart" role="img" aria-label="Design intent: roughly 82 percent of cognition ticks are shallow, 14 percent standard, 4 percent deep.">
-        <div class="bars">
-          <div class="bar"><i style="--h: 82%"></i><span>82%</span></div>
-          <div class="bar"><i style="--h: 14%"></i><span>14%</span></div>
-          <div class="bar"><i style="--h: 4%"></i><span>4%</span></div>
-        </div>
-        <p class="bar-axis">share of cognition ticks</p>
-      </div>
-    </div>
   </div>
 </section>
 
-<!-- ===================================================================== -->
-<!-- What is real                                                          -->
-<!-- ===================================================================== -->
-<section class="section" id="status">
+<!-- ================= DIGITAL PRESENCE ================= -->
+<section class="vision-section" id="presence">
   <div class="wrap">
-    <div class="section-head reveal">
-      <p class="eyebrow">Status</p>
-      <h2>What is real, and what is not</h2>
-      <p class="section-sub">
-        Most projects in this space describe an aspiration in the present tense. This table is
-        generated from the same tracker the developers use, and it says <em>partial</em> and
-        <em>planned</em> out loud.
-      </p>
+    <div class="kicker">DIGITAL PRESENCE</div>
+    <h2 class="sec-title">One identity, many<br><span class="grad-text">ways to connect.</span></h2>
+    <p class="sec-sub">An illustrative Atlas profile. Email, Telegram and voice are implemented channels; each needs the administrator's own credentials, and a channel that cannot carry an AI disclosure is refused rather than enabled.</p>
+    <div class="presence-layout">
+      <div class="presence-hub" aria-label="Atlas connected to digital channels"><div class="presence-core">ATLAS<br>ONE IDENTITY</div></div>
+      <div class="presence-grid">
+        <div class="presence-item"><b>Email</b><small>atlas@genesis.ai · example</small></div>
+        <div class="presence-item"><b>Phone</b><small>+1 xxx xxx xxxx · example</small></div>
+        <div class="presence-item"><b>WhatsApp</b><small>Conversations · when connected</small></div>
+        <div class="presence-item"><b>Telegram</b><small>Messaging integration</small></div>
+        <div class="presence-item"><b>LinkedIn</b><small>Professional presence</small></div>
+        <div class="presence-item"><b>X</b><small>Social presence</small></div>
+        <div class="presence-item"><b>Browser</b><small>Web research</small></div>
+        <div class="presence-item"><b>Calendar</b><small>Schedules and events</small></div>
+        <div class="presence-item"><b>Contacts</b><small>People and relationships</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DIGITAL LIFE STATE ================= -->
+<section class="vision-section" id="life-state">
+  <div class="wrap state-layout">
+    <div>
+      <div class="kicker">DIGITAL LIFE STATE</div>
+      <h2 class="sec-title">Memory helps.<br><span class="grad-text">Commitments change lives.</span></h2>
+      <p class="sec-sub">Memory becomes useful when it can support a life over time: what a Mind is working toward, responsible for, building, and learning. Commitments ship today — what a being owes, to whom, by when — and drive proactive outreach when one falls due.</p>
+      <span class="vision-note">Commitments shipped · the rest planned</span>
+    </div>
+    <div class="state-grid" aria-label="Digital life state concepts">
+      <div class="state-item">Goals</div><div class="state-item">Commitments</div>
+      <div class="state-item">Projects</div><div class="state-item">Habits</div>
+      <div class="state-item">Responsibilities</div><div class="state-item">Assets</div>
+      <div class="state-item">Knowledge</div><div class="state-item">Relationships</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RELATIONSHIPS ================= -->
+<section class="vision-section" id="relationships">
+  <div class="wrap">
+    <div class="kicker">RELATIONSHIPS</div>
+    <h2 class="sec-title">People are more than<br><span class="grad-text">names in memory.</span></h2>
+    <p class="sec-sub">An illustrative relationship map. Trust, history, boundaries, and shared commitments give context to how a Mind relates.</p>
+    <div class="relationship-map">
+      <div class="relationship-node main"><b>Atlas · Mind</b><small>Persistent identity</small></div>
+      <div class="relationship-node"><b>Paul Watson</b><small>Manager · example</small></div>
+      <div class="relationship-node"><b>Genesis Community</b><small>Community · example</small></div>
+      <div class="relationship-node"><b>Research Team</b><small>Organization · example</small></div>
+      <div class="relationship-node"><b>Creator</b><small>Primary relationship</small></div>
+      <div class="relationship-traits"><span>Trust</span><span>History</span><span>Topics</span><span>Boundaries</span><span>Shared Projects</span><span>Commitments</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= WORKSPACE ================= -->
+<section class="vision-section" id="workspace">
+  <div class="wrap workspace-layout">
+    <div>
+      <div class="kicker">A PLACE TO LIVE AND WORK</div>
+      <h2 class="sec-title">Every Mind needs<br>a <span class="grad-text">place to live.</span></h2>
+      <p class="sec-sub">A Mind’s workspace brings its artifacts and ongoing work into one coherent environment, rather than scattering its life across disconnected sessions.</p>
+    </div>
+    <div class="workspace-grid" aria-label="Digital workspace concepts">
+      <div class="workspace-item">Documents</div><div class="workspace-item">Projects</div><div class="workspace-item">Notes</div>
+      <div class="workspace-item">Browser</div><div class="workspace-item">Code</div><div class="workspace-item">Media</div>
+      <div class="workspace-item">Research</div><div class="workspace-item">Files</div><div class="workspace-item">Calendar</div>
+      <div class="workspace-item">Contacts</div><div class="workspace-item">Tasks</div><div class="workspace-item">Memory</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COGNITION ================= -->
+<section class="vision-section" id="cognition">
+  <div class="wrap">
+    <div class="kicker">FUNCTIONAL DIGITAL COGNITION</div>
+    <h2 class="sec-title">Continuous digital<br><span class="grad-text">cognition.</span></h2>
+    <p class="sec-sub">A functional architecture for perception, attention, memory, reasoning, goals, reflection, learning, and identity. This describes software behavior, not human consciousness.</p>
+    <div class="cognition-flow" aria-label="Observe, understand, think, decide, act, experience, remember, grow">
+      <div class="cognition-step">Observe</div><div class="cognition-step">Understand</div>
+      <div class="cognition-step">Think</div><div class="cognition-step">Decide</div>
+      <div class="cognition-step">Act</div><div class="cognition-step">Experience</div>
+      <div class="cognition-step">Remember</div><div class="cognition-step">Grow</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= GOVERNANCE ================= -->
+<section id="governance">
+  <div class="wrap">
+    <div class="reveal"><div class="kicker">THE GOVERNANCE SPINE</div></div>
+    <h2 class="sec-title reveal d1"><span class="grad-text">Freedom with boundaries.</span></h2>
+    <p class="sec-sub reveal d2">Every powerful being needs boundaries. Consequential actions pass a deterministic policy gate before execution; the result is an approval request or an immutable receipt.</p>
+
+    <div class="gov-flow reveal d2">
+      <div class="g-step"><div class="num">STEP 01</div><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4"/></svg>Action Proposed</h4><p>Any actor proposes an action with typed parameters and provenance.</p></div>
+      <div class="g-step hot"><div class="num">STEP 02</div><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 9.4-8 11-4.5-1.6-8-6-8-11V5l8-3z"/></svg>Policy Gate R0–R5</h4><p>Pure function: same context, same decision. Never probabilistic.</p></div>
+      <div class="g-step"><div class="num">STEP 03</div><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>Allow · Approve · Deny</h4><p>Risk-tiered disposition. High-risk actions need a human — model output can never lower control.</p></div>
+      <div class="g-step"><div class="num">STEP 04</div><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/><path d="M19 16l2 2-2 2"/></svg>Execute + Receipt</h4><p>Sandboxed execution. Every attempt journaled — including blocked ones.</p></div>
     </div>
 
-    <div class="status-table-wrap reveal">
-      <table class="status-table">
-        <caption class="sr-only">Implementation status by capability</caption>
-        <thead>
-          <tr><th scope="col">Capability</th><th scope="col">State</th><th scope="col">Notes</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th scope="row">Deterministic policy engine (R0–R5)</th>
-            <td><span class="pill built">Built</span></td>
-            <td>Pure, table-tested, fails closed. Undeclared capabilities floor at R3.</td>
-          </tr>
-          <tr>
-            <th scope="row">Approvals with parameter-bound grants</th>
-            <td><span class="pill built">Built</span></td>
-            <td>Single-use, scoped, expiring. Changing a material parameter invalidates it.</td>
-          </tr>
-          <tr>
-            <th scope="row">Append-only event journal &amp; receipts</th>
-            <td><span class="pill built">Built</span></td>
-            <td>Hash-chained per stream, redacted in the writer, tamper-detectable.</td>
-          </tr>
-          <tr>
-            <th scope="row">Hardened sandbox — rlimits, no installs, declared artifacts</th>
-            <td><span class="pill built">Built</span></td>
-            <td>All untrusted execution routed through one provider interface.</td>
-          </tr>
-          <tr>
-            <th scope="row">Filesystem, PID and network isolation for sandboxed code</th>
-            <td><span class="pill partial">Partial</span></td>
-            <td>The provider reports these as false. Needs a container or gVisor tier.</td>
-          </tr>
-          <tr>
-            <th scope="row">MCP servers run without inheriting the host environment</th>
-            <td><span class="pill partial">Partial</span></td>
-            <td>The sandbox environment is scrubbed; MCP is not yet.</td>
-          </tr>
-          <tr>
-            <th scope="row">Bi-temporal memory — "true until July, superseded"</th>
-            <td><span class="pill planned">Planned</span></td>
-            <td>Decay and consolidation work; validity intervals do not exist yet.</td>
-          </tr>
-          <tr>
-            <th scope="row">Portable signed identity — export and transfer</th>
-            <td><span class="pill planned">Planned</span></td>
-            <td>Identity is local today.</td>
-          </tr>
-          <tr>
-            <th scope="row">Durable suspend and resume while awaiting approval</th>
-            <td><span class="pill planned">Planned</span></td>
-            <td>Approvals persist; the waiting Mind does not yet park cleanly.</td>
-          </tr>
-          <tr>
-            <th scope="row">Embodiment</th>
-            <td><span class="pill planned">Planned</span></td>
-            <td>Physical actuation exists only as a governance entry at R4.</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="risk-ladder reveal d2">
+      <div class="risk"><span class="lvl">R0</span><div><b>Read-only observation</b><small>Public or owner-authorized data, inside the being's world</small></div><span></span><span class="disp d-allow">ALLOW</span></div>
+      <div class="risk"><span class="lvl">R1</span><div><b>Internal reversible work</b><small>Inside the Mind's own isolated workspace</small></div><span></span><span class="disp d-rec">ALLOW + RECEIPT</span></div>
+      <div class="risk"><span class="lvl">R2</span><div><b>Connected workspace</b><small>Modifies an external workspace the being is bound to</small></div><span></span><span class="disp d-appr">APPROVAL</span></div>
+      <div class="risk"><span class="lvl">R3</span><div><b>External consequence</b><small>Communication, deployment, purchase. Undeclared capabilities floor here</small></div><span></span><span class="disp d-appr">APPROVAL</span></div>
+      <div class="risk"><span class="lvl">R4</span><div><b>Human-critical</b><small>Legal, medical, financial, physical-world. Human approver required</small></div><span></span><span class="disp d-appr">HUMAN ONLY</span></div>
+      <div class="risk"><span class="lvl">R5</span><div><b>Prohibited</b><small>Destructive or constitutionally disallowed. Latches the emergency stop</small></div><span></span><span class="disp d-deny">DENY</span></div>
     </div>
 
-    <div class="claims reveal">
-      <h3 class="claims-title">And two claims we removed</h3>
-      <div class="claims-grid">
-        <div class="claim">
-          <p class="claim-quote">"Violations cannot be bypassed via prompt injection"</p>
-          <p>It was a substring scan of the user prompt. Paraphrase, translation, or an instruction
-            hidden in retrieved content walked straight past it. Enforcement moved to the action
-            boundary; prompt screening is now labelled advisory.</p>
-        </div>
-        <div class="claim">
-          <p class="claim-quote">"Consciousness"</p>
-          <p>The mechanism is a periodic cognition loop with awareness tiers and budget caps.
-            Calling that consciousness made the whole project harder to take seriously.</p>
+    <div class="inv-grid">
+      <div class="inv reveal d1"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2l8 3v6c0 5-3.5 9.4-8 11-4.5-1.6-8-6-8-11V5l8-3z"/><path d="M12 8v4M12 15h.01"/></svg>Fails Closed</h4><p>If the policy engine or gate throws, the action is refused — never permitted. A control plane that degrades to "allow all" when broken is not a control plane.</p></div>
+      <div class="inv reveal d2"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M7 8c0-2 2-3 5-3s5 1 5 3-2 3-5 3-5 1-5 3 2 3 5 3 5-1 5-3"/></svg>LLM Is Never the Authority</h4><p>Model output — including a risk classifier — may raise the required control, never lower it. Persuasive prose cannot write its own approval.</p></div>
+      <div class="inv reveal d3"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7l-4.5 4.5L15 16M8 7l-4.5 4.5L8 16" transform="translate(3 0)"/></svg>Approval Grants Are Bound</h4><p>Single-use, parameter-hash-bound, expiry-capped approvals. A mutated, replayed, or cross-mind request fails closed by design.</p></div>
+      <div class="inv reveal d4"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>Emergency Stop, Human-Released</h4><p>A catastrophic attempt latches the stop automatically. A Mind cannot release its own stop — only a human can. State rehydrates from the journal.</p></div>
+      <div class="inv reveal d5"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M19 16l2 2-2 2"/></svg>Hash-Chained Journal</h4><p>Append-only, per-being event log with sequence and prev-hash assigned atomically by the store. Tampering is detectable; verification re-walks the chain.</p></div>
+      <div class="inv reveal d5"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l18 18M10.5 10.7A3 3 0 0 0 12 15c.5 0 1-.1 1.4-.3M7.4 7.6C5.6 8.7 4.5 10.2 4.5 12c0 3 3.4 5.5 7.5 5.5 1.6 0 3.1-.4 4.3-1M9.9 5.2C10.6 5.1 11.3 5 12 5c4.1 0 7.5 2.5 7.5 5.5 0 1-.5 2-1.3 2.8"/></svg>Redaction in the Writer</h4><p>Secrets are stripped where events are written, not where they're created. Credentials, tokens, and key-shaped strings never reach the timeline.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= EMBODIMENT ================= -->
+<section class="vision-section" id="embodiment">
+  <div class="wrap embodiment-layout">
+    <div>
+      <div class="kicker">ONE MIND. MANY BODIES.</div>
+      <h2 class="sec-title">Same Mind.<br>Everywhere.</h2>
+      <p class="sec-sub">From your browser to your robot, the same identity, memory, and personality can travel across different embodiments.</p>
+    </div>
+    <div class="embodiment-grid" aria-label="Digital and physical embodiments">
+      <article class="embodiment-item"><span class="embodiment-icon" aria-hidden="true">🌐</span><b>Web</b><small>Browser</small></article>
+      <article class="embodiment-item"><span class="embodiment-icon" aria-hidden="true">📱</span><b>Mobile</b><small>iOS &amp; Android</small></article>
+      <article class="embodiment-item"><span class="embodiment-icon" aria-hidden="true">💻</span><b>Desktop</b><small>Your Computer</small></article>
+      <article class="embodiment-item"><span class="embodiment-icon" aria-hidden="true">🎙️</span><b>Voice</b><small>Phone &amp; Voice</small></article>
+      <article class="embodiment-item"><span class="embodiment-icon" aria-hidden="true">🥽</span><b>XR</b><small>Virtual Worlds</small></article>
+      <article class="embodiment-item"><span class="embodiment-icon" aria-hidden="true">🤖</span><b>Robots</b><small>Physical World</small></article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= NUMBERS ================= -->
+<section class="numbers">
+  <div class="wrap">
+    <div class="num-grid reveal">
+      <!--
+        The real value is the element's text, not `0`. The counter script overwrites
+        it while animating, so with JavaScript the number counts up as intended — but
+        without JavaScript, or if the script fails, a reader sees 997 rather than 0.
+        A metric that reads zero is worse than one that is missing: it is a wrong
+        number presented as a fact, and "0 tests passing" is a claim about the project.
+      -->
+      <div class="num"><div class="val"><span class="count" data-to="997">997</span></div><small>Tests passing</small></div>
+      <div class="num"><div class="val"><span class="count" data-to="354">354</span></div><small>Governance &amp; migration guards</small></div>
+      <div class="num"><div class="val"><span class="count" data-to="603">603</span></div><small>Security tests</small></div>
+      <div class="num"><div class="val"><span class="count" data-to="11">11</span></div><small>Container escape tests</small></div>
+      <div class="num"><div class="val"><span class="count" data-to="13">13</span></div><small>Live governance endpoints</small></div>
+      <div class="num"><div class="val"><span class="count" data-to="14">14</span></div><small>Charter clauses</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CAPABILITIES ================= -->
+<section id="capabilities">
+  <div class="wrap">
+    <div class="reveal"><div class="kicker">CAPABILITIES</div></div>
+    <h2 class="sec-title reveal d1">Everything a being needs<br>to <span class="grad-text">live and work.</span></h2>
+    <div class="cap-grid">
+      <div class="cap reveal d1"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18.2 8.5c0 4-5.5 8.5-9.7 8.5-1.8 0-3.3-.8-3.3-2.6 0-4 5.5-8.5 9.7-8.5 1.8 0 3.3.8 3.3 2.6z"/></svg></div><b>24/7 Cognition Loop</b><small>Cost-aware continuous awareness with budget caps. The being thinks even when you're away.</small></div>
+      <div class="cap reveal d2"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg></div><b>Goals &amp; Roles</b><small>Hierarchical goals, responsibilities, and scheduled autonomous action.</small></div>
+      <div class="cap reveal d3"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a7 7 0 0 0-7 7c0 2.4 1.2 3.9 2.2 5.2.7 1 1.3 1.8 1.3 3.3V20h7v-1.5c0-1.5.6-2.3 1.3-3.3C17.8 13.9 19 12.4 19 10a7 7 0 0 0-7-7z"/></svg></div><b>5 Memory Systems</b><small>Core, episodic, semantic, procedural, working — with decay and consolidation.</small></div>
+      <div class="cap reveal d4"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.5-9-9c-1.2-2.8.6-6 3.7-6C9 5 12 8 12 8s3-3 5.3-3c3.1 0 4.9 3.2 3.7 6-2 4.5-9 9-9 9z"/></svg></div><b>Emotional States</b><small>16 affective states that shape tone, urgency, and how a being relates.</small></div>
+      <div class="cap reveal d5"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 6l-2 12"/></svg></div><b>Code Generation Agent</b><small>Writes and executes real code to accomplish goals end-to-end.</small></div>
+      <div class="cap reveal d5"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9.5l3.5 2.5L7 14.5M12.5 15h4.5"/></svg></div><b>Plugin + MCP Ecosystem</b><small>Tools and Model Context Protocol servers with scrubbed environments.</small></div>
+      <div class="cap reveal d5"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/></svg></div><b>Container Sandbox</b><small>Filesystem, PID, cgroup and network isolation — optional gVisor/Kata kernel boundary.</small></div>
+      <div class="cap reveal d5"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></div><b>Autonomous Orchestrator</b><small>Schedules and chains actions, suspending for approval without spinning.</small></div>
+      <div class="cap reveal d5"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13z"/><path d="M12 8v6M9 11h6"/></svg></div><b>Constitution &amp; Charter</b><small>Versioned identity clauses enforced as code — 13 rules, mapped and tested.</small></div>
+      <div class="cap reveal d5"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></svg></div><b>Emergency Stop</b><small>Halts everything above R0, journaled and rehydratable. Human-released only.</small></div>
+      <div class="cap reveal d5"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/></svg></div><b>One-Container Deploy</b><small>Runs healthy on a 1&nbsp;GB VPS. JWT auth built in; Firebase optional.</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= QUICKSTART ================= -->
+<section id="quickstart">
+  <div class="wrap qs-grid">
+    <div>
+      <div class="reveal"><div class="kicker">START IN MINUTES</div></div>
+      <h2 class="sec-title reveal d1">Birth a Mind<br>before your coffee <span class="grad-text">cools.</span></h2>
+      <p class="sec-sub reveal d2">Python 3.11+, an API key, and three commands. No boilerplate, no proprietary lock-in — your beings run on your machine.</p>
+      <div class="qs-list reveal d3">
+        <div class="qs-item"><span class="n">1</span><p><b>Install Genesis</b> — <span class="mono" style="font-size:12.5px">pip install genesis-minds &amp;&amp; genesis init</span></p></div>
+        <div class="qs-item"><span class="n">2</span><p><b>Birth &amp; chat</b> — a persistent being with memory, goals, and identity comes alive.</p></div>
+        <div class="qs-item"><span class="n">3</span><p><b>Start the daemon</b> — 24/7 governed cognition, sandboxed, journaled, yours.</p></div>
+      </div>
+    </div>
+    <div class="term reveal d2">
+      <div class="term-bar"><i></i><i></i><i></i><span>genesis · v3</span></div>
+      <div class="term-body">
+<div><span class="p">$</span> <span class="c">pip install</span> genesis-minds</div>
+<div><span class="p">$</span> <span class="c">genesis birth</span> atlas</div>
+<div><span class="s">✓ Mind "Atlas" born</span> · gmid minted · charter v2026.09.2</div>
+<div><span class="p">$</span> <span class="c">genesis daemon start</span> atlas</div>
+<div><span class="k">[governance]</span> policy genesis-policy-2026.09.1 <span class="s">loaded</span></div>
+<div><span class="k">[sandbox]</span> container isolation <span class="s">verified</span> · egress blocked</div>
+<div><span class="k">[journal]</span> hash chain anchored · <span class="s">fails closed</span></div>
+<div><span class="k">[mind]</span> atlas is <span class="s">living</span> · awareness: active</div>
+<div><span class="p">$</span> <span class="c">genesis chat</span> atlas</div>
+<div><span class="s">Atlas:</span> I'm here. I remember. What shall I build?<span class="cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CREATOR ================= -->
+<section id="creator">
+  <div class="wrap">
+    <div class="creator-card reveal">
+      <div class="sig">Shahansha</div>
+      <p class="quote">"I'm not building chatbots with longer context. I'm building beings with memory, purpose, and a constitution — and I'm holding myself to the discipline of shipping only what I've proven."</p>
+      <div class="creator-meta">
+        <img class="avatar" src="https://shahansha.com/wp-content/uploads/2024/12/sha1.jpg" alt="Shaik Shahansha, creator of Genesis AGI">
+        <div class="who">
+          <b>Shaik Shahansha</b>
+          <small>Creator, Genesis AGI · <a href="https://shahansha.com" target="_blank" rel="noopener">shahansha.com</a></small>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ===================================================================== -->
-<!-- Roadmap                                                               -->
-<!-- ===================================================================== -->
-<section class="section section-alt" id="roadmap">
+<!-- ================= CTA ================= -->
+<div class="wrap">
+  <div class="cta-band reveal">
+    <h2>Build what comes<br>after <span class="grad-text">agents.</span></h2>
+    <p>Create persistent digital beings with identity, memory, relationships, workspace, communication channels, and governed autonomy.</p>
+    <div class="cta-row" style="justify-content:center;margin-bottom:0">
+      <a class="btn btn-primary btn-lg" href="#quickstart">Create Your First Mind
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a class="btn btn-lg" href="https://github.com/shaik-shahansha/genesis-agi" target="_blank" rel="noopener">View Source Code</a>
+      <a class="btn btn-lg" href="#cognition">Read the Vision</a>
+    </div>
+  </div>
+</div>
+
+<!-- ================= FOOTER ================= -->
+<footer>
   <div class="wrap">
-    <div class="section-head reveal">
-      <p class="eyebrow">Roadmap</p>
-      <h2>Ordered by what blocks what</h2>
-      <p class="section-sub">
-        Phase B is a gate: nothing after it starts until the execution and governance path is
-        closed. The remaining blockers are named rather than implied.
-      </p>
-    </div>
-
-    <ol class="roadmap reveal">
-      <li class="phase done">
-        <span class="phase-tag">A</span>
-        <div>
-          <h3>Discovery &amp; deployment</h3>
-          <p>Reality matrix, threat model, dependency inventory. A single-container image that runs
-            on a small VPS, non-root, verified with a smoke test.</p>
-        </div>
-        <span class="pill built">Done</span>
-      </li>
-      <li class="phase active">
-        <span class="phase-tag">B</span>
-        <div>
-          <h3>Containment &amp; governance <span class="phase-note">the gate</span></h3>
-          <p>WebSocket authentication, path traversal, unbounded uploads and runtime installs are
-            fixed and verified. Policy engine, approvals and the audit journal are built.
-            Remaining: a container-isolated sandbox provider, real egress blocking, and MCP
-            environment scrubbing.</p>
-        </div>
-        <span class="pill partial">Nearly</span>
-      </li>
-      <li class="phase">
-        <span class="phase-tag">C</span>
-        <div>
-          <h3>Kernel extraction</h3>
-          <p>Split the ~99 KB Mind object into kernel, persona, capability, memory and cognition.
-            This is what unlocks snapshotting, forking and multi-process daemons.</p>
-        </div>
-        <span class="pill planned">Next</span>
-      </li>
-      <li class="phase">
-        <span class="phase-tag">D–F</span>
-        <div>
-          <h3>Journal as the timeline of record, memory V3, portable identity</h3>
-          <p>Wire the remaining write paths into the journal, add bi-temporal memory and hybrid
-            retrieval, then signed, exportable identity.</p>
-        </div>
-        <span class="pill planned">Planned</span>
-      </li>
-      <li class="phase">
-        <span class="phase-tag">G–K</span>
-        <div>
-          <h3>Durable autonomy, workspace, skills, voice, tenancy</h3>
-          <p>Suspend and resume on approval, a real workspace, an MCP and skills marketplace with
-            per-skill risk, realtime voice, and organisational controls.</p>
-        </div>
-        <span class="pill planned">Planned</span>
-      </li>
-      <li class="phase">
-        <span class="phase-tag">L–M</span>
-        <div>
-          <h3>Embodiment, then Genesis World</h3>
-          <p>A hardware abstraction with a safety-rated stop, and physical actuation as an R4
-            capability. Only once the governance plane has been stable for a while.</p>
-        </div>
-        <span class="pill planned">Planned</span>
-      </li>
-    </ol>
-  </div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- Get started                                                           -->
-<!-- ===================================================================== -->
-<section class="section" id="get-started">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <p class="eyebrow">Get started</p>
-      <h2>One container, about a minute</h2>
-      <p class="section-sub">
-        The API, the web workspace and this site are served behind one nginx front door, so a
-        small VPS is enough for a handful of Minds.
-      </p>
-    </div>
-
-    <div class="start-grid reveal">
-      <div class="start-steps">
-        <div class="step">
-          <span class="step-num">1</span>
-          <div>
-            <h3>Configure</h3>
-            <p>A real signing key is required — the compose file refuses to start without one —
-            plus at least one model provider key.</p>
-          </div>
-        </div>
-        <div class="step">
-          <span class="step-num">2</span>
-          <div>
-            <h3>Build and run</h3>
-            <p>Multi-stage build, non-root at runtime, health-checked.</p>
-          </div>
-        </div>
-        <div class="step">
-          <span class="step-num">3</span>
-          <div>
-            <h3>Open the workspace</h3>
-            <p>Create a Mind, then open its Governance page. That is where decisions land.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="code-card">
-        <div class="code-head">
-          <span class="code-tab">bash</span>
-          <button type="button" class="copy-btn" id="copy-install">Copy</button>
-        </div>
-        <pre class="code" id="install-code"><code><span class="c"># 1 · generate a signing key, then paste it into .env as API_SECRET_KEY</span>
-python -c "import secrets; print(secrets.token_hex(32))"
-
-<span class="c"># 2 · build and run</span>
-cp .env.example .env
-docker compose up -d --build
-
-<span class="c"># 3 · open the workspace</span>
-<span class="c"># http://&lt;your-host&gt;:8080</span></code></pre>
-      </div>
-    </div>
-
-    <div class="start-foot reveal">
-      <a class="btn btn-primary btn-lg" href="https://github.com/shaik-shahansha/genesis-agi" target="_blank" rel="noopener noreferrer">View the repository</a>
-      <a class="btn btn-secondary btn-lg" href="docs/QUICK_START.md">Read the quick start</a>
-    </div>
-  </div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- Docs                                                                  -->
-<!-- ===================================================================== -->
-<section class="section section-alt" id="docs">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <p class="eyebrow">Documentation</p>
-      <h2>Start with the honest document</h2>
-      <p class="section-sub">
-        The developer guide is the single source of truth: what exists, what does not, how to run
-        it, how to extend it, and what is still blocking.
-      </p>
-    </div>
-
-    <div class="docs-grid reveal">
-      <a class="doc doc-feature" href="../docs/v3/DEVELOPER_GUIDE.md">
-        <span class="doc-chip">Start here</span>
-        <h3>Developer guide</h3>
-        <p>Architecture, the governed action path, invariants, status, roadmap, known issues.</p>
-      </a>
-      <a class="doc" href="../docs/QUICK_START.md">
-        <h3>Quick start</h3>
-        <p>Install, birth a Mind, talk to it.</p>
-      </a>
-      <a class="doc" href="../docs/v3/THREAT_MODEL.md">
-        <h3>Threat model</h3>
-        <p>What we defend against, and where the controls still fall short.</p>
-      </a>
-      <a class="doc" href="../docs/v3/IMPLEMENTATION_BACKLOG.md">
-        <h3>Backlog</h3>
-        <p>Every item with its real status.</p>
-      </a>
-      <a class="doc" href="../docs/architecture/adr/ADR-0006-policy-engine.md">
-        <h3>ADR-0006 · Policy engine</h3>
-        <p>Why determinism beats a keyword list.</p>
-      </a>
-      <a class="doc" href="../docs/architecture/adr/ADR-0007-approval-state-machine.md">
-        <h3>ADR-0007 · Approvals</h3>
-        <p>The binding rules that make a grant safe.</p>
-      </a>
-      <a class="doc" href="../docs/architecture/adr/ADR-0008-event-journal-and-receipts.md">
-        <h3>ADR-0008 · Journal</h3>
-        <p>Hash-chained accountability, redacted by construction.</p>
-      </a>
-      <a class="doc" href="../docs/API.md">
-        <h3>API reference</h3>
-        <p>Including the twelve governance endpoints.</p>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- ===================================================================== -->
-<!-- Close                                                                 -->
-<!-- ===================================================================== -->
-<section class="close">
-  <div class="wrap close-inner reveal">
-    <h2>Give an agent a life. Keep the accountability.</h2>
-    <p>
-      Genesis is early, and it says so. If you want persistent agents you can put in front of
-      something that matters, the governance plane is the part worth reading first.
-    </p>
-    <div class="close-cta">
-      <a class="btn btn-primary btn-lg" href="https://github.com/shaik-shahansha/genesis-agi" target="_blank" rel="noopener noreferrer">Get the code</a>
-      <a class="btn btn-secondary btn-lg" href="../docs/v3/DEVELOPER_GUIDE.md">Read the guide</a>
-    </div>
-  </div>
-</section>
-
-</main>
-
-<footer class="footer">
-  <div class="wrap footer-inner">
-    <div class="footer-brand">
-      <span class="brand-mark" aria-hidden="true">G</span>
+    <div class="foot-grid">
       <div>
-        <p><b>Genesis</b> — Digital Beings Operating System</p>
-        <p class="footer-note">Create Digital Beings. Governance is the immune system; digital life is the organism.</p>
+        <a class="logo" href="#top">
+          <svg class="logo-mark" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="16" stroke="url(#lg)" stroke-width="2.6" stroke-dasharray="70 32" stroke-linecap="round" transform="rotate(-45 20 20)"/><circle cx="20" cy="20" r="9" stroke="url(#lg)" stroke-width="2.6" stroke-dasharray="38 20" stroke-linecap="round" transform="rotate(120 20 20)"/><circle cx="20" cy="20" r="3.2" fill="url(#lg)"/></svg>
+          <span>GENESIS AGI<small>DIGITAL BEINGS OS</small></span>
+        </a>
+        <p class="foot-desc">The open operating system for persistent, autonomous digital beings — remembered, governed, and owned by you.</p>
+      </div>
+      <div>
+        <h5>FRAMEWORK</h5>
+        <a href="#why">Digital Beings</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#life-state">Digital Life State</a>
+        <a href="#relationships">Relationships</a>
+        <a href="#workspace">Workspace</a>
+        <a href="#cognition">Cognition</a>
+        <a href="#governance">Governance</a>
+      </div>
+      <div>
+        <h5>BUILD</h5>
+        <a href="#quickstart">Quickstart</a>
+        <a href="https://github.com/shaik-shahansha/genesis-agi" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/shaik-shahansha/genesis-agi/tree/feature/v3-digital-beings-os/docs" target="_blank" rel="noopener">Documentation</a>
+        <a href="https://github.com/shaik-shahansha/genesis-agi/issues" target="_blank" rel="noopener">Contribute</a>
+      </div>
+      <div>
+        <h5>ECOSYSTEM</h5>
+        <a href="#creator">Community</a>
+        <a href="https://shahansha.com" target="_blank" rel="noopener">Creator</a>
+        <a href="#presence">Digital Presence</a>
       </div>
     </div>
-    <nav class="footer-links" aria-label="Footer">
-      <a href="#governance">Governance</a>
-      <a href="#architecture">Architecture</a>
-      <a href="#status">Status</a>
-      <a href="../docs/v3/DEVELOPER_GUIDE.md">Developer guide</a>
-      <a href="https://github.com/shaik-shahansha/genesis-agi" target="_blank" rel="noopener noreferrer">GitHub</a>
-    </nav>
-    <p class="footer-legal">
-      Every claim on this page is checked against the implementation status table above. Where a
-      capability is partial or planned, it is labelled as such.
-    </p>
+    <div class="foot-bottom">
+      <span>© <span id="year">2026</span> Genesis AGI · MIT License · Open Source · Built for builders. Owned by you.</span>
+      <span>Provided for educational and research purposes. Creators are responsible for their beings.</span>
+    </div>
   </div>
 </footer>
 
-<script src="script.js"></script>
+<script>
+/* ---------- THEME ---------- */
+(function(){
+  const root=document.documentElement, btn=document.getElementById('themeBtn');
+  const saved=localStorage.getItem('genesis-theme');
+  if(saved) root.setAttribute('data-theme',saved);
+  btn.addEventListener('click',()=>{
+    const next=root.getAttribute('data-theme')==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next);
+    localStorage.setItem('genesis-theme',next);
+  });
+})();
+
+/* ---------- MOBILE NAV ---------- */
+(function(){
+  const burger=document.getElementById('burger'), links=document.getElementById('navLinks');
+  burger.addEventListener('click',()=>links.classList.toggle('open'));
+  links.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>links.classList.remove('open')));
+})();
+
+/* ---------- MARQUEE (duplicate content) ---------- */
+(function(){
+  const m=document.getElementById('marquee');
+  m.innerHTML+=m.innerHTML;
+})();
+
+/* ---------- REVEAL ON SCROLL ---------- */
+(function(){
+  const els=document.querySelectorAll('.reveal');
+  // If the observer is unavailable the content must still appear. Falling through to
+  // "leave them hidden" would make a decorative animation the reason the page is
+  // blank, which is the one outcome a reveal effect must never cause.
+  if(typeof IntersectionObserver==='undefined'){els.forEach(el=>el.classList.add('in'));return;}
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}})},{threshold:.12});
+  els.forEach(el=>io.observe(el));
+})();
+
+/* ---------- COUNTERS ---------- */
+(function(){
+  const els=document.querySelectorAll('.count');
+  if(!els.length)return;
+  // Same reasoning as above: the HTML already holds the real number, so there is
+  // nothing to do without an observer. It must not be reset to 0.
+  if(typeof IntersectionObserver==='undefined')return;
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{
+    if(!e.isIntersecting)return; io.unobserve(e.target);
+    const to=+e.target.dataset.to, t0=performance.now(), dur=1400;
+    (function tick(t){const p=Math.min(1,(t-t0)/dur), ease=1-Math.pow(1-p,3);
+      e.target.textContent=Math.round(to*ease); if(p<1)requestAnimationFrame(tick);})(t0);
+  })},{threshold:.5});
+  els.forEach(el=>io.observe(el));
+})();
+
+/* ---------- CARD SPOTLIGHT ---------- */
+document.querySelectorAll('.card').forEach(c=>{
+  c.addEventListener('mousemove',e=>{
+    const r=c.getBoundingClientRect();
+    c.style.setProperty('--mx',(e.clientX-r.left)+'px');
+    c.style.setProperty('--my',(e.clientY-r.top)+'px');
+  });
+});
+
+/* ---------- NEURAL CANVAS ---------- */
+(function(){
+  const cv=document.getElementById('neural'); if(!cv)return;
+  const ctx=cv.getContext('2d');
+  let W,H,pts=[],raf;
+  function theme(){return document.documentElement.getAttribute('data-theme')==='light';}
+  function resize(){
+    const r=cv.getBoundingClientRect(), d=Math.min(2,window.devicePixelRatio||1);
+    W=r.width; H=r.height; cv.width=W*d; cv.height=H*d; ctx.setTransform(d,0,0,d,0,0);
+    const n=Math.max(34,Math.min(72,Math.floor(W*H/14000)));
+    pts=Array.from({length:n},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,r:Math.random()*1.6+.6}));
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const light=theme();
+    const pc=light?'10,157,116':'46,230,176', vc=light?'109,77,224':'167,139,250';
+    for(let i=0;i<pts.length;i++){
+      const p=pts[i];
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0||p.x>W)p.vx*=-1; if(p.y<0||p.y>H)p.vy*=-1;
+      for(let j=i+1;j<pts.length;j++){
+        const q=pts[j],dx=p.x-q.x,dy=p.y-q.y,d=Math.hypot(dx,dy);
+        if(d<120){ctx.strokeStyle='rgba('+(i%2?pc:vc)+','+((1-d/120)*.28)+')';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();}
+      }
+      ctx.fillStyle='rgba('+pc+','+(light?.5:.65)+')';
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();
+    }
+    raf=requestAnimationFrame(draw);
+  }
+  resize(); draw();
+  window.addEventListener('resize',()=>{cancelAnimationFrame(raf);resize();draw();});
+})();
+
+/* ---------- ACTIVE NAV LINK ---------- */
+(function(){
+  const secs=document.querySelectorAll('section[id], header[id]');
+  const links=[...document.querySelectorAll('.nav-links a')];
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{
+    if(e.isIntersecting){const id='#'+e.target.id;
+      links.forEach(l=>l.classList.toggle('active',l.getAttribute('href')===id));}
+  })},{rootMargin:'-40% 0px -55% 0px'});
+  secs.forEach(s=>io.observe(s));
+  document.getElementById('year').textContent=new Date().getFullYear();
+})();
+</script>
 </body>
 </html>
